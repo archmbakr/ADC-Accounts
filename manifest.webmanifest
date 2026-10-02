@@ -26,5 +26,55 @@
    "type": "image/png",
    "purpose": "maskable"
   }
+ ],
+ "shortcuts": [
+  {
+   "name": "تسجيل مصروف",
+   "short_name": "مصروف",
+   "url": "./?go=exp",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  },
+  {
+   "name": "دفتر اليومية",
+   "short_name": "اليومية",
+   "url": "./?go=journal",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  },
+  {
+   "name": "العُهد",
+   "short_name": "العُهد",
+   "url": "./?go=custody",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  },
+  {
+   "name": "الحسابات البنكية",
+   "short_name": "البنوك",
+   "url": "./?go=banks",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  }
  ]
 }
