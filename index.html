@@ -1200,7 +1200,7 @@ function statusRender(){
 const PEND=OFF?'غير مرفوع':'بانتظار الرفع';
 function renderSites(){
   const all=bal();
-  let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regNames('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regNames('items').length}</span></button>${APP?appCustNavBtn():''}<button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
+  let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regMine('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regMine('items').length}</span></button>${APP?appCustNavBtn():''}<button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
   if(!OFF&&S.isManager)wantNames(S.sites.filter(s=>s._p).map(s=>s.byId));
   for(const s of S.sites){const b=bal(s.id);const owner=!OFF&&S.isManager&&s._p?(S.names[s.byId]||'مستخدم'):(OFF&&S.isManager&&s.offUser&&lc(s.offUser)!==lc(SEC.user&&SEC.user.name)?s.offUser:'');h+=`<button class="site-btn" data-site="${esc(s.id)}" aria-current="${S.sel===s.id}"><span class="n">${esc(s.name)}${owner?`<span class="owner-tag">${esc(owner)}</span>`:''}${s.pending?'<span class="pend">محلي</span>':''}</span><span class="t${recon(s.id).st==='short'?' neg':''}">${fmt(b.total)}</span></button>`}
   $('#sites').innerHTML=h;
@@ -2311,6 +2311,13 @@ function regNames(col){
   for(const e of S.exp){const v=(e[REG[col].field]||'').trim();if(v&&!set.has(v))set.set(v,false)}
   return [...set.entries()].map(([name,reg])=>({name,reg})).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
 }
+/* a regular user only sees the contractors/items that are on his own projects (or that he registered himself) */
+function regMine(col){
+  const list=regNames(col);if(S.isManager||OFF||!S.pfx)return list;
+  const f=REG[col].field,used=new Set(S.exp.map(e=>(e[f]||'').trim()).filter(Boolean));
+  const mine=new Set((S[REG[col].key]||[]).filter(r=>!r.hidden&&r.byId&&r.byId===S.uid).map(r=>r.name.trim()));
+  return list.filter(x=>used.has(x.name)||mine.has(x.name));
+}
 function regSelect(id,col,cls){
   const list=regNames(col),R=REG[col];
   return `<select id="${id}" ${cls?`class="${cls}"`:''}><option value="">اختر ${R.one==='بند'?'البند':'المقاول'}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}${canReg()?`<option value="__new">+ ${R.one} جديد…</option>`:''}</select>
@@ -2361,7 +2368,7 @@ function regStats(col,name){
 function renderRegister(col){
   const R=REG[col];
   if(S.stmt&&S.stmt.col===col)return renderStatement(col,S.stmt.name);
-  const list=regNames(col);
+  const list=regMine(col);
   const recs=new Map((S[R.key]||[]).filter(r=>!r.hidden).map(r=>[r.name.trim(),r]));
   const totalAll=list.reduce((a,x)=>a+regStats(col,x.name).total,0);
   $('#pane').innerHTML=`
@@ -2395,7 +2402,7 @@ function renderRegister(col){
       logChange('edit',col,upd,old);
       if(name!==old.name.trim()){for(const e of S.exp.filter(e=>(e[R.field]||'').trim()===old.name.trim())){const ne={...clean(e),[R.field]:name,updated:Date.now()};delete ne.id;queue('expenses',e.id,ne)}}
       S.regEdit=null;S.flash={text:'تم حفظ التعديل',until:Date.now()+6000};S.justSaved=true;render();return}
-    if(!addReg(col,data)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
+    if(!addReg(col,data)){m.className='msg err';m.textContent=regMine(col).some(x=>x.name===data.name.trim())?'هذا الاسم موجود بالفعل.':'هذا الاسم مسجّل بالفعل في القائمة العامة. اختره مباشرةً عند تسجيل المصروف، وسيظهر هنا بعد ذلك.';return}
     S.flash={text:'أُضيف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
   if(S.regFill&&S.regEdit){S.regFill=false;const r=(S[R.key]||[]).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc)}
   const qg=$('#qsGo');if(qg)qg.onclick=()=>{const v=$('#qsName').value;if(!v){$('#qsName').focus();return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
