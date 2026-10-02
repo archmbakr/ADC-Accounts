@@ -276,7 +276,7 @@ select.auto-flash{animation:autoFlash 1.2s ease-out}
 
 <script>
 /* ===================== installed app edition: Supabase backend ===================== */
-const APPCFG={url:'https://ifsupnuwtkyfyughcudi.supabase.co',key:'sb_publishable_a9bNBNCAi5C8Zds4OqH6zw_SsXyRkJz',vapid:'BKNaK9D7Sk2clJgKixBQMU91QNyezF2ISjV87OxsDIJ4JUalM5x_kgWxohsOBURijvqcVJmxgFU984ewAvxZ0FE'};
+const APPCFG={url:'https://ifsupnuwtkyfyughcudi.supabase.co',key:'sb_publishable_a9bNBNCAi5C8Zds4OqH6zw_SsXyRkJz',vapid:'BPUb7BqcmmftBrGx2_CFgm8S_vGFwFdrrfedfKEdhfqoiQezDKkOv-lx6j4roBJQvV1LFh7cI6xrVWGyjLHW91w'};
 const LS_ME='adc_app_me_v1';
 let SB=null,installEvt=null;
 const APPU={me:null,owner:false,approved:false,mode:'login',msg:'',info:'',email:'',offline:false,members:null,membersBusy:false,pwMsg:'',copyMsg:''};
@@ -571,7 +571,7 @@ async function appHasSes(){try{return !!(SB&&(await SB.auth.getSession()).data.s
 function sbErr(e){const c=String(e&&e.code||''),m=String(e&&e.message||'');
   if(c==='42501'||/row-level security|permission denied/i.test(m))return {code:'invalid_argument'};
   if(/JWT|token/i.test(m))return {code:'unauthenticated'};
-  return {code:'unavailable',message:m}}
+  return {code:'unavailable',message:(c?c+': ':'')+m}}
 async function appFetchCol(col,L){
   if(!(await appHasSes()))throw {code:'unavailable'};
   const out=new Map();
@@ -625,12 +625,12 @@ const APPDB={
   doc(path){
     return {
       async set(data){
-        if(!(await appHasSes()))throw {code:'unavailable'};
+        if(!(await appHasSes()))throw {code:'unavailable',message:'جلسة الدخول منتهية — اخرج وادخل مرة أخرى'};
         const {error}=await SB.from('docs').upsert({path,data},{onConflict:'path'});if(error)throw sbErr(error);
         const L=APPLIS.get(pColOf(path));if(L){L.rows.set(path,data);appSchedEmit(pColOf(path))}
       },
       async delete(){
-        if(!(await appHasSes()))throw {code:'unavailable'};
+        if(!(await appHasSes()))throw {code:'unavailable',message:'جلسة الدخول منتهية — اخرج وادخل مرة أخرى'};
         const {error}=await SB.from('docs').delete().eq('path',path);if(error)throw sbErr(error);
         const L=APPLIS.get(pColOf(path));if(L){L.rows.delete(path);appSchedEmit(pColOf(path))}
       },
@@ -956,6 +956,7 @@ async function flush(){
       try{const pf=p.pfx??S.pfx;if(p.pfx==null)p.pfx=pf;await withTimeout(S.db.doc(pf+p.col+'/'+p.id).set(p.data),12000)}
       catch(e){
         if(e&&e.code==='invalid_argument'){S.pending=S.pending.filter(x=>x!==p);savePending();showBanner('توجد عملية لم تُرفع لأن حسابك غير مسموح له بالتعديل في هذا المكان. التعديل في مواقع غيرك متاح للمستخدم الرئيسي فقط.');continue}
+        if(APP&&navigator.onLine&&e&&(e.message||e.code))showBanner('تعذّر رفع التعديلات حتى الآن ('+String(e.message||e.code).slice(0,160)+'). ستتم المحاولة تلقائيًا كل 30 ثانية.');
         break;
       }
     }
