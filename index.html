@@ -291,22 +291,22 @@ async function appInstall(){
 }
 function installHint(){
   if(isStandalone())return '';
-  if(installEvt)return `<button type="button" class="ghost" data-app="install">تثبيت الابلكيشن على الجهاز</button>`;
-  if(isIOS())return `<p class="lk-info">عشان تثبّته على الآيفون: افتح اللينك من Safari، دوس على زرار المشاركة، وبعدين «إضافة إلى الشاشة الرئيسية».</p>`;
+  if(installEvt)return `<button type="button" class="ghost" data-app="install">تثبيت التطبيق على الجهاز</button>`;
+  if(isIOS())return `<p class="lk-info">لتثبيته على الآيفون: افتح الرابط من Safari، واضغط على زر المشاركة، ثم «إضافة إلى الشاشة الرئيسية».</p>`;
   return '';
 }
 
 /* ---------- auth messages ---------- */
 function authErr(e){
   const m=String(e&&(e.message||e.error_description||e.msg)||'');
-  if(/invalid login credentials/i.test(m))return 'الإيميل أو الباسورد غلط.';
-  if(/email not confirmed/i.test(m))return 'لازم تأكد الإيميل الأول: افتح الرسالة اللي وصلتك على الإيميل ودوس على اللينك اللي فيها.';
-  if(/already registered|already exists/i.test(m))return 'الإيميل ده متسجّل قبل كده. ادخل بيه، ولو نسيت الباسورد دوس «نسيت الباسورد».';
-  if(/rate limit|too many|security purposes/i.test(m))return 'محاولات كتير في وقت قصير. استنى شوية وجرّب تاني.';
-  if(/password/i.test(m)&&/(least|short|weak|characters)/i.test(m))return 'الباسورد ضعيف. خليه ٨ حروف وأرقام على الأقل.';
-  if(/invalid.*email|email.*invalid/i.test(m))return 'الإيميل مكتوب غلط.';
-  if(/fetch|network|failed to|load failed/i.test(m)||!navigator.onLine)return 'مفيش اتصال بالنت. اتأكد من النت وجرّب تاني.';
-  return 'حصلت مشكلة: '+m;
+  if(/invalid login credentials/i.test(m))return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+  if(/email not confirmed/i.test(m))return 'يجب تأكيد البريد الإلكتروني أولًا: افتح الرسالة التي وصلتك على البريد الإلكتروني واضغط على الرابط الموجود فيها.';
+  if(/already registered|already exists/i.test(m))return 'هذا البريد الإلكتروني مسجّل من قبل. سجّل الدخول به، وإذا نسيت كلمة المرور اضغط «نسيت كلمة المرور».';
+  if(/rate limit|too many|security purposes/i.test(m))return 'محاولات كثيرة في وقت قصير. انتظر قليلًا وحاول مرة أخرى.';
+  if(/password/i.test(m)&&/(least|short|weak|characters)/i.test(m))return 'كلمة المرور ضعيفة. اجعلها ٨ حروف وأرقام على الأقل.';
+  if(/invalid.*email|email.*invalid/i.test(m))return 'البريد الإلكتروني مكتوب بشكل غير صحيح.';
+  if(/fetch|network|failed to|load failed/i.test(m)||!navigator.onLine)return 'لا يوجد اتصال بالإنترنت. تأكد من الاتصال وحاول مرة أخرى.';
+  return 'حدثت مشكلة: '+m;
 }
 const emailOk=v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -316,33 +316,37 @@ function appLockHTML(){
   const info=APPU.info?`<p class="lk-info">${esc(APPU.info)}</p>`:'';
   const em=esc(APPU.email||'');
   const pw=(id,lbl,ac)=>`<label for="${id}">${lbl}</label><input id="${id}" type="password" autocomplete="${ac}" dir="ltr">`;
-  const emailIn=`<label for="ap_email">الإيميل</label><input id="ap_email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" dir="ltr" value="${em}">`;
+  const emailIn=`<label for="ap_email">البريد الإلكتروني</label><input id="ap_email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" dir="ltr" value="${em}">`;
   const m=APPU.mode;let b='';
-  if(m==='nolib')b=`<h2>محتاج نت أول مرة</h2><p class="lk-sub">أول مرة تفتح الابلكيشن على الجهاز ده لازم يبقى في نت. اتأكد من النت وجرّب تاني.</p><button class="primary" type="button" data-app="reload">جرّب تاني</button>`;
-  else if(m==='signup')b=`<h2>حساب جديد</h2><p class="lk-sub">اكتب اسمك وإيميلك واختار باسورد. بعد ما تعمل الحساب، المدير لازم يوافق عليه.</p>
+  if(m==='nolib')b=`<h2>يحتاج إلى الإنترنت في أول مرة</h2><p class="lk-sub">عند فتح التطبيق لأول مرة على هذا الجهاز يجب الاتصال بالإنترنت. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</p><button class="primary" type="button" data-app="reload">حاول مرة أخرى</button>`;
+  else if(m==='signup')b=`<h2>حساب جديد</h2><p class="lk-sub">أدخل اسمك وبريدك الإلكتروني واختر كلمة مرور. بعد إنشاء الحساب، يجب أن يوافق عليه المدير.</p>
     <form id="apForm" class="lk-form" novalidate data-kind="signup">
       <label for="ap_name">الاسم</label><input id="ap_name" autocomplete="name" value="${esc(APPU.nameDraft||'')}">
-      ${emailIn}${pw('ap_pw','الباسورد (٨ على الأقل)','new-password')}${pw('ap_pw2','اكتب الباسورد تاني','new-password')}
-      <label class="chk sm"><input type="checkbox" id="ap_show"> إظهار الباسورد</label>
-      ${err}${info}<button class="primary" type="submit" id="apBtn">اعمل الحساب</button>
-      <button type="button" class="ghost" data-app="to-login">عندي حساب، عاوز أدخل</button></form>`;
-  else if(m==='forgot')b=`<h2>نسيت الباسورد</h2><p class="lk-sub">اكتب إيميلك، وهيوصلك لينك تغيّر منه الباسورد.</p>
+      ${emailIn}${pw('ap_pw','كلمة المرور (٨ على الأقل)','new-password')}${pw('ap_pw2','أعد كتابة كلمة المرور','new-password')}
+      <label class="chk sm"><input type="checkbox" id="ap_show"> إظهار كلمة المرور</label>
+      ${err}${info}<button class="primary" type="submit" id="apBtn">أنشئ الحساب</button>
+      <button type="button" class="ghost" data-app="to-login">لدي حساب، أريد تسجيل الدخول</button></form>`;
+  else if(m==='forgot')b=`<h2>نسيت كلمة المرور</h2><p class="lk-sub">أدخل بريدك الإلكتروني، وسيصلك رابط لتغيير كلمة المرور.</p>
     <form id="apForm" class="lk-form" novalidate data-kind="forgot">${emailIn}${err}${info}
-      <button class="primary" type="submit" id="apBtn">ابعت اللينك</button><button type="button" class="ghost" data-app="to-login">رجوع</button></form>`;
-  else if(m==='newpw')b=`<h2>باسورد جديد</h2><p class="lk-sub">اختار باسورد جديد لحسابك.</p>
-    <form id="apForm" class="lk-form" novalidate data-kind="newpw">${pw('ap_pw','الباسورد الجديد (٨ على الأقل)','new-password')}${pw('ap_pw2','اكتبه تاني','new-password')}
-      <label class="chk sm"><input type="checkbox" id="ap_show"> إظهار الباسورد</label>${err}${info}
-      <button class="primary" type="submit" id="apBtn">احفظ الباسورد</button></form>`;
-  else if(m==='checkmail')b=`<h2>أكّد الإيميل</h2><p class="lk-sub">بعتنا رسالة على <b dir="ltr">${em}</b>. افتحها ودوس على اللينك اللي فيها، وبعدين ارجع هنا وادخل.</p>${err}${info}
+      <button class="primary" type="submit" id="apBtn">أرسل الرابط</button><button type="button" class="ghost" data-app="to-login">رجوع</button></form>`;
+  else if(m==='newpw')b=`<h2>كلمة مرور جديدة</h2><p class="lk-sub">اختر كلمة مرور جديدة لحسابك.</p>
+    <form id="apForm" class="lk-form" novalidate data-kind="newpw">${pw('ap_pw','كلمة المرور الجديدة (٨ على الأقل)','new-password')}${pw('ap_pw2','أعد كتابته','new-password')}
+      <label class="chk sm"><input type="checkbox" id="ap_show"> إظهار كلمة المرور</label>${err}${info}
+      <button class="primary" type="submit" id="apBtn">احفظ كلمة المرور</button></form>`;
+  else if(m==='checkmail')b=`<h2>أكّد البريد الإلكتروني</h2><p class="lk-sub">أرسلنا رسالة إلى <b dir="ltr">${em}</b>. افتحها واضغط على الرابط الموجود فيها، ثم ارجع إلى هنا وسجّل الدخول.</p>${err}${info}
       <button class="primary" type="button" data-app="to-login">دخول</button>`;
-  else if(m==='wait')b=`<h2>مستني موافقة المدير</h2><p class="lk-sub">حسابك اتعمل باسم <b>${esc(APPU.me&&APPU.me.name||'')}</b> (<span dir="ltr">${esc(APPU.me&&APPU.me.email||'')}</span>). بلّغ المدير يوافق عليه من «الإعدادات»، وبعدين دوس «جرّب تاني».</p>${err}${info}
-      <button class="primary" type="button" data-app="recheck">جرّب تاني</button><button type="button" class="ghost" data-app="signout">خروج</button>`;
-  else b=`<h2>تسجيل الدخول</h2><p class="lk-sub">ادخل بالإيميل والباسورد بتوعك.</p>
-    <form id="apForm" class="lk-form" novalidate data-kind="login">${emailIn}${pw('ap_pw','الباسورد','current-password')}
-      <label class="chk sm"><input type="checkbox" id="ap_show"> إظهار الباسورد</label>${err}${info}
+  else if(m==='bio')b=`<h2>التطبيق مقفل</h2><p class="lk-sub">افتح بالبصمة${APPU.me&&APPU.me.name?' يا '+esc(APPU.me.name):''}.</p>${err}${info}
+      <button class="primary" type="button" data-app="bio-go" id="apBioBtn">افتح بالبصمة</button>
+      ${APPU.bioPw?`<form id="apForm" class="lk-form" novalidate data-kind="unlock"><label for="ap_pw">كلمة المرور</label><input id="ap_pw" type="password" autocomplete="current-password" dir="ltr"><button type="submit" id="apBtn">افتح بكلمة المرور</button></form>`:'<button type="button" class="ghost" data-app="bio-pw">سجّل الدخول بكلمة المرور بدلًا من ذلك</button>'}
+      <button type="button" class="ghost" data-app="signout">تسجيل الخروج</button>`;
+  else if(m==='wait')b=`<h2>بانتظار موافقة المدير</h2><p class="lk-sub">تم إنشاء حسابك باسم <b>${esc(APPU.me&&APPU.me.name||'')}</b> (<span dir="ltr">${esc(APPU.me&&APPU.me.email||'')}</span>). اطلب من المدير الموافقة عليه من «الإعدادات»، ثم اضغط «حاول مرة أخرى».</p>${err}${info}
+      <button class="primary" type="button" data-app="recheck">حاول مرة أخرى</button><button type="button" class="ghost" data-app="signout">خروج</button>`;
+  else b=`<h2>تسجيل الدخول</h2><p class="lk-sub">سجّل الدخول بالبريد الإلكتروني وكلمة المرور الخاصة بك.</p>
+    <form id="apForm" class="lk-form" novalidate data-kind="login">${emailIn}${pw('ap_pw','كلمة المرور','current-password')}
+      <label class="chk sm"><input type="checkbox" id="ap_show"> إظهار كلمة المرور</label>${err}${info}
       <button class="primary" type="submit" id="apBtn">دخول</button>
-      <button type="button" class="ghost" data-app="to-signup">أول مرة؟ اعمل حساب جديد</button>
-      <button type="button" class="ghost" data-app="to-forgot">نسيت الباسورد</button></form>`;
+      <button type="button" class="ghost" data-app="to-signup">أول مرة؟ أنشئ حسابًا جديدًا</button>
+      <button type="button" class="ghost" data-app="to-forgot">نسيت كلمة المرور</button></form>`;
   const lg=document.querySelector('.logo img');
   return `<div class="lk-box">${lg?`<img class="lk-logo" src="${lg.src}" alt="AFAQ Development Construction">`:''}${b}${installHint()}</div>`;
 }
@@ -378,7 +382,7 @@ async function appTryEnter(session){
 async function appBoot(){
   const cached=appLs(LS_ME);
   if(!sbClient()){
-    if(cached&&cached.approved){APPU.me=cached;APPU.owner=!!cached.owner;APPU.approved=true;APPU.offline=true;showBanner('مفيش نت. بتشتغل على آخر نسخة محفوظة على الجهاز، وأي حاجة تسجلها هتترفع لما تفتح الابلكيشن والنت شغال.');return}
+    if(cached&&cached.approved){APPU.me=cached;APPU.owner=!!cached.owner;APPU.approved=true;APPU.offline=true;await appBioGate();showBanner('لا يوجد اتصال بالإنترنت. أنت تعمل على آخر نسخة محفوظة على الجهاز، وأي شيء تسجّله سيُرفع عند فتح التطبيق مع توفر الإنترنت.');return}
     APPU.mode='nolib';appShow();return new Promise(()=>{});
   }
   SB.auth.onAuthStateChange((ev,ses)=>{
@@ -388,7 +392,8 @@ async function appBoot(){
   let ses=null;
   try{ses=(await SB.auth.getSession()).data.session}catch(e){}
   const recovery=/type=recovery/.test(location.hash+location.search);
-  if(!ses&&cached&&cached.approved&&!navigator.onLine){APPU.me=cached;APPU.owner=!!cached.owner;APPU.approved=true;APPU.offline=true;return}
+  if(!ses&&cached&&cached.approved&&!navigator.onLine){APPU.me=cached;APPU.owner=!!cached.owner;APPU.approved=true;APPU.offline=true;await appBioGate();return}
+  if(ses&&!recovery&&cached&&cached.id===ses.user.id){APPU.me=cached;await appBioGate()}
   const wait=new Promise(res=>{appEnter=res});
   if(ses&&!recovery){if(await appTryEnter(ses))return}
   else{APPU.mode=recovery?'newpw':'login';APPU.email=(cached&&cached.email)||'';appShow()}
@@ -396,14 +401,14 @@ async function appBoot(){
 }
 async function appSignOut(){
   if(S.pending.some(p=>p.col!=='log')){try{await flush()}catch(e){}
-    if(S.pending.some(p=>p.col!=='log')&&!confirm('فيه تعديلات لسه ما اترفعتش لأن مفيش نت. لو خرجت دلوقتي هتضيع. تخرج برضه؟'))return}
+    if(S.pending.some(p=>p.col!=='log')&&!confirm('توجد تعديلات لم تُرفع بعد لعدم وجود اتصال بالإنترنت. إذا خرجت الآن فستضيع. هل تريد الخروج على أي حال؟'))return}
   SEC.locked=true;
   try{await SB.auth.signOut()}catch(e){}
-  appLs(LS_ME,null);
+  appLs(LS_ME,null);appLs(LS_BIO,null);
   try{localStorage.removeItem(LS_CACHE);localStorage.removeItem(LS_PEND)}catch(e){}
   location.reload();
 }
-const appPwOk=(a,b)=>!a||a.length<8?'الباسورد لازم يبقى ٨ حروف أو أرقام على الأقل.':a!==b?'الباسوردين مش زي بعض.':'';
+const appPwOk=(a,b)=>!a||a.length<8?'يجب أن تكون كلمة المرور ٨ حروف أو أرقام على الأقل.':a!==b?'كلمتا المرور غير متطابقتين.':'';
 document.addEventListener('submit',async ev=>{
   const f=ev.target;if(!f||f.id!=='apForm')return;ev.preventDefault();
   const q=id=>{const e=document.getElementById(id);return e?e.value:''};
@@ -412,28 +417,35 @@ document.addEventListener('submit',async ev=>{
   try{
     if(kind==='login'){
       const email=q('ap_email').trim().toLowerCase(),password=q('ap_pw');APPU.email=email;
-      if(!email||!password){APPU.msg='اكتب الإيميل والباسورد.';return appShow()}
+      if(!email||!password){APPU.msg='أدخل البريد الإلكتروني وكلمة المرور.';return appShow()}
       const {data,error}=await SB.auth.signInWithPassword({email,password});
       if(error){APPU.msg=authErr(error);return appShow()}
       await appTryEnter(data.session);return;
     }
     if(kind==='signup'){
       const name=q('ap_name').trim(),email=q('ap_email').trim().toLowerCase(),a=q('ap_pw'),b=q('ap_pw2');APPU.email=email;APPU.nameDraft=name;
-      if(!name){APPU.msg='اكتب اسمك.';return appShow()}
-      if(!emailOk(email)){APPU.msg='الإيميل مكتوب غلط.';return appShow()}
+      if(!name){APPU.msg='أدخل اسمك.';return appShow()}
+      if(!emailOk(email)){APPU.msg='البريد الإلكتروني مكتوب بشكل غير صحيح.';return appShow()}
       const bad=appPwOk(a,b);if(bad){APPU.msg=bad;return appShow()}
       const {data,error}=await SB.auth.signUp({email,password:a,options:{data:{name},emailRedirectTo:location.origin+location.pathname}});
       if(error){APPU.msg=authErr(error);return appShow()}
-      if(data&&data.user&&Array.isArray(data.user.identities)&&!data.user.identities.length){APPU.msg='الإيميل ده متسجّل قبل كده. ادخل بيه، ولو نسيت الباسورد دوس «نسيت الباسورد».';APPU.mode='login';return appShow()}
+      if(data&&data.user&&Array.isArray(data.user.identities)&&!data.user.identities.length){APPU.msg='هذا البريد الإلكتروني مسجّل من قبل. سجّل الدخول به، وإذا نسيت كلمة المرور اضغط «نسيت كلمة المرور».';APPU.mode='login';return appShow()}
       if(data&&data.session){await appTryEnter(data.session);return}
       APPU.mode='checkmail';return appShow();
     }
     if(kind==='forgot'){
       const email=q('ap_email').trim().toLowerCase();APPU.email=email;
-      if(!emailOk(email)){APPU.msg='اكتب الإيميل صح.';return appShow()}
+      if(!emailOk(email)){APPU.msg='أدخل البريد الإلكتروني بشكل صحيح.';return appShow()}
       const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
       if(error){APPU.msg=authErr(error);return appShow()}
-      APPU.info='لو الإيميل ده عليه حساب، هيوصلك لينك. افتحه من نفس الجهاز.';return appShow();
+      APPU.info='إذا كان هذا البريد الإلكتروني مرتبطًا بحساب، فسيصلك رابط. افتحه من الجهاز نفسه.';return appShow();
+    }
+    if(kind==='unlock'){
+      const password=q('ap_pw');if(!password){APPU.msg='أدخل كلمة المرور.';return appShow()}
+      if(!navigator.onLine){APPU.msg='الفتح بكلمة المرور يتطلب اتصالًا بالإنترنت. افتح بالبصمة، أو شغّل الإنترنت.';return appShow()}
+      const {error}=await SB.auth.signInWithPassword({email:(APPU.me&&APPU.me.email)||'',password});
+      if(error){APPU.msg=authErr(error);return appShow()}
+      appBioDone();return;
     }
     if(kind==='newpw'){
       const a=q('ap_pw'),b=q('ap_pw2');const bad=appPwOk(a,b);if(bad){APPU.msg=bad;return appShow()}
@@ -441,7 +453,7 @@ document.addEventListener('submit',async ev=>{
       if(error){APPU.msg=authErr(error);return appShow()}
       try{history.replaceState(null,'',location.pathname)}catch(e){}
       const ses=(await SB.auth.getSession()).data.session;
-      if(ses){APPU.info='';await appTryEnter(ses)}else{APPU.mode='login';APPU.info='اتغيّر الباسورد. ادخل بالباسورد الجديد.';appShow()}
+      if(ses){APPU.info='';await appTryEnter(ses)}else{APPU.mode='login';APPU.info='تم تغيير كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.';appShow()}
       return;
     }
   }catch(e){APPU.msg=authErr(e);appShow()}
@@ -454,7 +466,7 @@ async function appLoadMembers(){
   try{const {data,error}=await SB.from('members').select('id,email,name,approved,created_at').order('created_at');if(!error)APPU.members=data||[]}catch(e){}
   APPU.membersBusy=false;
   const waiting=(APPU.members||[]).filter(m=>!m.approved).length;
-  if(waiting&&S.sel!=='__settings')showBanner('فيه '+waiting+' مستخدم مستني موافقتك. افتح «الإعدادات» عشان توافق عليهم.');
+  if(waiting&&S.sel!=='__settings')showBanner('يوجد '+waiting+' مستخدم بانتظار موافقتك. افتح «الإعدادات» للموافقة عليهم.');
   try{render()}catch(e){}
 }
 function appSecurityCard(){
@@ -464,33 +476,34 @@ function appSecurityCard(){
   if(APPU.owner){
     if(APPU.members===null&&!APPU.membersBusy)setTimeout(appLoadMembers,0);
     const list=APPU.members||[];
-    users=`<div class="sec-h" style="margin-top:14px">المستخدمين</div>
-    <p class="note">ابعت اللينك ده لأي حد عاوزه يستخدم الابلكيشن. هيعمل حساب بإيميله، ويفضل مستني لحد ما توافق عليه هنا. كل مستخدم بيشوف ويعدّل مواقعه هو بس، وانت بتشوف كل حاجة.</p>
-    <div class="row"><input readonly dir="ltr" value="${esc(link)}" aria-label="لينك الابلكيشن" style="flex:1;min-width:200px"><button type="button" data-app="copy">نسخ اللينك</button>${APPU.copyMsg?`<span class="msg ok">${esc(APPU.copyMsg)}</span>`:''}</div>
-    ${list.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>الإيميل</th><th>الحالة</th><th></th></tr></thead><tbody>
-    ${list.map(m=>`<tr><td>${esc(m.name||'')}</td><td dir="ltr">${esc(m.email||'')}</td><td>${m.approved?'<span class="msg ok">مفعّل</span>':'<b class="neg">مستني موافقتك</b>'}</td>
+    users=`<div class="sec-h" style="margin-top:14px">المستخدمون</div>
+    <p class="note">أرسل هذا الرابط إلى أي شخص تريده أن يستخدم التطبيق. سيُنشئ حسابًا ببريده الإلكتروني، ويبقى بانتظار موافقتك هنا. كل مستخدم يعرض ويعدّل مواقعه فقط، وأنت ترى كل شيء.</p>
+    <div class="row"><input readonly dir="ltr" value="${esc(link)}" aria-label="رابط التطبيق" style="flex:1;min-width:200px"><button type="button" data-app="copy">نسخ الرابط</button>${APPU.copyMsg?`<span class="msg ok">${esc(APPU.copyMsg)}</span>`:''}</div>
+    ${list.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد الإلكتروني</th><th>الحالة</th><th></th></tr></thead><tbody>
+    ${list.map(m=>`<tr><td>${esc(m.name||'')}</td><td dir="ltr">${esc(m.email||'')}</td><td>${m.approved?'<span class="msg ok">مفعّل</span>':'<b class="neg">بانتظار موافقتك</b>'}</td>
       <td>${m.approved?`<button type="button" class="ghost" data-app="block" data-id="${esc(m.id)}">إيقاف</button>`:`<button type="button" class="primary" data-app="approve" data-id="${esc(m.id)}">وافق</button>`}</td></tr>`).join('')}</tbody></table></div>`
-    :`<p class="note">${APPU.members===null?'جاري التحميل…':'لسه مفيش مستخدمين غيرك.'}</p>`}
+    :`<p class="note">${APPU.members===null?'جاري التحميل…':'لا يوجد مستخدمون غيرك بعد.'}</p>`}
     <div class="row"><button type="button" class="ghost" data-app="members">تحديث القائمة</button></div>
-    <p class="note">«إيقاف» بيمنع المستخدم يدخل، وبياناته بتفضل موجودة عندك.</p>`;
+    <p class="note">«إيقاف» يمنع المستخدم من الدخول، وتبقى بياناته محفوظة لديك.</p>`;
   }
   return `<div class="card backup" id="secCard"><div class="sec-h">الحساب والأمان</div>
-    <p>داخل باسم <b>${esc(me.name||'')}</b> (<span dir="ltr">${esc(me.email||'')}</span>)${APPU.owner?' · <b>المستخدم الرئيسي</b>':''}.</p>
+    <p>مسجّل الدخول باسم <b>${esc(me.name||'')}</b> (<span dir="ltr">${esc(me.email||'')}</span>)${APPU.owner?' · <b>المستخدم الرئيسي</b>':''}.</p>
     <form id="apPwForm" class="entry pw-form" novalidate>
-      <div class="f c2"><label for="apc_pw">باسورد جديد</label><input id="apc_pw" type="password" autocomplete="new-password" dir="ltr"></div>
-      <div class="f c2"><label for="apc_pw2">اكتبه تاني</label><input id="apc_pw2" type="password" autocomplete="new-password" dir="ltr"></div>
-      <div class="f c2" style="align-self:end"><button type="submit">غيّر الباسورد</button></div>
+      <div class="f c2"><label for="apc_pw">كلمة مرور جديدة</label><input id="apc_pw" type="password" autocomplete="new-password" dir="ltr"></div>
+      <div class="f c2"><label for="apc_pw2">أعد كتابته</label><input id="apc_pw2" type="password" autocomplete="new-password" dir="ltr"></div>
+      <div class="f c2" style="align-self:end"><button type="submit">غيّر كلمة المرور</button></div>
       ${APPU.pwMsg?`<p class="msg ${APPU.pwMsg.ok?'ok':'err'}" style="grid-column:1/-1">${esc(APPU.pwMsg.t)}</p>`:''}
     </form>
-    <div class="row">${installEvt&&!isStandalone()?'<button type="button" class="primary" data-app="install">تثبيت الابلكيشن على الجهاز</button>':''}<button type="button" class="danger" data-app="signout">خروج من الحساب</button></div>
-    ${isStandalone()?'':isIOS()?'<p class="note">للتثبيت على الآيفون: من Safari دوس زرار المشاركة، وبعدين «إضافة إلى الشاشة الرئيسية».</p>':installEvt?'':'<p class="note">للتثبيت: من قائمة المتصفح (⋮) اختار «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».</p>'}
+    ${appBioCard()}
+    <div class="row">${installEvt&&!isStandalone()?'<button type="button" class="primary" data-app="install">تثبيت التطبيق على الجهاز</button>':''}<button type="button" class="danger" data-app="signout">تسجيل الخروج</button></div>
+    ${isStandalone()?'':isIOS()?'<p class="note">للتثبيت على الآيفون: من Safari اضغط زر المشاركة، ثم «إضافة إلى الشاشة الرئيسية».</p>':installEvt?'':'<p class="note">للتثبيت: من قائمة المتصفح (⋮) اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».</p>'}
     ${users}</div>`;
 }
 document.addEventListener('submit',async ev=>{
   const f=ev.target;if(!f||f.id!=='apPwForm')return;ev.preventDefault();
   const a=document.getElementById('apc_pw').value,b=document.getElementById('apc_pw2').value;
   const bad=appPwOk(a,b);if(bad){APPU.pwMsg={t:bad};return render()}
-  try{const {error}=await SB.auth.updateUser({password:a});APPU.pwMsg=error?{t:authErr(error)}:{ok:1,t:'اتغيّر الباسورد.'}}catch(e){APPU.pwMsg={t:authErr(e)}}
+  try{const {error}=await SB.auth.updateUser({password:a});APPU.pwMsg=error?{t:authErr(error)}:{ok:1,t:'تم تغيير كلمة المرور.'}}catch(e){APPU.pwMsg={t:authErr(e)}}
   render();
 });
 document.addEventListener('click',async ev=>{
@@ -499,15 +512,19 @@ document.addEventListener('click',async ev=>{
   else if(a==='to-signup'){APPU.mode='signup';APPU.msg='';APPU.info='';appShow()}
   else if(a==='to-forgot'){APPU.mode='forgot';APPU.msg='';APPU.info='';appShow()}
   else if(a==='reload')location.reload();
+  else if(a==='bio-go')appBioVerify();
+  else if(a==='bio-pw'){APPU.bioPw=true;APPU.msg='';appShow()}
+  else if(a==='bio-on')appBioEnable();
+  else if(a==='bio-off'){appLs(LS_BIO,null);APPU.bioMsg={ok:1,t:'تم إلغاء الفتح بالبصمة على هذا الجهاز.'};render()}
   else if(a==='install')appInstall();
   else if(a==='signout')appSignOut();
   else if(a==='recheck'){b.disabled=true;try{const ses=(await SB.auth.getSession()).data.session;if(ses)await appTryEnter(ses);else{APPU.mode='login';appShow()}}catch(e){APPU.msg=authErr(e);appShow()}}
   else if(a==='members'){APPU.members=null;appLoadMembers();render()}
-  else if(a==='copy'){const link=location.origin+location.pathname;try{await navigator.clipboard.writeText(link);APPU.copyMsg='اتنسخ.'}catch(e){APPU.copyMsg='انسخه بإيدك من الخانة.'}render();setTimeout(()=>{APPU.copyMsg='';render()},2500)}
+  else if(a==='copy'){const link=location.origin+location.pathname;try{await navigator.clipboard.writeText(link);APPU.copyMsg='تم النسخ.'}catch(e){APPU.copyMsg='انسخه يدويًا من الخانة.'}render();setTimeout(()=>{APPU.copyMsg='';render()},2500)}
   else if(a==='approve'||a==='block'){
     b.disabled=true;
     const {error}=await SB.from('members').update({approved:a==='approve'}).eq('id',b.dataset.id);
-    if(error)showBanner('ما قدرتش أعدّل المستخدم. حاول تاني.');
+    if(error)showBanner('تعذّر تعديل المستخدم. حاول مرة أخرى.');
     else{const m=(APPU.members||[]).find(x=>x.id===b.dataset.id);if(m){m.approved=a==='approve';logChange('edit','files',{details:(a==='approve'?'موافقة على المستخدم ':'إيقاف المستخدم ')+(m.name||m.email)})}}
     render();
   }
@@ -629,6 +646,81 @@ window.claude={use:async name=>{
 }};
 setTimeout(()=>{if(APPU.owner&&SB)appLoadMembers()},4000);
 
+/* ---------- fingerprint / face unlock (WebAuthn platform authenticator, local screen lock) ---------- */
+const LS_BIO='adc_bio_v1';
+let APPBIO_OK=null;
+async function appBioSupported(){
+  if(APPBIO_OK!==null)return APPBIO_OK;
+  try{APPBIO_OK=!!(window.PublicKeyCredential&&window.isSecureContext&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())}catch(e){APPBIO_OK=false}
+  return APPBIO_OK;
+}
+appBioSupported().then(()=>{try{if(S.sel==='__settings')render()}catch(e){}});
+const b64u=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64u=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((s.length+3)%4)),c=>c.charCodeAt(0));
+function appBioCfg(){const c=appLs(LS_BIO);return c&&APPU.me&&c.uid===APPU.me.id&&c.id?c:null}
+function bioErr(e){const n=e&&e.name;
+  if(n==='NotAllowedError'||n==='AbortError')return 'أُلغيت البصمة أو انتهى الوقت. حاول مرة أخرى.';
+  if(n==='InvalidStateError')return 'هذه البصمة مسجّلة من قبل على هذا الجهاز.';
+  if(n==='SecurityError')return 'تتطلب البصمة فتح التطبيق من الرابط الأصلي (https).';
+  if(n==='NotSupportedError')return 'هذا الجهاز لا يدعم الفتح بالبصمة.';
+  return 'لم تعمل البصمة ('+(n||'خطأ')+').'}
+async function appBioEnable(){
+  if(!APPU.me)return;
+  if(!(await appBioSupported())){APPU.bioMsg={t:'هذا الجهاز أو المتصفح لا يدعم الفتح بالبصمة.'};return render()}
+  try{
+    const cred=await navigator.credentials.create({publicKey:{
+      challenge:crypto.getRandomValues(new Uint8Array(32)),
+      rp:{name:'ADC حسابات المواقع',id:location.hostname},
+      user:{id:new TextEncoder().encode(APPU.me.id).slice(0,64),name:APPU.me.email||APPU.me.name||'user',displayName:APPU.me.name||APPU.me.email||'user'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},
+      timeout:60000,attestation:'none'}});
+    if(!cred)throw {name:'NotAllowedError'};
+    appLs(LS_BIO,{uid:APPU.me.id,id:b64u(cred.rawId),after:(appLs(LS_BIO)||{}).after??1,at:Date.now()});
+    APPU.bioMsg={ok:1,t:'تم تفعيل الفتح بالبصمة. من الآن سيطلب التطبيق البصمة عند كل فتح.'};
+  }catch(e){APPU.bioMsg={t:bioErr(e)}}
+  render();
+}
+let appBioResolve=null;
+function appBioDone(){APPU.bioPw=false;APPU.hiddenAt=0;APPU.msg='';appHide();APPU.lastActive=Date.now();if(appBioResolve){const f=appBioResolve;appBioResolve=null;f()}}
+async function appBioVerify(auto){
+  const c=appBioCfg();if(!c){appBioDone();return}
+  const btn=document.getElementById('apBioBtn');if(btn)btn.disabled=true;
+  APPU.bioBusy=true;
+  try{
+    const a=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:location.hostname,
+      allowCredentials:[{type:'public-key',id:unb64u(c.id)}],userVerification:'required',timeout:60000}});
+    const ad=a&&a.response&&new Uint8Array(a.response.authenticatorData);
+    if(!a||b64u(a.rawId)!==c.id||!ad||!(ad[32]&0x04))throw {name:'NotAllowedError'};
+    appBioDone();
+  }catch(e){APPU.msg=auto?'':bioErr(e);appShow()}
+  finally{APPU.bioBusy=false}
+}
+function appBioLockNow(){APPU.mode='bio';APPU.msg='';APPU.bioPw=false;appShow();setTimeout(()=>{if(APPU.mode==='bio'&&SEC.locked)appBioVerify(true)},150)}
+function appBioGate(){
+  if(!appBioCfg())return Promise.resolve();
+  return new Promise(res=>{appBioResolve=res;appBioLockNow()});
+}
+function appBioCard(){
+  const c=appBioCfg(),m=APPU.bioMsg;
+  const msg=m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:'';
+  if(APPBIO_OK===false&&!c)return `<div class="sec-h" style="margin-top:14px">الفتح بالبصمة</div><p class="note">هذا الجهاز أو المتصفح لا يدعم الفتح بالبصمة. جرّبه من التطبيق بعد تثبيته على الهاتف.</p>${msg}`;
+  if(!c)return `<div class="sec-h" style="margin-top:14px">الفتح بالبصمة</div><p class="note">يطلب التطبيق بصمة إصبعك (أو الوجه) عند كل فتح على هذا الجهاز، حتى لا يتمكن أي شخص يمسك الهاتف من الدخول إلى الحسابات.</p>
+    <div class="row"><button type="button" class="primary" data-app="bio-on">فعّل الفتح بالبصمة</button></div>${msg}`;
+  const af=c.after??1;
+  return `<div class="sec-h" style="margin-top:14px">الفتح بالبصمة</div><p>مفعّل على هذا الجهاز ✔</p>
+    <div class="row"><label for="apBioAfter">اطلب البصمة عند مغادرة التطبيق</label><select id="apBioAfter">${[[0,'أي مرة'],[1,'دقيقة'],[5,'٥ دقائق'],[15,'ربع ساعة'],[60,'ساعة']].map(([v,t])=>`<option value="${v}" ${v===af?'selected':''}>${t}</option>`).join('')}</select>
+    <button type="button" class="ghost" data-app="bio-off">إلغاء البصمة</button></div>${msg}`;
+}
+document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='apBioAfter'){const c=appLs(LS_BIO);if(c){c.after=+ev.target.value;appLs(LS_BIO,c)}}});
+document.addEventListener('click',ev=>{if(ev.target&&ev.target.matches&&ev.target.matches('input[type=file]'))APPU.picking=Date.now()},true);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){if(!APPU.bioBusy&&!SEC.locked)APPU.hiddenAt=Date.now();return}
+  const c=appBioCfg();if(!c||SEC.locked||!APPU.hiddenAt)return;
+  if(APPU.picking&&Date.now()-APPU.picking<10*60000){APPU.picking=0;return}
+  if(Date.now()-APPU.hiddenAt>=(c.after??1)*60000)appBioLockNow();
+});
+
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
 const LS_CACHE='adc_cache_v1',LS_PEND='adc_pending_v1',LS_BACKUP='adc_last_backup',LS_BY='adc_by';
@@ -689,7 +781,7 @@ async function flush(){
     for(const p of [...S.pending]){
       try{const pf=p.pfx??S.pfx;if(p.pfx==null)p.pfx=pf;await withTimeout(S.db.doc(pf+p.col+'/'+p.id).set(p.data),12000)}
       catch(e){
-        if(e&&e.code==='invalid_argument'){S.pending=S.pending.filter(x=>x!==p);savePending();showBanner('فيه عملية ما اترفعتش لأن حسابك مش مسموح له يعدّل في المكان ده. التعديل في مواقع غيرك للمستخدم الرئيسي بس.');continue}
+        if(e&&e.code==='invalid_argument'){S.pending=S.pending.filter(x=>x!==p);savePending();showBanner('توجد عملية لم تُرفع لأن حسابك غير مسموح له بالتعديل في هذا المكان. التعديل في مواقع غيرك متاح للمستخدم الرئيسي فقط.');continue}
         break;
       }
     }
@@ -705,19 +797,19 @@ function statusRender(){
   const hl=$('#hdrLock');if(hl){hl.hidden=!!SEC.locked||(OFF&&!SEC.user);hl.onclick=lockNow;if(APP)hl.textContent='خروج'}
   const el=$('#status'),t=$('#statusText');const n=S.pending.filter(p=>p.col!=='log').length;
   let cls='off',txt='';
-  if(OFF){txt=(SEC.user?'المستخدم: '+SEC.user.name+(SEC.user.role==='admin'?' (رئيسي)':'')+' · ':'')+'نسخة الكمبيوتر · آخر تحديث: '+(S.baseAt?stamp(S.baseAt):'لسه ما اتعملش');if(n)txt+=' · '+n+' تعديل جديد مش مرفوع'}
+  if(OFF){txt=(SEC.user?'المستخدم: '+SEC.user.name+(SEC.user.role==='admin'?' (رئيسي)':'')+' · ':'')+'نسخة الكمبيوتر · آخر تحديث: '+(S.baseAt?stamp(S.baseAt):'لم يتم بعد');if(n)txt+=' · '+n+' تعديل جديد غير مرفوع'}
   else{
-    if(S.mode==='live'){cls='live';txt='متصل · اتحفظت نسخة على الجهاز '+stamp(S.cacheAt).slice(11)}
+    if(S.mode==='live'){cls='live';txt='متصل · حُفظت نسخة على الجهاز '+stamp(S.cacheAt).slice(11)}
     else if(S.mode==='loading'){cls='';txt='جاري الاتصال…'}
     else txt=S.cacheAt?'بدون اتصال · نسخة الجهاز من '+stamp(S.cacheAt):'بدون اتصال';
-    if(n)txt+=' · '+n+' مستني الرفع';
-    if(S.roleKnown&&!S.isManager&&S.canWrite)txt+=' · بتشوف وتعدّل مواقعك بس';
+    if(n)txt+=' · '+n+' بانتظار الرفع';
+    if(S.roleKnown&&!S.isManager&&S.canWrite)txt+=' · تعرض وتعدّل مواقعك فقط';
   }
   el.className='status '+cls;t.textContent=txt;
 }
 
 /* ---------- views ---------- */
-const PEND=OFF?'مش مرفوع':'مستني الرفع';
+const PEND=OFF?'غير مرفوع':'بانتظار الرفع';
 function renderSites(){
   const all=bal();
   let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regNames('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regNames('items').length}</span></button><button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
@@ -750,7 +842,7 @@ function balTiles(b,mine){
   </div>`;
 }
 const myBy=()=>(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
-const moreBox=(inner,open)=>`<details class="more" id="moreBox" ${open?'open':''}><summary>تفاصيل أكتر (ملاحظات، صورة الإيصال)</summary><div class="more-in">${inner}</div></details>`;
+const moreBox=(inner,open)=>`<details class="more" id="moreBox" ${open?'open':''}><summary>تفاصيل أكثر (ملاحظات، صورة الإيصال)</summary><div class="more-in">${inner}</div></details>`;
 const isUserView=()=>S.roleKnown&&!S.isManager;
 function siteOwnerKey(s){
   if(OFF)return lc(s.offUser||MAIN_USER);
@@ -773,7 +865,7 @@ function userBalCard(){
   return `<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="sec-h">الرصيد حسب المستخدم</div>
   <div class="tbl-wrap"><table><thead><tr><th>المستخدم</th><th class="num">عدد المواقع</th><th class="num">الإيداعات</th><th class="num">المصروفات</th><th class="num">نقدي</th><th class="num">بنك وتحويلات</th><th class="num">الرصيد (${CUR})</th></tr></thead><tbody>
   ${rows.map(r=>`<tr class="${r.total<0?'row-neg':''}"><td><b>${esc(r.name)}</b></td><td class="num plain">${r.sites}</td><td class="num in">${fmt(r.dep)}</td><td class="num">${fmt(r.exp)}</td><td class="num plain${negCls(r.cash)}">${fmt(r.cash)}</td><td class="num plain${negCls(r.bank)}">${fmt(r.bank)}</td><td class="num strong${negCls(r.total)}">${fmt(r.total)}</td></tr>`).join('')}
-  </tbody></table></div><p class="foot-note" style="margin:0">رصيد كل مستخدم = إيداعات مواقعه ناقص مصروفات مواقعه.</p></div>`;
+  </tbody></table></div><p class="foot-note" style="margin:0">رصيد كل مستخدم = إيداعات مواقعه مطروحًا منها مصروفات مواقعه.</p></div>`;
 }
 /* ---------- reconciliation (الجرد) ---------- */
 function balAt(siteId,date){
@@ -789,7 +881,7 @@ function reconOf(c){
   return {c,book,cash,bank,dc,dbk,d,st,bookTotal:book.cash+book.bank,actual:cash+bank};
 }
 function recon(siteId){const c=countsOf(siteId)[0];return c?reconOf(c):{st:'none'}}
-const ST={none:['pill-none','لم يتم الجرد'],ok:['pill-ok','مظبوط'],short:['pill-neg','عجز'],over:['pill-over','زيادة']};
+const ST={none:['pill-none','لم يتم الجرد'],ok:['pill-ok','مطابق'],short:['pill-neg','عجز'],over:['pill-over','زيادة']};
 const stPill=r=>`<span class="${ST[r.st][0]}">${ST[r.st][1]}${r.st==='short'||r.st==='over'?' '+fmt(Math.abs(r.d)):''}</span>`;
 const diffCell=v=>`<span class="${v<-0.004?'neg':v>0.004?'pos':''}">${Math.abs(v)<0.005?'0':(v>0?'\u2066+'+fmt(v)+'\u2069':fmt(v))}</span>`;
 
@@ -798,18 +890,18 @@ function countCard(site){
   const delBtn=c=>S.isManager?(S.confirmDel==='counts:'+c.id?`<span class="confirm"><button class="danger" data-delyes="counts:${esc(c.id)}">تأكيد الحذف</button><button data-delno="1">إلغاء</button></span>`:`<button class="ghost" data-del="counts:${esc(c.id)}">حذف</button>`):'';
   return `<div class="card recon ${r?'st-'+r.st:''}">
     <div class="rc-h"><div class="sec-h">مطابقة الرصيد (الجرد)</div>${r?stPill(r):stPill({st:'none'})}</div>
-    ${r?`<p class="rc-sub">آخر جرد بتاريخ <b class="date-i">${esc(r.c.date)}</b>. الرصيد الدفتري محسوب من الإيداعات والمصروفات لحد اليوم ده.${r.c.pending?` <span class="pend">${PEND}</span>`:''}</p>
+    ${r?`<p class="rc-sub">آخر جرد بتاريخ <b class="date-i">${esc(r.c.date)}</b>. الرصيد الدفتري محسوب من الإيداعات والمصروفات حتى هذا اليوم.${r.c.pending?` <span class="pend">${PEND}</span>`:''}</p>
     <div class="tbl-wrap"><table class="rc-t"><thead><tr><th></th><th class="num">الدفتري</th><th class="num">الموجود فعلًا</th><th class="num">الفرق</th></tr></thead><tbody>
       <tr><td>نقدي</td><td class="num plain">${fmt(r.book.cash)}</td><td class="num plain">${fmt(r.cash)}</td><td class="num plain">${diffCell(r.dc)}</td></tr>
       <tr><td>بنك</td><td class="num plain">${fmt(r.book.bank)}</td><td class="num plain">${fmt(r.bank)}</td><td class="num plain">${diffCell(r.dbk)}</td></tr>
     </tbody><tfoot><tr><td>الإجمالي</td><td class="num strong">${fmt(r.bookTotal)}</td><td class="num strong">${fmt(r.actual)}</td><td class="num strong">${diffCell(r.d)}</td></tr></tfoot></table></div>
-    ${r.st==='short'?`<p class="rc-msg neg">فيه عجز ${fmt(Math.abs(r.d))} ${CUR}: الموجود فعلًا أقل من الحساب. راجع الإيداعات والمصروفات المسجلة لحد ${esc(r.c.date)}.</p>`:r.st==='over'?`<p class="rc-msg pos">فيه زيادة ${fmt(r.d)} ${CUR}: الموجود فعلًا أكتر من الحساب. غالبًا فيه مصروف ما اتسجلش أو إيداع اتسجل بمبلغ أقل.</p>`:`<p class="rc-msg okc">الحساب مظبوط: الموجود فعلًا مطابق للرصيد الدفتري.</p>`}`
-    :`<p class="rc-sub">لسه ما اتعملش جرد للموقع ده.${S.isManager?' اعد النقدية الموجودة وشوف رصيد البنك في الكشف، وسجلهم هنا عشان تتأكد إن الحساب مظبوط.':''}</p>`}
+    ${r.st==='short'?`<p class="rc-msg neg">يوجد عجز ${fmt(Math.abs(r.d))} ${CUR}: الموجود فعلًا أقل من الحساب. راجع الإيداعات والمصروفات المسجلة حتى ${esc(r.c.date)}.</p>`:r.st==='over'?`<p class="rc-msg pos">توجد زيادة ${fmt(r.d)} ${CUR}: الموجود فعلًا أكثر من الحساب. غالبًا يوجد مصروف لم يُسجَّل أو إيداع سُجِّل بمبلغ أقل.</p>`:`<p class="rc-msg okc">الحساب مضبوط: الموجود فعلًا مطابق للرصيد الدفتري.</p>`}`
+    :`<p class="rc-sub">لم يُجرَ جرد لهذا الموقع بعد.${S.isManager?' عُدّ النقدية الموجودة وراجع رصيد البنك في الكشف، وسجّلهما هنا لكي تتأكد من صحة الحساب.':''}</p>`}
     ${S.isManager?`<form class="entry" id="countForm" autocomplete="off">
       <div class="f c1 half"><label for="k_date">تاريخ الجرد</label><input id="k_date" type="date" required value="${today()}"></div>
       <div class="f c1 half"><label for="k_cash">النقدية الموجودة</label><input id="k_cash" type="number" inputmode="decimal" step="0.01" required placeholder="0.00"></div>
       <div class="f c2"><label for="k_bank">رصيد البنك حسب الكشف</label><input id="k_bank" type="number" inputmode="decimal" step="0.01" required placeholder="0.00"></div>
-      <div class="f c2"><label for="k_notes">ملاحظات (اختياري)</label><input id="k_notes" maxlength="300" placeholder="مين عمل الجرد…"></div>
+      <div class="f c2"><label for="k_notes">ملاحظات (اختياري)</label><input id="k_notes" maxlength="300" placeholder="من أجرى الجرد…"></div>
       <div class="form-foot"><button type="submit" class="primary" id="countBtn">حفظ الجرد</button><span class="msg" id="countMsg"></span></div>
     </form>`:''}
     ${list.length>1?`<details class="rc-hist"><summary>الجرد السابق (${list.length-1})</summary><div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th class="num">الدفتري</th><th class="num">الموجود فعلًا</th><th class="num">الفرق</th><th>الحالة</th><th>ملاحظات</th>${S.isManager?'<th></th>':''}</tr></thead><tbody>
@@ -825,10 +917,10 @@ function bindCount(site){
   f.onsubmit=ev=>{
     ev.preventDefault();
     const m=$('#countMsg');const cash=parseFloat($('#k_cash').value),bank=parseFloat($('#k_bank').value),date=$('#k_date').value;
-    if(!date||isNaN(cash)||isNaN(bank)){m.className='msg err';m.textContent='اكتب التاريخ والنقدية ورصيد البنك (اكتب 0 لو مفيش).';return}
+    if(!date||isNaN(cash)||isNaN(bank)){m.className='msg err';m.textContent='أدخل التاريخ والنقدية ورصيد البنك (أدخل 0 إن لم يوجد).';return}
     const rec={siteId:site.id,date,cash,bank,notes:$('#k_notes').value.trim(),by:lsGet(LS_BY)||'',byId:S.uid||'',created:Date.now()};
     const r=reconOf(rec);
-    S.countMsg='اتسجل الجرد: '+(r.st==='ok'?'الحساب مظبوط.':r.st==='short'?'فيه عجز '+Math.abs(Math.round(r.d*100)/100).toLocaleString('en-US')+' '+CUR+'.':'فيه زيادة '+(Math.round(r.d*100)/100).toLocaleString('en-US')+' '+CUR+'.');
+    S.countMsg='تم تسجيل الجرد: '+(r.st==='ok'?'الحساب مضبوط.':r.st==='short'?'يوجد عجز '+Math.abs(Math.round(r.d*100)/100).toLocaleString('en-US')+' '+CUR+'.':'توجد زيادة '+(Math.round(r.d*100)/100).toLocaleString('en-US')+' '+CUR+'.');
     S.justSaved=true;queue('counts',newId(),rec);logChange('add','counts',rec);render();
   };
 }
@@ -836,7 +928,7 @@ function bindCount(site){
 function renderOverview(){
   const head=`<div class="pane-h"><h2>${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</h2><div class="actions">${S.sites.length?'<button data-print="summary">طباعة / PDF</button>':''}${S.downloads?'<button id="exportAll" class="primary">حفظ ملف Excel</button>':''}</div></div>`;
   if(!S.sites.length){
-    $('#pane').innerHTML=head+`<div class="card blank"><h3>مفيش مواقع لسه</h3><p>${S.canWrite?'اكتب اسم أول موقع في خانة «اسم موقع جديد» واضغط إضافة، وبعدها اختاره وسجّل إيداعات المالك والمصروفات.'+(OFF?' ولو عندك ملف نسخة من الابلكيشن الأونلاين، اعمل «تحديث» من صفحة الإعدادات.':' ولو عندك ملف نسخة احتياطية، استرجعه من صفحة الإعدادات.'):'لما يتضاف موقع هيظهر هنا.'}</p></div>`+`<p class="foot-note">النسخ الاحتياطي والاسترجاع والأمان${OFF?' والمستخدمين':''} في صفحة <button class="linkish" data-site="__settings">الإعدادات</button>.</p>`;
+    $('#pane').innerHTML=head+`<div class="card blank"><h3>لا توجد مواقع بعد</h3><p>${S.canWrite?'اكتب اسم أول موقع في خانة «اسم موقع جديد» واضغط إضافة، ثم اختره وسجّل إيداعات المالك والمصروفات.'+(OFF?' وإذا كان لديك ملف نسخة من التطبيق على الإنترنت، فاستخدم «تحديث» من صفحة الإعدادات.':' وإذا كان لديك ملف نسخة احتياطية، فاسترجعه من صفحة الإعدادات.'):'عند إضافة موقع سيظهر هنا.'}</p></div>`+`<p class="foot-note">النسخ الاحتياطي والاسترجاع والأمان${OFF?' والمستخدمين':''} في صفحة <button class="linkish" data-site="__settings">الإعدادات</button>.</p>`;
     bindOverview();return;
   }
   const rows=S.sites.map(s=>({s,b:bal(s.id),r:recon(s.id)}));
@@ -854,7 +946,7 @@ function renderOverview(){
   `<div class="tbl-wrap overview"><table><thead><tr><th>الموقع</th><th class="num">الإيداعات</th><th class="num">المصروفات</th><th class="num">الرصيد الدفتري</th><th class="num">نقدي موجود</th><th class="num">في البنك</th><th class="num">الفرق</th><th>الحالة</th><th>آخر جرد</th></tr></thead><tbody>
   ${rows.map(({s,b,r})=>`<tr class="${r.st==='short'?'row-neg':r.st==='over'?'row-over':''}"><td class="nm"><button class="linkish" data-site="${esc(s.id)}">${esc(s.name)}</button></td><td class="num in">${fmt(b.dep)}</td><td class="num">${fmt(b.exp)}</td><td class="num strong${negCls(b.total)}">${fmt(b.total)}</td><td class="num plain">${act(r,'cash')}</td><td class="num plain">${act(r,'bank')}</td><td class="num plain">${r.st==='none'?'<span class="muted">—</span>':diffCell(r.d)}</td><td>${stPill(r)}</td><td class="date">${r.st==='none'?'—':esc(r.c.date)}</td></tr>`).join('')}
   </tbody><tfoot><tr><td>الإجمالي</td><td class="num in">${fmt(all.dep)}</td><td class="num">${fmt(all.exp)}</td><td class="num strong${negCls(all.total)}">${fmt(all.total)}</td><td class="num plain">${counted.length?fmt(actCash):'—'}</td><td class="num plain">${counted.length?fmt(actBank):'—'}</td><td class="num plain">${counted.length?diffCell(dsum):'—'}</td><td colspan="2"></td></tr></tfoot></table></div>
-  <p class="foot-note">الفرق = الموجود فعلًا (نقدي + بنك) ناقص الرصيد الدفتري في تاريخ آخر جرد. بالسالب يبقى عجز، وبالموجب زيادة.${none.length?' '+none.length+' '+(none.length===1?'موقع لسه ما اتعملوش':'مواقع لسه ما اتعملهاش')+' جرد.':''}</p>
+  <p class="foot-note">الفرق = الموجود فعلًا (نقدي + بنك) مطروحًا منه الرصيد الدفتري في تاريخ آخر جرد. القيمة السالبة تعني عجزًا، والموجبة زيادة.${none.length?' '+none.length+' '+(none.length===1?'موقع لم يُجرَ له جرد بعد':'مواقع لم يُجرَ لها جرد بعد')+' جرد.':''}</p>
   <div class="breakdowns">
     <div class="card"><div class="sec-h">أكبر المقاولين (كل المواقع)</div>${barsHTML(groupSum(S.exp,'contractor'))}</div>
     <div class="card"><div class="sec-h">أكبر البنود (كل المواقع)</div>${barsHTML(groupSum(S.exp,'item'))}</div>
@@ -883,13 +975,13 @@ function renderSite(){
   const rcpt=e=>e.receipt?`<button class="rcpt" data-receipt="${esc(e.receipt)}" data-rtype="${esc(e.receiptType||'')}">عرض الإيصال</button>`:'';
   const canPhoto=OFF?S.canWrite:!!S.assets;
   const moreOpen=S.moreOpen||!!S.pickedFile||!!(edRec&&(edRec.remarks||edRec.receipt));
-  const photoField=`<div class="f c2"><label for="e_photo">صورة الإيصال</label>${canPhoto?`<input id="e_photo" type="file" accept="image/*,application/pdf">${S.pickedFile?`<span class="note ok-note">مختار: ${esc(S.pickedFile.name||'صورة')}</span>`:''}${edRec&&edRec.receipt?'<label class="chk sm"><input type="checkbox" id="e_rmphoto"> شيل الإيصال الحالي</label>':''}`:`<input disabled placeholder="${OFF?'الصور بتترفع من النسخة الأونلاين بس':'رفع الصور مش متاح بالصلاحية دي'}">`}</div>`;
+  const photoField=`<div class="f c2"><label for="e_photo">صورة الإيصال</label>${canPhoto?`<input id="e_photo" type="file" accept="image/*,application/pdf">${S.pickedFile?`<span class="note ok-note">المحدد: ${esc(S.pickedFile.name||'صورة')}</span>`:''}${edRec&&edRec.receipt?'<label class="chk sm"><input type="checkbox" id="e_rmphoto"> إزالة الإيصال الحالي</label>':''}`:`<input disabled placeholder="${OFF?'تُرفع الصور من النسخة على الإنترنت فقط':'رفع الصور غير متاح بهذه الصلاحية'}">`}</div>`;
   const form=kind==='exp'?`
       <div class="f c1 half"><label for="e_amount">المبلغ (${CUR})</label><input id="e_amount" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="0.00"></div>
       <div class="f c1 half"><label for="e_date">تاريخ الصرف</label><input id="e_date" type="date" required value="${today()}"></div>
       <div class="f c2"><label for="e_contractor">المقاول</label>${regSelect('e_contractor','contractors')}</div>
       <div class="f c2"><label for="e_item">البند</label>${regSelect('e_item','items')}</div>
-      ${methodSelect('اتصرف من')}
+      ${methodSelect('صُرف من')}
       <div class="f c5"><label for="e_notes">البيان</label><input id="e_notes" required maxlength="300" placeholder="وصف المصروف"></div>
       ${moreBox(`<div class="f c2"><label for="e_remarks">ملاحظات</label><input id="e_remarks" maxlength="300" placeholder="رقم المستخلص، رقم الشيك…"></div>${photoField}`,moreOpen)}
       <div class="form-foot"><button class="primary" type="submit" id="saveBtn">${ed?'حفظ التعديل':'حفظ المصروف'}</button>${ed?'<button type="button" id="cancelEdit">إلغاء التعديل</button>':''}<span class="msg" id="formMsg"></span></div>
@@ -898,26 +990,26 @@ function renderSite(){
   :`
       <div class="f c1 half"><label for="e_amount">المبلغ (${CUR})</label><input id="e_amount" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="0.00"></div>
       <div class="f c1 half"><label for="e_date">تاريخ الإيداع</label><input id="e_date" type="date" required value="${today()}"></div>
-      ${methodSelect('اتودع في')}
+      ${methodSelect('أُودع في')}
       <div class="f c3"><label for="e_notes">البيان</label><input id="e_notes" required maxlength="300" placeholder="مثال: دفعة من المالك على حساب الموقع"></div>
       ${moreBox(`<div class="f c2"><label for="e_remarks">ملاحظات</label><input id="e_remarks" maxlength="300" placeholder="رقم الشيك، رقم التحويل…"></div>${photoField}`,moreOpen)}
       <div class="form-foot"><button class="primary in-btn" type="submit" id="saveBtn">${ed?'حفظ التعديل':'حفظ الإيداع'}</button>${ed?'<button type="button" id="cancelEdit">إلغاء التعديل</button>':''}<span class="msg" id="formMsg"></span></div>`;
   const expTable=()=>`<table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>البند</th><th>المقاول</th><th>ملاحظات</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
-    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num">${fmt(amt(e))}<span class="mtag">${METHOD[meth(e)]}</span></td><td>${esc(e.notes)||'—'}</td><td class="date">${esc(e.date)}</td><td>${e.item?`<button class="chip chip-btn" data-stmtgo="items" data-name="${esc(e.item)}">${esc(e.item)}</button>`:'—'}</td><td>${e.contractor?`<button class="linkish" data-stmtgo="contractors" data-name="${esc(e.contractor)}">${esc(e.contractor)}</button>`:'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">اتعدّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('expenses',e)}</tr>`).join('')}
+    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num">${fmt(amt(e))}<span class="mtag">${METHOD[meth(e)]}</span></td><td>${esc(e.notes)||'—'}</td><td class="date">${esc(e.date)}</td><td>${e.item?`<button class="chip chip-btn" data-stmtgo="items" data-name="${esc(e.item)}">${esc(e.item)}</button>`:'—'}</td><td>${e.contractor?`<button class="linkish" data-stmtgo="contractors" data-name="${esc(e.contractor)}">${esc(e.contractor)}</button>`:'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('expenses',e)}</tr>`).join('')}
     </tbody><tfoot><tr><td class="num">${fmt(ftot)}</td><td colspan="${S.canWrite?6:5}">${filtOn?`إجمالي النتائج (${list.length})`:'إجمالي المصروفات'}</td></tr></tfoot></table>`;
-  const depTable=()=>`<table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>اتودع في</th><th>ملاحظات</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
-    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num in">${fmt(amt(e))}</td><td>${esc(e.notes)||'إيداع من المالك'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><span class="chip">${METHOD[meth(e)]}</span></td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">اتعدّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('deposits',e)}</tr>`).join('')}
+  const depTable=()=>`<table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>أُودع في</th><th>ملاحظات</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
+    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num in">${fmt(amt(e))}</td><td>${esc(e.notes)||'إيداع من المالك'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><span class="chip">${METHOD[meth(e)]}</span></td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('deposits',e)}</tr>`).join('')}
     </tbody><tfoot><tr><td class="num in">${fmt(ftot)}</td><td colspan="${S.canWrite?5:4}">${filtOn?`إجمالي النتائج (${list.length})`:'إجمالي الإيداعات'}</td></tr></tfoot></table>`;
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${esc(site.name)}</h2><div class="actions">
     ${S.canWrite&&canEditRec(site)?'<button id="impOpen">استيراد من Excel</button>':''}
     <button data-print="site">طباعة كشف الحساب / PDF</button>
-    ${S.downloads&&hasAny?'<button id="exportSite">Excel الموقع ده</button>':''}
-    ${canEditRec(site)?(S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'لازم تمسح إيداعات ومصروفات وجرد الموقع الأول.':'حذف الموقع نهائيًا؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:'<button class="ghost" id="delSite">حذف الموقع</button>'):''}
+    ${S.downloads&&hasAny?'<button id="exportSite">Excel هذا الموقع</button>':''}
+    ${canEditRec(site)?(S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'يجب حذف إيداعات ومصروفات وجرد الموقع أولًا.':'حذف الموقع نهائيًا؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:'<button class="ghost" id="delSite">حذف الموقع</button>'):''}
   </div></div>
   ${importCard(site)}
   ${S.canWrite?`<div class="card entry-card${ed?' editing':''}" id="entryCard">
-    ${ed?`<div class="edit-h"><b>تعديل ${ed.col==='expenses'?'مصروف':'إيداع'}</b><span class="note">اتسجل ${esc(edRec?stamp(edRec.created):'')}. التعديل هيتسجل في سجل التعديلات بالقيمة القديمة والجديدة.</span></div>`
+    ${ed?`<div class="edit-h"><b>تعديل ${ed.col==='expenses'?'مصروف':'إيداع'}</b><span class="note">سُجِّل ${esc(edRec?stamp(edRec.created):'')}. سيُسجَّل التعديل في سجل التعديلات بالقيمة القديمة والجديدة.</span></div>`
     :`<div class="seg" role="tablist" aria-label="نوع الحركة"><button role="tab" data-kind="exp" aria-selected="${kind==='exp'}">تسجيل مصروف</button><button role="tab" data-kind="dep" aria-selected="${kind==='dep'}">تسجيل إيداع من المالك</button></div>`}
     <form class="entry" id="entryForm" autocomplete="off" novalidate>${form}</form></div>`:''}
   ${balTiles(b)}
@@ -933,7 +1025,7 @@ function renderSite(){
       ${filtOn?'<button class="ghost" id="clearF">مسح الفلتر</button>':''}
     </div>
     ${list.length?`<div class="tbl-wrap">${tab==='exp'?expTable():depTable()}</div>`
-    :`<div class="blank" style="padding:28px 8px"><h3>${(tab==='exp'?exps:deps).length?'مفيش نتائج للفلتر ده':(tab==='exp'?'لسه مفيش مصروفات في الموقع ده':'لسه مفيش إيداعات في الموقع ده')}</h3><p>${(tab==='exp'?exps:deps).length?'غيّر الفلتر أو امسحه.':(S.canWrite?(tab==='exp'?'سجّل أول مصروف من «تسجيل مصروف» فوق.':'سجّل أول إيداع من «تسجيل إيداع من المالك» فوق.'):'')}</p></div>`}
+    :`<div class="blank" style="padding:28px 8px"><h3>${(tab==='exp'?exps:deps).length?'لا توجد نتائج لهذا الفلتر':(tab==='exp'?'لا توجد مصروفات في هذا الموقع بعد':'لا توجد إيداعات في هذا الموقع بعد')}</h3><p>${(tab==='exp'?exps:deps).length?'غيّر الفلتر أو امسحه.':(S.canWrite?(tab==='exp'?'سجّل أول مصروف من «تسجيل مصروف» في الأعلى.':'سجّل أول إيداع من «تسجيل إيداع من المالك» في الأعلى.'):'')}</p></div>`}
   </div>
   ${exps.length?`<div class="breakdowns">
     <div class="card"><div class="sec-h">المصروف حسب المقاول</div>${barsHTML(groupSum(exps,'contractor'))}</div>
@@ -954,28 +1046,28 @@ function bindSite(site){
     const amount=parseFloat($('#e_amount').value);
     const rec={siteId:site.id,amount,date:$('#e_date').value,method:$('#e_method').value,notes:$('#e_notes').value.trim(),remarks:$('#e_remarks').value.trim(),by:old?(old.by||''):myBy()};
     if(kind==='exp'){rec.contractor=regValue('e_contractor','contractors');rec.item=regValue('e_item','items')}
-    if(!(amount>0)){msg.className='msg err';msg.textContent='اكتب مبلغ أكبر من صفر.';return}
+    if(!(amount>0)){msg.className='msg err';msg.textContent='أدخل مبلغًا أكبر من صفر.';return}
     const miss=[];if(!rec.date)miss.push('التاريخ');if(kind==='exp'&&!rec.contractor)miss.push('المقاول');if(kind==='exp'&&!rec.item)miss.push('البند');if(!rec.notes)miss.push('البيان');
-    if(miss.length){msg.className='msg err';msg.textContent='لازم تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','البند':'#e_item','البيان':'#e_notes'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
+    if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','البند':'#e_item','البيان':'#e_notes'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
     if(kind==='exp')commitNewRegs([['e_contractor','contractors'],['e_item','items']]);
     const file=S.pickedFile;
     if(old){rec.receipt=old.receipt||'';rec.receiptType=old.receiptType||''}
     if($('#e_rmphoto')&&$('#e_rmphoto').checked){rec.receipt='';rec.receiptType=''}
     if(file){
-      if(!OFF&&S.mode!=='live'){msg.className='msg err';msg.textContent='رفع الصورة محتاج نت. شيل الصورة واحفظ، وضيفها بعدين من «تعديل».';return}
+      if(!OFF&&S.mode!=='live'){msg.className='msg err';msg.textContent='رفع الصورة يحتاج إلى الإنترنت. احذف الصورة واحفظ، ثم أضفها لاحقًا من «تعديل».';return}
       const btn=$('#saveBtn');S.busy=true;btn.disabled=true;msg.className='msg';msg.textContent='جاري رفع الصورة…';
       try{const up=await uploadReceipt(file);rec.receipt=up.id;rec.receiptType=up.type}
       catch(e){S.busy=false;btn.disabled=false;msg.className='msg err';msg.textContent=uploadErr(e);return}
       S.busy=false;S.pickedFile=null;
     }
     if(!rec.receipt){delete rec.receipt;delete rec.receiptType}
-    const later=(!OFF&&S.mode!=='live')?' على الجهاز، وهيترفع لما النت يرجع':'';
+    const later=(!OFF&&S.mode!=='live')?' على الجهاز، وسيُرفع عند عودة الاتصال بالإنترنت':'';
     if(old){
       const full={...clean(old),...rec,created:old.created||Date.now(),byId:old.byId||'',updated:Date.now(),editedById:S.uid||''};
       delete full.id;if(!rec.receipt){delete full.receipt;delete full.receiptType}
       if(kind==='exp'&&!rec.item)full.item='';
       queue(col,old.id,full);logChange('edit',col,full,old);
-      S.lastMsg='اتحفظ التعديل'+later;S.editing=null;
+      S.lastMsg='تم حفظ التعديل'+later;S.editing=null;
     }else{
       rec.created=Date.now();rec.byId=S.uid||'';
       queue(col,newId(),rec);logChange('add',col,rec);
@@ -1004,12 +1096,12 @@ function bindSite(site){
 }
 
 async function removeDoc(col,id){
-  if(!canEditRec(rec)){showBanner('مش مسموح لك تحذف من موقع غيرك.');return false}
+  if(!canEditRec(rec)){showBanner('غير مسموح لك بالحذف من موقع غيرك.');return false}
   const rec=(S[COLS[col]]||[]).find(x=>x.id===id);
   const p=S.pending.find(x=>x.col===col&&x.id===id);
   if(p){S.pending=S.pending.filter(x=>x!==p);savePending();merge();if(rec)logChange('delete',col,rec);render();return true}
-  if(OFF){showBanner('الحركة دي جاية من النسخة الأونلاين، فاحذفها من هناك وبعدين اعمل «تحديث» هنا.');return false}
-  if(!S.db||S.mode!=='live'){showBanner('الحذف محتاج اتصال بالنت. حاول تاني لما يرجع.');return false}
+  if(OFF){showBanner('هذه الحركة واردة من النسخة على الإنترنت، فاحذفها من هناك ثم نفّذ «تحديث» هنا.');return false}
+  if(!S.db||S.mode!=='live'){showBanner('الحذف يتطلب اتصالًا بالإنترنت. حاول مرة أخرى عند عودة الاتصال.');return false}
   try{await withTimeout(S.db.doc(col+'/'+id).delete(),12000);showBanner('');if(rec)logChange('delete',col,rec);return true}
   catch(e){showBanner(errText(e));return false}
 }
@@ -1036,11 +1128,11 @@ function renderJournal(){
   const acts=r=>!S.canWrite?'':!canEditRec(r)?'<td></td>':`<td class="acts">${S.confirmDel===r.col+':'+r.id?`<span class="confirm"><button class="danger" data-delyes="${r.col}:${esc(r.id)}">تأكيد الحذف</button><button data-delno="1">إلغاء</button></span>`:`<button class="ghost" data-edit="${r.col}:${esc(r.id)}">تعديل</button><button class="ghost" data-del="${r.col}:${esc(r.id)}">حذف</button>`}</td>`;
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>دفتر اليومية</h2><div class="actions"><button data-print="journal">طباعة / PDF</button>${S.downloads?'<button id="exportAll">حفظ ملف Excel</button>':''}</div></div>
-  <p class="foot-note" style="margin:-8px 0 0">سجّل هنا كل الحركات واختار الموقع، وكل حركة بتترحّل لوحدها على حساب موقعها.</p>
+  <p class="foot-note" style="margin:-8px 0 0">سجّل هنا جميع الحركات واختر الموقع، وستُرحَّل كل حركة تلقائيًا إلى حساب موقعها.</p>
   ${S.canWrite?(S.sites.length?`<div class="card entry-card j-card">
     <form class="entry j-entry" id="jForm" autocomplete="off" novalidate>
       <div class="f c1 half"><label for="j_type">النوع</label><select id="j_type"><option value="exp" ${isExp?'selected':''}>مصروف</option><option value="dep" ${!isExp?'selected':''}>إيداع من المالك</option></select></div>
-      <div class="f c2 half"><label for="j_site">الموقع</label><select id="j_site"><option value="">اختار الموقع</option>${siteOpts}</select></div>
+      <div class="f c2 half"><label for="j_site">الموقع</label><select id="j_site"><option value="">اختر الموقع</option>${siteOpts}</select></div>
       <div class="f c1 half"><label for="j_amount">المبلغ (${CUR})</label><input id="j_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
       <div class="f c1 half"><label for="j_date">التاريخ</label><input id="j_date" type="date" value="${esc(K.date||today())}"></div>
       <div class="f c1 half"><label for="j_method">طريقة الدفع</label><select id="j_method">${Object.entries(METHOD).map(([k,v])=>`<option value="${k}" ${(K.method||'cash')===k?'selected':''}>${v}</option>`).join('')}</select></div>
@@ -1048,13 +1140,13 @@ function renderJournal(){
       <div class="f c2 j-exp" ${isExp?'':'hidden'}><label for="j_item">البند</label>${regSelect('j_item','items')}</div>
       <div class="f c2 j-exp" ${isExp?'':'hidden'}><label for="j_contractor">المقاول</label>${regSelect('j_contractor','contractors')}</div>
       ${moreBox(`<div class="f c2"><label for="j_remarks">ملاحظات</label><input id="j_remarks" maxlength="300" placeholder="رقم المستخلص، رقم الشيك…"></div>
-      <div class="f c2"><label for="j_photo">صورة الإيصال</label>${canPhoto?`<input id="j_photo" type="file" accept="image/*,application/pdf">${S.pickedFile?`<span class="note ok-note">مختار: ${esc(S.pickedFile.name||'صورة')}</span>`:''}`:`<input disabled placeholder="رفع الصور مش متاح بالصلاحية دي">`}</div>`,S.moreOpen||!!S.pickedFile)}
+      <div class="f c2"><label for="j_photo">صورة الإيصال</label>${canPhoto?`<input id="j_photo" type="file" accept="image/*,application/pdf">${S.pickedFile?`<span class="note ok-note">المحدد: ${esc(S.pickedFile.name||'صورة')}</span>`:''}`:`<input disabled placeholder="رفع الصور غير متاح بهذه الصلاحية">`}</div>`,S.moreOpen||!!S.pickedFile)}
       <div class="form-foot"><button class="primary" type="submit" id="jSave">تسجيل وترحيل</button><span class="msg" id="jMsg"></span></div>
       <datalist id="dl_con">${allCons.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
       <datalist id="dl_item">${allItems.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
     </form>
-    <p class="foot-note" style="margin:10px 0 0">بعد الحفظ النوع والموقع والتاريخ بيفضلوا زي ما هم، عشان تسجل الحركة اللي بعدها على طول.</p></div>`
-    :`<div class="card blank" style="padding:24px"><h3>مفيش مواقع لسه</h3><p>${S.canWrite?'ضيف موقع من خانة «اسم موقع جديد» الأول، وبعدين سجّل هنا.':'مفيش مواقع متاحة ليك.'}</p></div>`):''}
+    <p class="foot-note" style="margin:10px 0 0">بعد الحفظ يبقى النوع والموقع والتاريخ كما هي، لكي تسجّل الحركة التالية مباشرةً.</p></div>`
+    :`<div class="card blank" style="padding:24px"><h3>لا توجد مواقع بعد</h3><p>${S.canWrite?'أضف موقعًا من خانة «اسم موقع جديد» أولًا، ثم سجّل هنا.':'لا توجد مواقع متاحة لك.'}</p></div>`):''}
   <div class="stats">
     <div class="stat"><div class="l">وارد (إيداعات)${filtOn?' · حسب الفلتر':''}</div><div class="v in">${fmt(tin)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">منصرف (مصروفات)${filtOn?' · حسب الفلتر':''}</div><div class="v">${fmt(tout)}<small>${CUR}</small></div></div>
@@ -1076,7 +1168,7 @@ function renderJournal(){
       <td>${esc(r.remarks)||'—'}${r.by?`<span class="note">سجّله: ${esc(r.by)}</span>`:''}${r.receipt?`<button class="rcpt" data-receipt="${esc(r.receipt)}" data-rtype="${esc(r.receiptType||'')}">عرض الإيصال</button>`:''}</td>
       <td class="num strong${negCls(r.run)}">${fmt(r.run)}</td>${acts(r)}</tr>`).join('')}
     </tbody></table></div>${list.length>S.jLimit?`<button class="ghost" id="jMore">عرض ${Math.min(200,list.length-S.jLimit)} حركة أقدم</button>`:''}`
-    :`<div class="blank" style="padding:28px 8px"><h3>${all.length?'مفيش حركات للفلتر ده':'لسه مفيش حركات'}</h3><p>${all.length?'غيّر الفلتر أو امسحه.':'أول حركة تسجلها هتظهر هنا.'}</p></div>`}
+    :`<div class="blank" style="padding:28px 8px"><h3>${all.length?'لا توجد حركات لهذا الفلتر':'لا توجد حركات بعد'}</h3><p>${all.length?'غيّر الفلتر أو امسحه.':'ستظهر هنا أول حركة تسجّلها.'}</p></div>`}
   </div>`;
   bindJournal();
 }
@@ -1101,10 +1193,10 @@ function bindJournal(){
     const rec={siteId:site,amount,date:$('#j_date').value,method:$('#j_method').value,notes:$('#j_notes').value.trim(),remarks:$('#j_remarks').value.trim(),by:myBy()};
     if(type==='exp'){rec.contractor=regValue('j_contractor','contractors');rec.item=regValue('j_item','items')}
     const miss=[];if(!site)miss.push('الموقع');if(!(amount>0))miss.push('المبلغ');if(!rec.date)miss.push('التاريخ');if(!rec.notes)miss.push('البيان');if(type==='exp'&&!rec.item)miss.push('البند');if(type==='exp'&&!rec.contractor)miss.push('المقاول');
-    if(miss.length){msg.className='msg err';msg.textContent='لازم تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor'}[miss[0]]);if(el)el.focus();return}
+    if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor'}[miss[0]]);if(el)el.focus();return}
     if(type==='exp')commitNewRegs([['j_contractor','contractors'],['j_item','items']]);
     if(S.pickedFile){
-      if(!OFF&&S.mode!=='live'){msg.className='msg err';msg.textContent='رفع الصورة محتاج نت. شيل الصورة وسجّل، وضيفها بعدين من «تعديل».';return}
+      if(!OFF&&S.mode!=='live'){msg.className='msg err';msg.textContent='رفع الصورة يحتاج إلى الإنترنت. احذف الصورة وسجّل، ثم أضفها لاحقًا من «تعديل».';return}
       const btn=$('#jSave');S.busy=true;btn.disabled=true;msg.className='msg';msg.textContent='جاري رفع الصورة…';
       try{const up=await uploadReceipt(S.pickedFile);rec.receipt=up.id;rec.receiptType=up.type}
       catch(e){S.busy=false;btn.disabled=false;msg.className='msg err';msg.textContent=uploadErr(e);return}
@@ -1114,8 +1206,8 @@ function bindJournal(){
     const col=type==='exp'?'expenses':'deposits';
     queue(col,newId(),rec);logChange('add',col,rec);
     S.jKeep={type:'exp',site,date:rec.date,method:type==='exp'?rec.method:'cash'};
-    const later=(!OFF&&S.mode!=='live')?' على الجهاز، وهيترفع لما النت يرجع':'';
-    S.flash={text:(type==='exp'?'اتسجل مصروف ':'اتسجل إيداع ')+fmtPlain(amount)+' '+CUR+' واترحّل على '+siteNameOf(site)+later,until:Date.now()+8000};
+    const later=(!OFF&&S.mode!=='live')?' على الجهاز، وسيُرفع عند عودة الاتصال بالإنترنت':'';
+    S.flash={text:(type==='exp'?'تم تسجيل مصروف ':'تم تسجيل إيداع ')+fmtPlain(amount)+' '+CUR+' ورُحِّل على '+siteNameOf(site)+later,until:Date.now()+8000};
     S.justSaved=true;render();const a=$('#j_amount');if(a)a.focus();
   };
 }
@@ -1143,26 +1235,26 @@ async function uploadReceipt(file){
 }
 function uploadErr(e){
   const c=e&&e.code;
-  if(c==='unsupported_type')return 'نوع الملف ده مش مدعوم. ارفع صورة (JPG أو PNG) أو PDF.';
-  if(c==='too_large')return 'الملف كبير أوي. صوّره تاني بحجم أصغر.';
-  if(c==='quota_or_state')return 'مساحة الصور اتملت. كلم المسؤول عن الابلكيشن.';
-  if(c==='rate_limited')return 'استنى شوية وجرّب تاني.';
-  if(c==='not_granted'||c==='capability_disabled')return 'رفع الصور مش متاح بالصلاحية دي.';
-  return 'رفع الصورة ما نجحش. اتأكد من النت وجرّب تاني.';
+  if(c==='unsupported_type')return 'نوع هذا الملف غير مدعوم. ارفع صورة (JPG أو PNG) أو PDF.';
+  if(c==='too_large')return 'الملف كبير جدًا. صوّره مرة أخرى بحجم أصغر.';
+  if(c==='quota_or_state')return 'امتلأت مساحة الصور. تواصل مع المسؤول عن التطبيق.';
+  if(c==='rate_limited')return 'انتظر قليلًا وحاول مرة أخرى.';
+  if(c==='not_granted'||c==='capability_disabled')return 'رفع الصور غير متاح بهذه الصلاحية.';
+  return 'تعذّر رفع الصورة. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.';
 }
 function viewerHTML(){
   const v=S.viewer;if(!v)return '';
-  if((OFF||APP)&&!v.url)return `<div class="viewer" id="viewer" role="dialog" aria-label="الإيصال"><div class="vbox"><div class="vbar"><b>الإيصال</b><button id="closeViewer">قفل</button></div><p class="note" style="margin:16px">${v.missing&&APP?'صورة الإيصال مش موجودة أو مش مسموح لك تشوفها.':v.missing?'صورة الإيصال دي مش موجودة على الجهاز ده. اعمل «تحديث» بملف نسخة احتياطية جديد من النسخة الأونلاين، وهيجيب معاه الصور.':'جاري فتح الصورة…'}</p></div></div>`;
+  if((OFF||APP)&&!v.url)return `<div class="viewer" id="viewer" role="dialog" aria-label="الإيصال"><div class="vbox"><div class="vbar"><b>الإيصال</b><button id="closeViewer">قفل</button></div><p class="note" style="margin:16px">${v.missing&&APP?'صورة الإيصال غير موجودة أو غير مسموح لك بعرضها.':v.missing?'صورة الإيصال هذه غير موجودة على هذا الجهاز. نفّذ «تحديث» بملف نسخة احتياطية جديد من النسخة على الإنترنت، وسيجلب معه الصور.':'جاري فتح الصورة…'}</p></div></div>`;
   const src=v.url||('/_blob/'+encodeURIComponent(v.id));
   return `<div class="viewer" id="viewer" role="dialog" aria-label="الإيصال"><div class="vbox"><div class="vbar"><b>الإيصال</b><button id="closeViewer">قفل</button></div>
     ${v.type==='application/pdf'?`<p class="note">الإيصال ملف PDF.</p><a class="primary-link" href="${src}" target="_blank" rel="noopener">افتح الملف</a>`:`<img src="${src}" alt="صورة الإيصال">`}</div></div>`;
 }
 function errText(e){
   const c=e&&e.code;
-  if(c==='invalid_argument')return 'مش مسموح لك تعدّل البيانات. اطلب من صاحب الابلكيشن صلاحية Contributor أو Editor.';
-  if(c==='quota_exceeded')return 'مساحة التخزين اتملت. امسح بعض السجلات القديمة وحاول تاني.';
-  if(c==='resource_exhausted')return 'عمليات كتير في وقت قصير. استنى ثواني وحاول تاني.';
-  return 'العملية ما نجحتش. اتأكد من الاتصال وحاول تاني.';
+  if(c==='invalid_argument')return 'غير مسموح لك بتعديل البيانات. اطلب من صاحب التطبيق صلاحية Contributor أو Editor.';
+  if(c==='quota_exceeded')return 'امتلأت مساحة التخزين. احذف بعض السجلات القديمة وحاول مرة أخرى.';
+  if(c==='resource_exhausted')return 'عمليات كثيرة في وقت قصير. انتظر بضع ثوانٍ وحاول مرة أخرى.';
+  return 'لم تنجح العملية. تأكد من الاتصال وحاول مرة أخرى.';
 }
 
 /* ---------- minimal .xlsx writer (no external library) ---------- */
@@ -1234,14 +1326,14 @@ function logDetails(col,r){
   if(col==='sites'||col==='contractors'||col==='items')return r.name||'';
   return r.details||'';
 }
-const FLD=[['name','الاسم'],['claim','إجمالي المستخلص',v=>v?fmtPlain(+v):'—'],['spec','التخصص'],['phone','التليفون'],['code','الكود'],['amount','المبلغ',v=>fmtPlain(+v||0)],['date','التاريخ'],['contractor','المقاول'],['item','البند'],['method','نقدي/بنك',v=>METHOD[v==='bank'?'bank':'cash']],['notes','البيان'],['remarks','ملاحظات'],['receipt','الإيصال',v=>v?'موجود':'مفيش']];
+const FLD=[['name','الاسم'],['claim','إجمالي المستخلص',v=>v?fmtPlain(+v):'—'],['spec','التخصص'],['phone','الهاتف'],['code','الكود'],['amount','المبلغ',v=>fmtPlain(+v||0)],['date','التاريخ'],['contractor','المقاول'],['item','البند'],['method','نقدي/بنك',v=>METHOD[v==='bank'?'bank':'cash']],['notes','البيان'],['remarks','ملاحظات'],['receipt','الإيصال',v=>v?'موجود':'لا يوجد']];
 function diffText(a,b){
   const out=[];for(const [k,l,f] of FLD){const x=a[k]??'',y=b[k]??'';const fx=f?f(x):x,fy=f?f(y):y;if(String(fx)!==String(fy))out.push(l+': '+(fx===''?'—':fx)+' ← '+(fy===''?'—':fy))}
   return out.length?out.join(' · '):'بدون تغيير في القيم';
 }
 const fmtPlain=n=>(Math.round(n*100)/100).toLocaleString('en-US',{maximumFractionDigits:2});
 function logChange(action,col,r,old){
-  const isReg=col==='contractors'||col==='items';const e={at:Date.now(),action,kind:col,byId:S.uid||'',siteId:col==='sites'?(r.id||''):(r.siteId||''),siteName:col==='sites'?(r.name||''):isReg?'':siteNameOf(r.siteId),amount:col==='counts'?(+r.cash||0)+(+r.bank||0):(col==='sites'||isReg?null:amt(r)),date:r.date||'',details:old?diffText(old,r):logDetails(col,r),by:(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||r.by||S.myName||'',source:OFF?'الكمبيوتر':'أونلاين'};
+  const isReg=col==='contractors'||col==='items';const e={at:Date.now(),action,kind:col,byId:S.uid||'',siteId:col==='sites'?(r.id||''):(r.siteId||''),siteName:col==='sites'?(r.name||''):isReg?'':siteNameOf(r.siteId),amount:col==='counts'?(+r.cash||0)+(+r.bank||0):(col==='sites'||isReg?null:amt(r)),date:r.date||'',details:old?diffText(old,r):logDetails(col,r),by:(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||r.by||S.myName||'',source:OFF?'الكمبيوتر':'الإنترنت'};
   S.pending.push({col:'log',id:newId(),data:e});savePending();merge();
   flush();
   if(OFF&&lsGet(LS_AUTOX)){clearTimeout(S.autoT);S.autoT=setTimeout(()=>exportExcel(null,true),1200)}
@@ -1263,7 +1355,7 @@ async function exportExcel(siteId,auto){
   const sites=S.sites.filter(s=>!siteId||s.id===siteId);
   const sum1={name:'الملخص',rows:[],styles:{},widths:[26,14,14,14,14,14,13,14,14,12,14],freeze:0};
   sum1.rows.push(['ADC Construction · حسابات المواقع'+(siteId?' · '+siteNameOf(siteId):'')]);sum1.styles[0]=3;
-  sum1.rows.push(['اتحفظ الملف: '+stamp(now)]);sum1.rows.push([]);
+  sum1.rows.push(['تم حفظ الملف: '+stamp(now)]);sum1.rows.push([]);
   H(sum1,['الموقع','الإيداعات','المصروفات','الرصيد الدفتري','دفتري نقدي','دفتري بنك','تاريخ آخر جرد','نقدي موجود','في البنك','الفرق','الحالة']);
   let tot=[0,0,0,0,0];
   for(const s of sites){const b=bal(s.id),r=recon(s.id);tot=[tot[0]+b.dep,tot[1]+b.exp,tot[2]+b.total,tot[3]+b.cash,tot[4]+b.bank];
@@ -1274,7 +1366,7 @@ async function exportExcel(siteId,auto){
   const el=pick(S.exp).sort(byDate);for(const r of el)ex.rows.push([amt(r),r.notes||'',r.date,r.item||'',r.contractor||'',r.remarks||'',METHOD[meth(r)],siteNameOf(r.siteId),r.by||'',dt(r.created),dt(r.updated),r.receipt?'موجود':'']);
   T(ex,[sum(el),'الإجمالي']);
   const dp={name:'الإيداعات',rows:[],styles:{},widths:[13,28,12,10,24,20,14,17],freeze:1};
-  H(dp,['المبلغ','البيان','التاريخ','اتودع في','ملاحظات','الموقع','المسجل','وقت التسجيل','آخر تعديل','إيصال']);dp.widths.push(17,8);
+  H(dp,['المبلغ','البيان','التاريخ','أُودع في','ملاحظات','الموقع','المسجل','وقت التسجيل','آخر تعديل','إيصال']);dp.widths.push(17,8);
   const dl=pick(S.dep).sort(byDate);for(const r of dl)dp.rows.push([amt(r),r.notes||'إيداع من المالك',r.date,METHOD[meth(r)],r.remarks||'',siteNameOf(r.siteId),r.by||'',dt(r.created),dt(r.updated),r.receipt?'موجود':'']);
   T(dp,[sum(dl),'الإجمالي']);
   const ct={name:'الجرد',rows:[],styles:{},widths:[20,12,13,13,13,13,13,13,16,22,17],freeze:1};
@@ -1292,14 +1384,14 @@ async function exportExcel(siteId,auto){
    T(jr,['','','','الإجمالي',ti,to,'','','','','',run])}
   const blob=XLSX_W.build([sum1,jr,ex,dp,ct,lg]);
   const d=new Date(now),fn='ADC-حسابات-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كل-المواقع')+'-'+today()+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
-  try{await saveFile(fn,blob);if(!siteId){lsSet(LS_XLSX,now);S.xlsxMsg=(auto?'اتحفظ ملف Excel تلقائي: ':'اتحفظ: ')+fn}render()}catch(e){}
+  try{await saveFile(fn,blob);if(!siteId){lsSet(LS_XLSX,now);S.xlsxMsg=(auto?'تم حفظ ملف Excel تلقائيًا: ':'تم الحفظ: ')+fn}render()}catch(e){}
 }
 function excelBar(){
   if(!S.downloads)return '';
   const n=newSinceExcel(),last=lsGet(LS_XLSX);
   if(S.xlsxMsg){const m=S.xlsxMsg;S.xlsxMsg='';return `<div class="xbar ok"><i aria-hidden="true">✓</i><span>${esc(m)}</span></div>`}
   if(!n)return '';
-  return `<div class="xbar"><span>فيه <b>${n}</b> ${n===1?'تعديل جديد':'تعديلات جديدة'} من ${last?'آخر ملف Excel اتحفظ ('+stamp(last)+')':'ساعة ما بدأت، ولسه ما اتحفظش ملف Excel'}.</span><button class="primary" data-xlsx="all">حفظ ملف Excel دلوقتي</button></div>`;
+  return `<div class="xbar"><span>يوجد <b>${n}</b> ${n===1?'تعديل جديد':'تعديلات جديدة'} ${last?'منذ آخر ملف Excel محفوظ ('+stamp(last)+')':'منذ بدء العمل، ولم يُحفظ ملف Excel بعد'}.</span><button class="primary" data-xlsx="all">حفظ ملف Excel الآن</button></div>`;
 }
 function logCard(){
   const l=S.log.slice().sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,25);
@@ -1308,7 +1400,7 @@ function logCard(){
   return `<div class="card"><div class="sec-h">سجل التعديلات (آخر ${l.length||0})</div>
   ${l.length?`<div class="tbl-wrap"><table class="log-t"><thead><tr><th>التاريخ والوقت</th><th>العملية</th><th>الموقع</th><th class="num">المبلغ</th><th>التفاصيل</th><th>المسجل</th></tr></thead><tbody>
   ${l.map(e=>`<tr><td class="date">${esc(dt(e.at))}</td><td><span class="${e.action==='delete'?'pill-neg':e.action==='edit'?'pill-over':'pill-none'}">${ACT[e.action]||''} ${KIND[e.kind]||''}</span></td><td>${esc(e.siteName)||'—'}</td><td class="num plain">${e.amount==null?'—':fmt(e.amount)}</td><td>${esc(e.details)||'—'}</td><td>${esc(who(e))||'—'}</td></tr>`).join('')}
-  </tbody></table></div><p class="foot-note" style="margin:8px 0 0">السجل الكامل بتاريخ ووقت كل تعديل موجود في ملف Excel، في شيت «سجل التعديلات».</p>`:'<p class="empty-note">أول ما تسجل أو تحذف أي حاجة هتظهر هنا بتاريخها ووقتها.</p>'}</div>`;
+  </tbody></table></div><p class="foot-note" style="margin:8px 0 0">السجل الكامل بتاريخ ووقت كل تعديل موجود في ملف Excel، في ورقة «سجل التعديلات».</p>`:'<p class="empty-note">عند تسجيل أو حذف أي شيء سيظهر هنا بتاريخه ووقته.</p>'}</div>`;
 }
 /* ---------- files ---------- */
 async function saveFile(filename,blob){
@@ -1331,13 +1423,13 @@ async function saveBackup(){
   const n=rcIdsOf([...S.exp,...S.dep]).length;
   if(n){S.xlsxMsg='جاري تجهيز الملف مع '+n+' صورة إيصال…';render()}
   const receipts=n?await collectReceipts(false):{};
-  try{await saveFile('ADC-نسخة-احتياطية-'+today()+'.json',new Blob([JSON.stringify(fullData({receipts}))],{type:'application/json'}));lsSet(LS_BACKUP,Date.now());S.xlsxMsg='اتحفظ ملف النسخة الاحتياطية'+(n?' ومعاه '+Object.keys(receipts).length+' صورة إيصال':'')+'.';render()}catch(e){}
+  try{await saveFile('ADC-نسخة-احتياطية-'+today()+'.json',new Blob([JSON.stringify(fullData({receipts}))],{type:'application/json'}));lsSet(LS_BACKUP,Date.now());S.xlsxMsg='تم حفظ ملف النسخة الاحتياطية'+(n?' ومعه '+Object.keys(receipts).length+' صورة إيصال':'')+'.';render()}catch(e){}
 }
 function readImport(file){
   readFile(file,t=>{
     try{const d=parseBackup(t);const mp=l=>new Map(l.map(x=>[x.id,x]));const nw=(list,cur)=>{const m=mp(cur);return list.filter(x=>{const c=m.get(x.id);return !c||(x.updated||0)>(c.updated||0)})};
       S.importData={at:d.at,receipts:d.receipts,sites:nw(d.sites,S.sites),exp:nw(d.exp,S.exp),dep:nw(d.dep,S.dep),cnt:nw(d.cnt,S.cnt),log:nw(d.log,S.log),cons:nw(d.cons,S.cons),items:nw(d.items,S.items)}}
-    catch(e){S.importData={err:'الملف ده مش ملف نسخة احتياطية من الابلكيشن.'}}
+    catch(e){S.importData={err:'هذا الملف ليس ملف نسخة احتياطية من التطبيق.'}}
     render();
   });
 }
@@ -1364,18 +1456,18 @@ async function applyImport(){
   for(const e of d.log)put('log',e);
   const nImp=d.sites.length+d.exp.length+d.dep.length+d.cnt.length;
   savePending();merge();S.importData=null;if(nImp)logChange('import','files',{details:'استرجاع '+nImp+' حركة من ملف'});flush();
-  if(need.length)S.xlsxMsg='اترفع '+up+' صورة إيصال'+(miss?'، و'+miss+' صورة ما اترفعتش':'')+'.';render();
+  if(need.length)S.xlsxMsg='تم الرفع '+up+' صورة إيصال'+(miss?'، و'+miss+' صورة لم تُرفع':'')+'.';render();
 }
 /* offline: update + export */
 async function exportLocal(){
   const receipts=await collectReceipts(true);
   await saveFile('ADC-من-الكمبيوتر-'+today()+'.json',new Blob([JSON.stringify(fullData({source:'offline',receipts}))],{type:'application/json'}));
-  lsSet(LS_EXPORT,Date.now());S.note='اتحفظ ملف فيه كل البيانات وتعديلاتك. ارفعه من «استرجاع من ملف» في الابلكيشن الأونلاين.';render();
+  lsSet(LS_EXPORT,Date.now());S.note='تم حفظ ملف يحتوي على كل البيانات وتعديلاتك. ارفعه من «استرجاع من ملف» في التطبيق المتصل بالإنترنت.';render();
 }
 function readUpdate(file){
   readFile(file,t=>{
     try{const d=parseBackup(t);if(S.baseAt&&d.at&&d.at<S.baseAt){S.update={at:d.at,data:d};render();return}applyUpdate(d)}
-    catch(e){S.update={err:'الملف ده مش ملف نسخة احتياطية من ابلكيشن حسابات المواقع.'};render()}
+    catch(e){S.update={err:'هذا الملف ليس ملف نسخة احتياطية من تطبيق حسابات المواقع.'};render()}
   });
 }
 function applyUpdate(d){
@@ -1384,7 +1476,7 @@ function applyUpdate(d){
   S.baseAt=d.at||Date.now();
   vaultSave();
   merge();savePending();S.update=null;
-  S.note='اتحدثت البيانات: '+S.srv.sites.length+' موقع، '+S.srv.dep.length+' إيداع، '+S.srv.exp.length+' مصروف، '+S.srv.cnt.length+' جرد.'+(S.pending.length?' ولسه عندك '+S.pending.length+' تعديل هنا مش مرفوع.':'');
+  S.note='تم تحديث البيانات: '+S.srv.sites.length+' موقع، '+S.srv.dep.length+' إيداع، '+S.srv.exp.length+' مصروف، '+S.srv.cnt.length+' جرد.'+(S.pending.length?' وما زال لديك '+S.pending.length+' تعديل هنا غير مرفوع.':'');
   if(!String(S.sel).startsWith('__')&&!S.sites.some(s=>s.id===S.sel))S.sel='__all';
   render();
 }
@@ -1394,16 +1486,16 @@ function backupHTML(){
     const n=S.pending.filter(p=>p.col!=='log').length,up=S.update,lastExp=lsGet(LS_EXPORT);
     return `<div class="card backup" id="sync">
     <div class="sec-h">التحديث والمزامنة</div>
-    <p><b>تحديث:</b> من الابلكيشن الأونلاين اضغط «حفظ ملف نسخة احتياطية»، وبعدين هنا اضغط «تحديث» واختار الملف ده. هتتحدث البيانات بآخر نسخة أونلاين، وأي حركة سجلتها هنا ولسه مش مرفوعة هتفضل زي ما هي.</p>
-    <p><b>رفع تعديلاتك:</b> لو سجلت إيداعات أو مصروفات هنا، اضغط «حفظ ملف للرفع»، وافتح الابلكيشن الأونلاين واضغط «استرجاع من ملف» واختار الملف.</p>
+    <p><b>تحديث:</b> من التطبيق على الإنترنت اضغط «حفظ ملف نسخة احتياطية»، ثم اضغط هنا «تحديث» واختر هذا الملف. ستُحدَّث البيانات بآخر نسخة على الإنترنت، وأي حركة سجّلتها هنا ولم تُرفع بعد ستبقى كما هي.</p>
+    <p><b>رفع تعديلاتك:</b> إذا سجّلت إيداعات أو مصروفات هنا، فاضغط «حفظ ملف للرفع»، ثم افتح التطبيق على الإنترنت واضغط «استرجاع من ملف» واختر الملف.</p>
     <div class="row">
-      <span class="filebtn"><button type="button" class="primary">تحديث</button><input type="file" id="updFile" accept=".json,application/json" aria-label="اختار ملف النسخة الاحتياطية للتحديث"></span>
+      <span class="filebtn"><button type="button" class="primary">تحديث</button><input type="file" id="updFile" accept=".json,application/json" aria-label="اختر ملف النسخة الاحتياطية للتحديث"></span>
       <button id="exportLocal">حفظ ملف للرفع${n?' ('+n+')':''}</button>
     </div>
-    <label class="chk"><input type="checkbox" id="autoX" ${lsGet(LS_AUTOX)?'checked':''}> احفظ ملف Excel تلقائي بعد كل تعديل (بتاريخ ووقت التعديل في اسم الملف)</label>
-    ${n?`<p class="warn">فيه ${n} تعديل جديد هنا لسه مش في النسخة الأونلاين.${lastExp?' آخر ملف رفع اتحفظ '+stamp(lastExp)+'.':''}</p>`:''}
+    <label class="chk"><input type="checkbox" id="autoX" ${lsGet(LS_AUTOX)?'checked':''}> احفظ ملف Excel تلقائيًا بعد كل تعديل (بتاريخ ووقت التعديل في اسم الملف)</label>
+    ${n?`<p class="warn">يوجد ${n} تعديل جديد هنا لم يُرفع بعد إلى النسخة على الإنترنت.${lastExp?' آخر ملف رفع محفوظ '+stamp(lastExp)+'.':''}</p>`:''}
     ${S.note?`<p class="msg ok">${esc(S.note)}</p>`:''}
-    ${up?`<div class="row"><span class="msg ${up.err?'err':''}">${up.err?esc(up.err):`الملف ده (${stamp(up.at)}) أقدم من آخر تحديث عندك (${stamp(S.baseAt)}). متأكد إنك عايز ترجع للنسخة الأقدم؟`}</span>${up.err?'':'<button class="danger" id="updYes">أيوه، حدّث بيها</button>'}<button id="updNo">إلغاء</button></div>`:''}
+    ${up?`<div class="row"><span class="msg ${up.err?'err':''}">${up.err?esc(up.err):`هذا الملف (${stamp(up.at)}) أقدم من آخر تحديث لديك (${stamp(S.baseAt)}). هل أنت متأكد أنك تريد الرجوع إلى النسخة الأقدم؟`}</span>${up.err?'':'<button class="danger" id="updYes">نعم، حدّث بها</button>'}<button id="updNo">إلغاء</button></div>`:''}
   </div>`;
   }
   const last=lsGet(LS_BACKUP);
@@ -1411,14 +1503,14 @@ function backupHTML(){
   const imp=S.importData;
   return `<div class="card backup">
     <div class="sec-h">نسخة على الجهاز</div>
-    <p>الابلكيشن بيحفظ آخر نسخة من الحسابات على الجهاز ده تلقائيًا كل ما يتحدّث، وبيفتح منها لو النت قطع. وللأمان، احفظ كمان ملف نسخة احتياطية في فولدر على جهازك من وقت للتاني.</p>
-    <p>نسخة الكمبيوتر بتفتح من غير نت خالص. عشان تحدّثها، احفظ ملف نسخة احتياطية من هنا وافتحه بزرار «تحديث» فيها. واللي بيتسجل هناك بيرجع هنا من «استرجاع من ملف».</p>
-    <p>آخر ملف نسخة احتياطية: ${last?`<b>${stamp(last)}</b>${days>=7?` <span class="warn">(من ${days} يوم، يُفضّل تحفظ نسخة جديدة)</span>`:''}`:'<span class="warn">لسه ما اتحفظش ملف</span>'}</p>
+    <p>يحفظ التطبيق آخر نسخة من الحسابات على هذا الجهاز تلقائيًا عند كل تحديث، ويفتح منها إذا انقطع الإنترنت. وللأمان، احفظ أيضًا ملف نسخة احتياطية في مجلد على جهازك من وقت لآخر.</p>
+    <p>نسخة الكمبيوتر تعمل دون إنترنت تمامًا. لتحديثها، احفظ ملف نسخة احتياطية من هنا وافتحه بزر «تحديث» فيها. وما يُسجَّل هناك يعود إلى هنا من «استرجاع من ملف».</p>
+    <p>آخر ملف نسخة احتياطية: ${last?`<b>${stamp(last)}</b>${days>=7?` <span class="warn">(من ${days} يوم، يُفضَّل حفظ نسخة جديدة)</span>`:''}`:'<span class="warn">لم يُحفظ ملف بعد</span>'}</p>
     <div class="row">
-      ${S.downloads?'<button class="primary" id="saveBackup">حفظ ملف نسخة احتياطية</button><button id="dlOffline">تنزيل نسخة الكمبيوتر</button>':'<span class="msg">حفظ الملفات مش متاح في العرض ده.</span>'}
-      ${S.isManager?'<span class="filebtn"><button type="button">استرجاع من ملف</button><input type="file" id="importFile" accept=".json,application/json" aria-label="اختار ملف النسخة الاحتياطية"></span>':''}
+      ${S.downloads?'<button class="primary" id="saveBackup">حفظ ملف نسخة احتياطية</button><button id="dlOffline">تنزيل نسخة الكمبيوتر</button>':'<span class="msg">حفظ الملفات غير متاح في هذا العرض.</span>'}
+      ${S.isManager?'<span class="filebtn"><button type="button">استرجاع من ملف</button><input type="file" id="importFile" accept=".json,application/json" aria-label="اختر ملف النسخة الاحتياطية"></span>':''}
     </div>
-    ${imp?`<div class="row"><span class="msg">${imp.err?`<span class="msg err">${esc(imp.err)}</span>`:`الملف من ${stamp(imp.at)}: هيتضاف أو يتحدّث <b>${imp.sites.length}</b> موقع و<b>${imp.dep.length}</b> إيداع و<b>${imp.exp.length}</b> مصروف و<b>${imp.cnt.length}</b> جرد.`}</span>
+    ${imp?`<div class="row"><span class="msg">${imp.err?`<span class="msg err">${esc(imp.err)}</span>`:`الملف من ${stamp(imp.at)}: ستتم إضافته أو تحديثه <b>${imp.sites.length}</b> موقع و<b>${imp.dep.length}</b> إيداع و<b>${imp.exp.length}</b> مصروف و<b>${imp.cnt.length}</b> جرد.`}</span>
       ${imp.busy?`<span class="msg">${esc(imp.busy)}</span>`:''}${!imp.busy&&!imp.err&&(imp.sites.length||imp.exp.length||imp.dep.length||imp.cnt.length||(imp.cons||[]).length||(imp.items||[]).length)?'<button class="primary" id="importYes">استرجاع</button>':''}<button id="importNo">إلغاء</button></div>`:''}
   </div>`;
 }
@@ -1435,7 +1527,7 @@ function bindOverview(){
   on('#importFile','onchange',e=>readImport(e.target.files&&e.target.files[0]));
   on('#importYes','onclick',applyImport);
   on('#importNo','onclick',()=>{S.importData=null;render()});
-  on('#dlOffline','onclick',async()=>{try{const b=await (await fetch('offline.html')).blob();await S.downloads.save({filename:'ADC-حسابات-المواقع-كمبيوتر.html',data:new Blob([b],{type:'text/html'})})}catch(e){showBanner('تنزيل نسخة الكمبيوتر ما نجحش. حاول تاني.')}});
+  on('#dlOffline','onclick',async()=>{try{const b=await (await fetch('offline.html')).blob();await S.downloads.save({filename:'ADC-حسابات-المواقع-كمبيوتر.html',data:new Blob([b],{type:'text/html'})})}catch(e){showBanner('تعذّر تنزيل نسخة الكمبيوتر. حاول مرة أخرى.')}});
   on('#exportLocal','onclick',exportLocal);
   on('#updFile','onchange',e=>readUpdate(e.target.files&&e.target.files[0]));
   on('#updYes','onclick',()=>applyUpdate(S.update.data));
@@ -1534,32 +1626,32 @@ async function offLogin(name,pw){
 function lockHTML(){
   const wait=SEC.until>Date.now()?Math.ceil((SEC.until-Date.now())/1000):0;
   const err=SEC.msg?`<p class="lk-err" role="alert">${esc(SEC.msg)}</p>`:'';
-  const waitP=wait?`<p class="lk-err">استنى ${wait} ثانية وجرّب تاني.</p>`:'';
+  const waitP=wait?`<p class="lk-err">انتظر ${wait} ثانية وحاول مرة أخرى.</p>`:'';
   let body='';
   if(OFF&&SEC.mode==='wipe'){
-    body=`<h2>مسح بيانات الجهاز</h2><p class="lk-sub">ده هيمسح كل البيانات والمستخدمين في نسخة الكمبيوتر على الجهاز ده، والحركات اللي ما اترفعتش هتضيع. بعدها تدخل بالمستخدم الرئيسي من جديد وترجّع البيانات بزرار «تحديث» من ملف نسخة احتياطية.</p>
+    body=`<h2>حذف بيانات الجهاز</h2><p class="lk-sub">سيؤدي هذا إلى مسح جميع البيانات والمستخدمين في نسخة الكمبيوتر على هذا الجهاز، وستضيع الحركات التي لم تُرفع. بعد ذلك سجّل الدخول بالمستخدم الرئيسي من جديد واسترجع البيانات بزر «تحديث» من ملف نسخة احتياطية.</p>
     <form id="lkWipe" class="lk-form" novalidate><label for="lk_wipe">اكتب كلمة «مسح» للتأكيد</label><input id="lk_wipe">${err}
     <button class="danger" type="submit">امسح وابدأ من جديد</button><button type="button" id="lkBack">رجوع</button></form>`;
   }else if(OFF){
-    body=`<h2>تسجيل الدخول</h2><p class="lk-sub">ادخل باسم المستخدم والباسورد.</p>${SEC.info?`<p class="lk-info">${esc(SEC.info)}</p>`:''}
+    body=`<h2>تسجيل الدخول</h2><p class="lk-sub">سجّل الدخول باسم المستخدم وكلمة المرور.</p>${SEC.info?`<p class="lk-info">${esc(SEC.info)}</p>`:''}
     <form id="lkForm" class="lk-form" autocomplete="off" novalidate>
       <label for="lk_user">اسم المستخدم</label><input id="lk_user" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" dir="ltr" value="${esc(SEC.lastUser||'')}">
-      <label for="lk_pw">الباسورد</label><input id="lk_pw" type="password" autocomplete="current-password" dir="ltr">
-      <label class="chk sm"><input type="checkbox" id="lk_show"> إظهار الباسورد</label>
+      <label for="lk_pw">كلمة المرور</label><input id="lk_pw" type="password" autocomplete="current-password" dir="ltr">
+      <label class="chk sm"><input type="checkbox" id="lk_show"> إظهار كلمة المرور</label>
       ${err}${waitP}
       <button class="primary" type="submit" id="lkBtn" ${wait?'disabled':''}>دخول</button>
-      <button type="button" class="ghost" id="lkForgot">نسيت الباسورد</button>
+      <button type="button" class="ghost" id="lkForgot">نسيت كلمة المرور</button>
       ${FS_OK?'<button type="button" class="ghost" id="lkOpenDb">فتح ملف قاعدة بيانات</button>':''}
-      ${SEC.forgot?`<p class="lk-warn">لو انت مستخدم عادي، اطلب من المستخدم الرئيسي يغيّرلك الباسورد. لو المستخدم الرئيسي نسي الباسورد، مفيش طريقة ترجّع البيانات المتشفّرة غير إنك تمسحها وترجّعها من ملف نسخة احتياطية.</p><button type="button" class="danger" id="lkWipeGo">مسح بيانات الجهاز</button>`:''}
+      ${SEC.forgot?`<p class="lk-warn">إذا كنت مستخدمًا عاديًا، فاطلب من المستخدم الرئيسي تغيير كلمة المرور الخاصة بك. وإذا نسي المستخدم الرئيسي كلمة المرور، فلا توجد طريقة لاستعادة البيانات المشفّرة إلا بحذفها واسترجاعها من ملف نسخة احتياطية.</p><button type="button" class="danger" id="lkWipeGo">حذف بيانات الجهاز</button>`:''}
     </form>`;
   }else{
-    body=`<h2>الابلكيشن مقفول</h2><p class="lk-sub">اكتب الـ PIN (٦ أرقام) عشان تكمّل.</p>
+    body=`<h2>التطبيق مقفل</h2><p class="lk-sub">أدخل الـ PIN (٦ أرقام) للمتابعة.</p>
     <form id="lkForm" class="lk-form" autocomplete="off" novalidate>
       <label for="lk_pin">الـ PIN</label><input id="lk_pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" class="pin-in">
       ${err}${waitP}
       <button class="primary" type="submit" id="lkBtn" ${wait?'disabled':''}>فتح</button>
       <button type="button" class="ghost" id="lkForgot">نسيت الـ PIN</button>
-      ${SEC.forgot?`<p class="lk-warn">اسأل مدير الابلكيشن عن الـ PIN.</p>`:''}
+      ${SEC.forgot?`<p class="lk-warn">اسأل مدير التطبيق عن الـ PIN.</p>`:''}
     </form>`;
   }
   const lg=document.querySelector('.logo img');
@@ -1582,19 +1674,19 @@ function bindLock(){
     try{
       if(OFF){
         const u=q('lk_user').value.trim(),p=q('lk_pw').value;SEC.lastUser=u;
-        if(!u||!p){SEC.msg='اكتب اسم المستخدم والباسورد.';return showLock()}
-        if(!window.crypto||!crypto.subtle){SEC.msg='الملف متفتح في مكان مش بيدعم التشفير (زي معاينة الملفات). نزّل الملف على الجهاز وافتحه بـ Chrome أو Edge.';return showLock()}
+        if(!u||!p){SEC.msg='أدخل اسم المستخدم وكلمة المرور.';return showLock()}
+        if(!window.crypto||!crypto.subtle){SEC.msg='الملف مفتوح في مكان لا يدعم التشفير (مثل معاينة الملفات). نزّل الملف على الجهاز وافتحه بـ Chrome أو Edge.';return showLock()}
         let ok=false;
         try{for(const [a,b] of loginVariants(u,p)){if(await offLogin(a,b)){ok=true;break}}}
-        catch(e){SEC.msg='حصلت مشكلة وانت بتدخل ('+(e&&e.name||'خطأ')+'). نزّل الملف على الجهاز وافتحه بـ Chrome أو Edge، مش من معاينة الملفات.';return showLock()}
-        if(!ok){failWait();SEC.msg='اسم المستخدم أو الباسورد غلط.'+(hasAr(u)?' اسم المستخدم اتكتب بحروف عربي، غيّر الكيبورد للإنجليزي واكتبه تاني.':' اتأكد إن الكيبورد إنجليزي وإن Caps Lock مقفول.');return showLock()}
+        catch(e){SEC.msg='حدثت مشكلة أثناء تسجيل الدخول ('+(e&&e.name||'خطأ')+'). حمّل الملف على الجهاز وافتحه باستخدام Chrome أو Edge، وليس من معاينة الملفات.';return showLock()}
+        if(!ok){failWait();SEC.msg='اسم المستخدم أو كلمة المرور غير صحيحة.'+(hasAr(u)?' اسم المستخدم مكتوب بحروف عربية، غيّر لوحة المفاتيح إلى الإنجليزية واكتبه مرة أخرى.':' تأكد من أن لوحة المفاتيح بالإنجليزية وأن Caps Lock غير مفعّل.');return showLock()}
         SEC.fails=0;S.isManager=SEC.user.role==='admin';S.roleKnown=true;SEC.info='';
         await fsInit(true);const synced=await syncFromDbFile();
-        merge();hideLock();S.sel='__all';S.loaded=true;if(synced)SEC.note='اتحمّلت آخر نسخة من ملف قاعدة البيانات «'+FS.db.name+'».';render();dbFileSave();return;
+        merge();hideLock();S.sel='__all';S.loaded=true;if(synced)SEC.note='تم تحميل آخر نسخة من ملف قاعدة البيانات «'+FS.db.name+'».';render();dbFileSave();return;
       }
       const pin=q('lk_pin').value.trim();
       if(pin.length===PIN_LEN&&await sha(PIN_SALT+pin)===PIN_HASH){SEC.fails=0;hideLock();render();return}
-      failWait();SEC.msg='الـ PIN غلط.';showLock();
+      failWait();SEC.msg='الـ PIN غير صحيح.';showLock();
     }finally{if(btn&&btn.isConnected&&SEC.until<=Date.now())btn.disabled=false}
   };
   const pi=q('lk_pin');if(pi)pi.oninput=()=>{pi.value=toLatinDigits(pi.value).replace(/\D/g,'').slice(0,PIN_LEN);if(pi.value.length===PIN_LEN&&f)f.requestSubmit()};
@@ -1604,7 +1696,7 @@ function bindLock(){
   const wg=q('lkWipeGo');if(wg)wg.onclick=()=>{SEC.mode='wipe';SEC.msg='';showLock()};
   const bk=q('lkBack');if(bk)bk.onclick=()=>{SEC.mode='';SEC.msg='';showLock()};
   const w=q('lkWipe');if(w)w.onsubmit=ev=>{ev.preventDefault();
-    if(q('lk_wipe').value.trim()!=='مسح'){SEC.msg='اكتب كلمة «مسح» بالظبط.';return showLock()}
+    if(q('lk_wipe').value.trim()!=='مسح'){SEC.msg='اكتب كلمة «مسح» بالضبط.';return showLock()}
     for(const k of [LS_AUTH,LS_VAULT,LS_BASE,LS_LOCAL,LS_META])try{localStorage.removeItem(k)}catch(e){}
     if(typeof hSet==='function'){hSet('db',null);FS.db=null;FS.dbPerm=''}
     S.srv={sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[]};S.pending=[];S.baseAt=null;merge();SEC.mode='';SEC.forgot=false;SEC.msg='';SEC.lastUser=MAIN_USER;showLock()};
@@ -1622,34 +1714,34 @@ document.addEventListener('visibilitychange',()=>{if(!APP&&document.visibilitySt
 /* settings card */
 function securityCard(){
   const idle=idleMin();
-  const idleSel=`<label for="sec_idle">اقفل بعد</label><select id="sec_idle">${[2,5,10,15,30,60].map(m=>`<option value="${m}" ${m===idle?'selected':''}>${m} دقيقة من غير استخدام</option>`).join('')}</select>`;
+  const idleSel=`<label for="sec_idle">أقفل بعد</label><select id="sec_idle">${[2,5,10,15,30,60].map(m=>`<option value="${m}" ${m===idle?'selected':''}>${m} دقيقة دون استخدام</option>`).join('')}</select>`;
   if(APP)return appSecurityCard();
   if(!OFF)return `<div class="card backup" id="secCard"><div class="sec-h">قفل الشاشة بـ PIN</div>
-    <p>الابلكيشن بيطلب PIN موحّد من ٦ أرقام كل ما يتفتح، وبعد فترة من غير استخدام. الدخول نفسه بيتم بحساب claude.ai بتاع كل شخص، وده اللي بيحمي البيانات فعلًا.</p>
-    <div class="row">${idleSel}<button id="secLock">اقفل دلوقتي</button></div></div>`;
+    <p>يطلب التطبيق PIN موحّدًا من ٦ أرقام عند كل فتح، وبعد فترة من عدم الاستخدام. أما الدخول نفسه فيتم بحساب claude.ai الخاص بكل شخص، وهو ما يحمي البيانات فعلًا.</p>
+    <div class="row">${idleSel}<button id="secLock">أقفل الآن</button></div></div>`;
   const a=auth()||{users:{}},me=SEC.user||{};
   const users=Object.values(a.users||{}).sort((x,y)=>(x.role==='admin'?-1:1)-(y.role==='admin'?-1:1)||x.name.localeCompare(y.name));
   const pwForm=(id,title,needOld)=>`<form id="${id}" class="entry pw-form" novalidate><div class="sec-h" style="grid-column:1/-1;margin:0">${title}</div>
-    ${needOld?'<div class="f c2"><label for="cp_old">الباسورد الحالي</label><input id="cp_old" type="password" autocomplete="current-password"></div>':''}
-    <div class="f c2"><label for="cp_new">الباسورد الجديد</label><input id="cp_new" type="password" autocomplete="new-password"></div>
-    <div class="f c2"><label for="cp_new2">اكتبه تاني</label><input id="cp_new2" type="password" autocomplete="new-password"></div>
+    ${needOld?'<div class="f c2"><label for="cp_old">كلمة المرور الحالية</label><input id="cp_old" type="password" autocomplete="current-password"></div>':''}
+    <div class="f c2"><label for="cp_new">كلمة المرور الجديدة</label><input id="cp_new" type="password" autocomplete="new-password"></div>
+    <div class="f c2"><label for="cp_new2">أعد كتابته</label><input id="cp_new2" type="password" autocomplete="new-password"></div>
     <div class="form-foot"><button class="primary" type="submit">حفظ</button><button type="button" class="pwCancel">إلغاء</button><span class="msg" id="cpMsg"></span></div></form>`;
-  return `<div class="card backup" id="secCard"><div class="sec-h">الأمان والمستخدمين</div>
-    <p>انت داخل باسم <b>${esc(me.name||'')}</b>${me.role==='admin'?' (المستخدم الرئيسي)':''}. البيانات على الجهاز متشفّرة. ملفات Excel والنسخ الاحتياطية اللي بتتحفظ مش متشفّرة، فحطها في فولدر آمن.</p>
-    ${me.role!=='admin'?'<p>انت شايف المواقع اللي انت سجلتها بس.</p>':''}
-    <div class="row">${me.role==='admin'?idleSel:''}<button id="secLock">اقفل دلوقتي</button><button id="secChpw">تغيير الباسورد بتاعي</button></div>
-    ${SEC.chpw?pwForm('chpwForm','تغيير الباسورد بتاعك',true):''}
-    ${me.role==='admin'?`<div class="tbl-wrap"><table class="users-t"><thead><tr><th>المستخدم</th><th>النوع</th><th>المواقع اللي سجلها</th><th></th></tr></thead><tbody>
+  return `<div class="card backup" id="secCard"><div class="sec-h">الأمان والمستخدمون</div>
+    <p>أنت مسجّل الدخول باسم <b>${esc(me.name||'')}</b>${me.role==='admin'?' (المستخدم الرئيسي)':''}. البيانات على الجهاز مشفّرة. ملفات Excel والنسخ الاحتياطية التي تُحفظ غير مشفّرة، لذا ضعها في مجلد آمن.</p>
+    ${me.role!=='admin'?'<p>أنت ترى المواقع التي سجّلتها فقط.</p>':''}
+    <div class="row">${me.role==='admin'?idleSel:''}<button id="secLock">أقفل الآن</button><button id="secChpw">تغيير كلمة المرور الخاصة بي</button></div>
+    ${SEC.chpw?pwForm('chpwForm','تغيير كلمة المرور الخاصة بك',true):''}
+    ${me.role==='admin'?`<div class="tbl-wrap"><table class="users-t"><thead><tr><th>المستخدم</th><th>النوع</th><th>المواقع التي سجّلها</th><th></th></tr></thead><tbody>
       ${users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td>${u.role==='admin'?'<span class="pill-ok">رئيسي</span>':'<span class="pill-none">مستخدم</span>'}</td><td class="num plain">${u.role==='admin'?'كل المواقع':S.srv.sites.concat(S.pending.filter(p=>p.col==='sites').map(p=>p.data)).filter(s=>lc(s.offUser)===lc(u.name)).length}</td>
-        <td class="acts">${u.role==='admin'?'':(SEC.delUser===lc(u.name)?`<span class="confirm"><button class="danger" data-udelyes="${esc(lc(u.name))}">تأكيد الحذف</button><button data-udelno="1">إلغاء</button></span>`:`<button class="ghost" data-ureset="${esc(lc(u.name))}">تغيير الباسورد</button><button class="ghost" data-udel="${esc(lc(u.name))}">حذف</button>`)}</td></tr>`).join('')}
+        <td class="acts">${u.role==='admin'?'':(SEC.delUser===lc(u.name)?`<span class="confirm"><button class="danger" data-udelyes="${esc(lc(u.name))}">تأكيد الحذف</button><button data-udelno="1">إلغاء</button></span>`:`<button class="ghost" data-ureset="${esc(lc(u.name))}">تغيير كلمة المرور</button><button class="ghost" data-udel="${esc(lc(u.name))}">حذف</button>`)}</td></tr>`).join('')}
       </tbody></table></div>
-      ${SEC.resetFor?pwForm('resetForm','باسورد جديد للمستخدم '+esc((a.users[SEC.resetFor]||{}).name||''),false):''}
+      ${SEC.resetFor?pwForm('resetForm','كلمة مرور جديدة للمستخدم '+esc((a.users[SEC.resetFor]||{}).name||''),false):''}
       ${SEC.addUser?`<form id="addUserForm" class="entry pw-form" novalidate><div class="sec-h" style="grid-column:1/-1;margin:0">مستخدم جديد</div>
         <div class="f c2"><label for="nu_name">اسم المستخدم</label><input id="nu_name" maxlength="40" autocomplete="off"></div>
-        <div class="f c2"><label for="nu_pw">الباسورد (٦ حروف أو أرقام على الأقل)</label><input id="nu_pw" type="password" autocomplete="new-password"></div>
-        <div class="f c2"><label for="nu_pw2">اكتبه تاني</label><input id="nu_pw2" type="password" autocomplete="new-password"></div>
+        <div class="f c2"><label for="nu_pw">كلمة المرور (٦ حروف أو أرقام على الأقل)</label><input id="nu_pw" type="password" autocomplete="new-password"></div>
+        <div class="f c2"><label for="nu_pw2">أعد كتابته</label><input id="nu_pw2" type="password" autocomplete="new-password"></div>
         <div class="form-foot"><button class="primary" type="submit">إضافة المستخدم</button><button type="button" class="pwCancel">إلغاء</button><span class="msg" id="nuMsg"></span></div>
-        <p class="foot-note" style="grid-column:1/-1;margin:0">المستخدم الجديد هيشوف المواقع اللي هو يضيفها بس، ويسجل فيها مصروفات وإيداعات. التعديل والحذف والجرد للمستخدم الرئيسي بس.</p></form>`
+        <p class="foot-note" style="grid-column:1/-1;margin:0">سيرى المستخدم الجديد المواقع التي يضيفها هو فقط، ويسجل فيها مصروفات وإيداعات. التعديل والحذف والجرد للمستخدم الرئيسي فقط.</p></form>`
       :'<div class="row"><button class="primary" id="secAddUser">إضافة مستخدم جديد</button></div>'}`:''}
     ${SEC.note?`<p class="msg ok">${esc(SEC.note)}</p>`:''}</div>`;
 }
@@ -1665,20 +1757,20 @@ function bindSecurity(){
   document.querySelectorAll('[data-ureset]').forEach(b=>b.onclick=()=>{close();SEC.resetFor=b.dataset.ureset;SEC.note='';render();const n=q('cp_new');if(n)n.focus()});
   document.querySelectorAll('[data-udel]').forEach(b=>b.onclick=()=>{close();SEC.delUser=b.dataset.udel;render()});
   document.querySelectorAll('[data-udelno]').forEach(b=>b.onclick=()=>{SEC.delUser='';render()});
-  document.querySelectorAll('[data-udelyes]').forEach(b=>b.onclick=()=>{const a=auth();const nm=(a.users[b.dataset.udelyes]||{}).name;delete a.users[b.dataset.udelyes];lsSet(LS_AUTH,a);dbFileSave();close();SEC.note='اتمسح المستخدم '+nm+'. المواقع والحركات اللي سجلها لسه موجودة وبتظهرلك.';render()});
-  const pwCheck=(n,n2,m)=>{if(n.length<6){m.className='msg err';m.textContent='الباسورد لازم يكون ٦ حروف أو أرقام على الأقل.';return false}if(n!==n2){m.className='msg err';m.textContent='الباسوردين مش زي بعض.';return false}return true};
+  document.querySelectorAll('[data-udelyes]').forEach(b=>b.onclick=()=>{const a=auth();const nm=(a.users[b.dataset.udelyes]||{}).name;delete a.users[b.dataset.udelyes];lsSet(LS_AUTH,a);dbFileSave();close();SEC.note='تم حذف المستخدم '+nm+'. المواقع والحركات التي سجّلها ما زالت موجودة وتظهر لك.';render()});
+  const pwCheck=(n,n2,m)=>{if(n.length<6){m.className='msg err';m.textContent='يجب أن تكون كلمة المرور ٦ حروف أو أرقام على الأقل.';return false}if(n!==n2){m.className='msg err';m.textContent='كلمتا المرور غير متطابقتين.';return false}return true};
   const cf=q('chpwForm');if(cf)cf.onsubmit=async ev=>{ev.preventDefault();const m=q('cpMsg'),a=auth(),rec=a.users[lc(SEC.user.name)];
-    let raw;try{raw=unb64((await dec(await userKey(rec.name,q('cp_old').value,unb64(rec.salt)),rec.wrap)).k)}catch(e){m.className='msg err';m.textContent='الباسورد الحالي غلط.';return}
+    let raw;try{raw=unb64((await dec(await userKey(rec.name,q('cp_old').value,unb64(rec.salt)),rec.wrap)).k)}catch(e){m.className='msg err';m.textContent='كلمة المرور الحالية غير صحيحة.';return}
     if(!pwCheck(q('cp_new').value,q('cp_new2').value,m))return;
-    a.users[lc(rec.name)]={...rec,...await wrapFor(rec.name,q('cp_new').value,raw)};lsSet(LS_AUTH,a);dbFileSave();close();SEC.note='اتغيّر الباسورد بتاعك.';render()};
+    a.users[lc(rec.name)]={...rec,...await wrapFor(rec.name,q('cp_new').value,raw)};lsSet(LS_AUTH,a);dbFileSave();close();SEC.note='تم تغيير كلمة المرور الخاصة بك.';render()};
   const rf=q('resetForm');if(rf)rf.onsubmit=async ev=>{ev.preventDefault();const m=q('cpMsg');if(!pwCheck(q('cp_new').value,q('cp_new2').value,m))return;
     const a=auth(),target=a.users[SEC.resetFor];if(!target)return;
-    const raw=await exportDek();a.users[SEC.resetFor]={...target,...await wrapFor(target.name,q('cp_new').value,raw)};lsSet(LS_AUTH,a);const nm=target.name;close();SEC.note='اتغيّر باسورد '+nm+'.';render()};
+    const raw=await exportDek();a.users[SEC.resetFor]={...target,...await wrapFor(target.name,q('cp_new').value,raw)};lsSet(LS_AUTH,a);const nm=target.name;close();SEC.note='تم تغيير كلمة مرور '+nm+'.';render()};
   const uf=q('addUserForm');if(uf)uf.onsubmit=async ev=>{ev.preventDefault();const m=q('nuMsg'),name=q('nu_name').value.trim(),a=auth();
-    if(!name){m.className='msg err';m.textContent='اكتب اسم المستخدم.';return}
-    if(a.users[lc(name)]){m.className='msg err';m.textContent='الاسم ده موجود بالفعل.';return}
+    if(!name){m.className='msg err';m.textContent='أدخل اسم المستخدم.';return}
+    if(a.users[lc(name)]){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
     if(!pwCheck(q('nu_pw').value,q('nu_pw2').value,m))return;
-    const raw=await exportDek();a.users[lc(name)]={name,role:'user',...await wrapFor(name,q('nu_pw').value,raw)};lsSet(LS_AUTH,a);dbFileSave();close();SEC.note='اتضاف المستخدم '+name+'. يقدر يدخل بالاسم والباسورد دول على الجهاز ده.';render()};
+    const raw=await exportDek();a.users[lc(name)]={name,role:'user',...await wrapFor(name,q('nu_pw').value,raw)};lsSet(LS_AUTH,a);dbFileSave();close();SEC.note='تمت إضافة المستخدم '+name+'. يمكنه تسجيل الدخول بهذا الاسم وكلمة المرور على هذا الجهاز.';render()};
 }
 /* the data key is kept non-extractable; the admin re-derives it from their own wrap held in memory at login */
 async function exportDek(){return DEK_RAW}
@@ -1730,18 +1822,18 @@ function dbFileSave(){
   clearTimeout(dbTimer);
   dbTimer=setTimeout(async()=>{
     try{await writeHandle(FS.db,dbPayload());FS.dbSaved=Date.now();FS.err='';lsSet(LS_META,{savedAt:FS.dbSaved});autoBackupDaily()}
-    catch(e){FS.err='الحفظ في ملف قاعدة البيانات ما نجحش. اتأكد إن الفلاشة أو الفولدر موجودين، أو اختار مكان تاني.';FS.dbPerm=await perm(FS.db,false)}
+    catch(e){FS.err='تعذّر الحفظ في ملف قاعدة البيانات. تأكد من وجود ذاكرة الفلاش أو المجلد، أو اختر مكانًا آخر.';FS.dbPerm=await perm(FS.db,false)}
     if(S.sel==='__all')render();else statusRender();
   },700);
 }
 async function backupNow(manual){
-  if(!FS.bk||FS.bkPerm!=='granted'){if(manual){FS.err='اختار فولدر النسخ الاحتياطية الأول.';render()}return false}
+  if(!FS.bk||FS.bkPerm!=='granted'){if(manual){FS.err='اختر مجلد النسخ الاحتياطية أولًا.';render()}return false}
   try{
     const d=new Date(),name='ADC-نسخة-احتياطية-'+today()+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.adcdb';
     const p=JSON.parse(dbPayload());p.receipts=await collectRawReceipts();
     const fh=await FS.bk.getFileHandle(name,{create:true});await writeHandle(fh,JSON.stringify(p));
-    FS.bkSaved=Date.now();lsSet(LS_LASTBK,{at:FS.bkSaved,day:today()});FS.err='';if(manual){SEC.note='اتعملت نسخة احتياطية: '+name;render()}return true;
-  }catch(e){FS.err='النسخة الاحتياطية ما اتحفظتش. اتأكد إن الفولدر موجود.';FS.bkPerm=await perm(FS.bk,false);render();return false}
+    FS.bkSaved=Date.now();lsSet(LS_LASTBK,{at:FS.bkSaved,day:today()});FS.err='';if(manual){SEC.note='تم إنشاء نسخة احتياطية: '+name;render()}return true;
+  }catch(e){FS.err='لم تُحفظ النسخة الاحتياطية. تأكد من وجود المجلد.';FS.bkPerm=await perm(FS.bk,false);render();return false}
 }
 function autoBackupDaily(){const l=lsGet(LS_LASTBK);if(FS.bk&&FS.bkPerm==='granted'&&(!l||l.day!==today()))backupNow(false)}
 async function saveToFolder(filename,blob){
@@ -1754,19 +1846,19 @@ async function pickDbFile(){
     FS.db=h;await hSet('db',h);FS.dbPerm=await perm(h,true);
     clearTimeout(vaultTimer);lsSet(LS_VAULT,await enc(SEC.key,vaultObj()));
     await writeHandle(h,dbPayload());FS.dbSaved=Date.now();lsSet(LS_META,{savedAt:FS.dbSaved});FS.err='';
-    SEC.note='اتحفظت قاعدة البيانات في الملف «'+h.name+'». من دلوقتي كل تعديل بيتحفظ فيه لوحده.';
-  }catch(e){if(e&&e.name!=='AbortError')FS.err='ما قدرتش أحفظ في المكان ده. جرّب فولدر تاني.'}
+    SEC.note='تم حفظ قاعدة البيانات في الملف «'+h.name+'». من الآن سيُحفظ فيه كل تعديل تلقائيًا.';
+  }catch(e){if(e&&e.name!=='AbortError')FS.err='تعذّر الحفظ في هذا المكان. جرّب مجلدًا آخر.'}
   render();
 }
 async function pickBkDir(){
   try{const h=await showDirectoryPicker({mode:'readwrite'});FS.bk=h;await hSet('bk',h);FS.bkPerm=await perm(h,true);FS.err='';
-    SEC.note='فولدر النسخ الاحتياطية بقى «'+h.name+'». الابلكيشن هيعمل فيه نسخة كل يوم لوحده، وملفات Excel وملفات الرفع هتتحفظ فيه.';await backupNow(false)}
-  catch(e){if(e&&e.name!=='AbortError')FS.err='ما قدرتش أستخدم الفولدر ده. جرّب فولدر تاني.'}
+    SEC.note='أصبح مجلد النسخ الاحتياطية «'+h.name+'». سيُنشئ التطبيق فيه نسخة كل يوم تلقائيًا، وستُحفظ فيه ملفات Excel وملفات الرفع.';await backupNow(false)}
+  catch(e){if(e&&e.name!=='AbortError')FS.err='تعذّر استخدام هذا المجلد. جرّب مجلدًا آخر.'}
   render();
 }
 async function regrant(){FS.dbPerm=await perm(FS.db,true);FS.bkPerm=await perm(FS.bk,true);if(FS.dbPerm==='granted')dbFileSave();render()}
-async function unlinkDb(){FS.db=null;FS.dbPerm='';await hSet('db',null);SEC.note='اتشال ربط ملف قاعدة البيانات. البيانات لسه محفوظة في المتصفح.';render()}
-async function unlinkBk(){FS.bk=null;FS.bkPerm='';await hSet('bk',null);SEC.note='اتشال فولدر النسخ الاحتياطية.';render()}
+async function unlinkDb(){FS.db=null;FS.dbPerm='';await hSet('db',null);SEC.note='تم إلغاء ربط ملف قاعدة البيانات. البيانات ما زالت محفوظة في المتصفح.';render()}
+async function unlinkBk(){FS.bk=null;FS.bkPerm='';await hSet('bk',null);SEC.note='تمت إزالة مجلد النسخ الاحتياطية.';render()}
 /* open an existing database file (new computer, or after wiping) — from the login screen */
 async function openDbFile(){
   try{
@@ -1777,8 +1869,8 @@ async function openDbFile(){
     if(d.receipts)for(const id in d.receipts){try{await rcSetRaw(id,d.receipts[id])}catch(e){}}
     try{localStorage.removeItem(LS_BASE);localStorage.removeItem(LS_LOCAL)}catch(e){}
     FS.db=h;await hSet('db',h);FS.dbPerm=await perm(h,true);
-    SEC.msg='';SEC.info='اتفتح ملف «'+h.name+'». ادخل باسم مستخدم وباسورد من الملف ده.';SEC.forgot=false;SEC.mode='';SEC.lastUser='';showLock();
-  }catch(e){if(e&&e.name==='AbortError')return;SEC.msg='الملف ده مش ملف قاعدة بيانات من الابلكيشن.';showLock()}
+    SEC.msg='';SEC.info='تم فتح ملف «'+h.name+'». سجّل الدخول باسم مستخدم وكلمة مرور من هذا الملف.';SEC.forgot=false;SEC.mode='';SEC.lastUser='';showLock();
+  }catch(e){if(e&&e.name==='AbortError')return;SEC.msg='هذا الملف ليس ملف قاعدة بيانات من التطبيق.';showLock()}
 }
 /* after login: if the linked file is newer than this browser's copy (e.g. used on another computer), load it */
 async function syncFromDbFile(){
@@ -1794,17 +1886,17 @@ async function syncFromDbFile(){
 }
 function storageCard(){
   if(!OFF||!isAdmin())return '';
-  if(!FS_OK)return `<div class="card backup"><div class="sec-h">مكان حفظ البيانات</div><p class="warn">المتصفح ده مش بيدعم اختيار مكان الحفظ. افتح الملف بـ Chrome أو Edge عشان تحدد مكان قاعدة البيانات والنسخ الاحتياطية.</p></div>`;
+  if(!FS_OK)return `<div class="card backup"><div class="sec-h">مكان حفظ البيانات</div><p class="warn">هذا المتصفح لا يدعم اختيار مكان الحفظ. افتح الملف بـ Chrome أو Edge لكي تحدد مكان قاعدة البيانات والنسخ الاحتياطية.</p></div>`;
   const pend=(FS.db&&FS.dbPerm!=='granted')||(FS.bk&&FS.bkPerm!=='granted');
   const lb=lsGet(LS_LASTBK);
   return `<div class="card backup" id="fsCard"><div class="sec-h">مكان حفظ البيانات</div>
-    <p>البيانات بتتحفظ في المتصفح. اختار كمان ملف على الهارد أو على فلاشة، والابلكيشن هيحفظ فيه نسخة متشفّرة بعد كل تعديل. ومن الملف ده تقدر تفتح البيانات على أي كمبيوتر تاني.</p>
-    ${pend?`<div class="xbar"><span>المتصفح محتاج إذنك عشان يكمّل الحفظ في الملف والفولدر اللي اخترتهم.</span><button class="primary" id="fsGrant">اسمح بالحفظ</button></div>`:''}
-    <div class="fs-row"><div class="fs-l"><b>ملف قاعدة البيانات</b><span class="note">${FS.db?`«${esc(FS.db.name)}»${FS.dbPerm==='granted'?(FS.dbSaved?' · آخر حفظ '+esc(stamp(FS.dbSaved)):' · مربوط'):' · مستني الإذن'}`:'لسه ما اتحددش مكان'}</span></div>
-      <div class="row"><button ${FS.db?'':'class="primary"'} id="fsPickDb">${FS.db?'تغيير المكان':'اختار مكان الملف'}</button>${FS.db?'<button class="ghost" id="fsUnDb">إلغاء الربط</button>':''}</div></div>
-    <div class="fs-row"><div class="fs-l"><b>فولدر النسخ الاحتياطية</b><span class="note">${FS.bk?`«${esc(FS.bk.name)}»${lb?' · آخر نسخة '+esc(stamp(lb.at)):''}${FS.bkPerm==='granted'?'':' · مستني الإذن'}`:'لسه ما اتحددش فولدر'}</span></div>
-      <div class="row"><button ${FS.bk?'':'class="primary"'} id="fsPickBk">${FS.bk?'تغيير الفولدر':'اختار الفولدر'}</button>${FS.bk?'<button id="fsBkNow">نسخة احتياطية دلوقتي</button><button class="ghost" id="fsUnBk">إلغاء</button>':''}</div></div>
-    <p class="foot-note" style="margin:0">في فولدر النسخ الاحتياطية بتتعمل نسخة متشفّرة كل يوم لوحدها، وبيتحفظ فيه كمان ملفات Excel وملفات «حفظ ملف للرفع». أي نسخة منهم تقدر تفتحها بزرار «فتح ملف قاعدة بيانات» في شاشة الدخول.</p>
+    <p>تُحفظ البيانات في المتصفح. اختر أيضًا ملفًا على القرص الصلب أو على ذاكرة فلاش، وسيحفظ التطبيق فيه نسخة مشفّرة بعد كل تعديل. ومن هذا الملف يمكنك فتح البيانات على أي كمبيوتر آخر.</p>
+    ${pend?`<div class="xbar"><span>يحتاج المتصفح إلى إذنك لإكمال الحفظ في الملف والمجلد اللذين اخترتهما.</span><button class="primary" id="fsGrant">اسمح بالحفظ</button></div>`:''}
+    <div class="fs-row"><div class="fs-l"><b>ملف قاعدة البيانات</b><span class="note">${FS.db?`«${esc(FS.db.name)}»${FS.dbPerm==='granted'?(FS.dbSaved?' · آخر حفظ '+esc(stamp(FS.dbSaved)):' · مربوط'):' · بانتظار الإذن'}`:'لم يُحدَّد مكان بعد'}</span></div>
+      <div class="row"><button ${FS.db?'':'class="primary"'} id="fsPickDb">${FS.db?'تغيير المكان':'اختر مكان الملف'}</button>${FS.db?'<button class="ghost" id="fsUnDb">إلغاء الربط</button>':''}</div></div>
+    <div class="fs-row"><div class="fs-l"><b>مجلد النسخ الاحتياطية</b><span class="note">${FS.bk?`«${esc(FS.bk.name)}»${lb?' · آخر نسخة '+esc(stamp(lb.at)):''}${FS.bkPerm==='granted'?'':' · بانتظار الإذن'}`:'لم يُحدَّد مجلد بعد'}</span></div>
+      <div class="row"><button ${FS.bk?'':'class="primary"'} id="fsPickBk">${FS.bk?'تغيير المجلد':'اختر المجلد'}</button>${FS.bk?'<button id="fsBkNow">نسخة احتياطية الآن</button><button class="ghost" id="fsUnBk">إلغاء</button>':''}</div></div>
+    <p class="foot-note" style="margin:0">في مجلد النسخ الاحتياطية تُنشأ نسخة مشفّرة تلقائيًا كل يوم، ويُحفظ فيه أيضًا ملفات Excel وملفات «حفظ ملف للرفع». يمكنك فتح أي نسخة منها بزر «فتح ملف قاعدة بيانات» في شاشة الدخول.</p>
     ${FS.err?`<p class="msg err">${esc(FS.err)}</p>`:''}</div>`;
 }
 function bindStorage(){
@@ -1822,7 +1914,7 @@ function regNames(col){
 }
 function regSelect(id,col,cls){
   const list=regNames(col),R=REG[col];
-  return `<select id="${id}" ${cls?`class="${cls}"`:''}><option value="">اختار ${R.one==='بند'?'البند':'المقاول'}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}${canReg()?`<option value="__new">+ ${R.one} جديد…</option>`:''}</select>
+  return `<select id="${id}" ${cls?`class="${cls}"`:''}><option value="">اختر ${R.one==='بند'?'البند':'المقاول'}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}${canReg()?`<option value="__new">+ ${R.one} جديد…</option>`:''}</select>
   <input id="${id}_new" class="reg-new" hidden maxlength="100" placeholder="اسم ال${R.one} الجديد">`;
 }
 function bindRegSelect(id,col){
@@ -1862,36 +1954,36 @@ function renderRegister(col){
   const totalAll=list.reduce((a,x)=>a+regStats(col,x.name).total,0);
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${R.title}</h2></div>
-  ${list.length?`<div class="card qs"><div class="sec-h">كشف حساب ${R.one}</div><div class="row"><select id="qsName" aria-label="اختار ال${R.one}"><option value="">اختار ال${R.one}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><button class="primary" id="qsGo">اطلع كشف الحساب</button></div></div>`:''}
-  <p class="foot-note" style="margin:-8px 0 0">${col==='contractors'?'سجّل المقاولين هنا مرة واحدة، وبعدها اختارهم من القايمة وانت بتسجل المصروف.':'سجّل بنود الصرف هنا مرة واحدة، وبعدها اختارها من القايمة وانت بتسجل المصروف.'}</p>
+  ${list.length?`<div class="card qs"><div class="sec-h">كشف حساب ${R.one}</div><div class="row"><select id="qsName" aria-label="اختر ال${R.one}"><option value="">اختر ال${R.one}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><button class="primary" id="qsGo">استخرج كشف الحساب</button></div></div>`:''}
+  <p class="foot-note" style="margin:-8px 0 0">${col==='contractors'?'سجّل المقاولين هنا مرة واحدة، وبعد ذلك اخترهم من القائمة أثناء تسجيل المصروف.':'سجّل بنود الصرف هنا مرة واحدة، وبعد ذلك اخترها من القائمة أثناء تسجيل المصروف.'}</p>
   ${canReg()?`<div class="card${S.regEdit?' entry-card editing':''}" id="regCard">${S.regEdit?`<div class="edit-h"><b>تعديل ${R.one}: ${esc(S.regEdit.name)}</b></div>`:''}<form class="entry" id="regForm" autocomplete="off" novalidate>
     <div class="f c2"><label for="r_name">اسم ال${R.one}</label><input id="r_name" maxlength="100" placeholder="${col==='contractors'?'مثال: مؤسسة الفتح للمباني':'مثال: خرسانة مسلحة'}"></div>
     ${col==='contractors'?`<div class="f c2"><label for="r_spec">التخصص (اختياري)</label><input id="r_spec" maxlength="80" placeholder="مباني، كهرباء، نجارة…"></div>
-    <div class="f c2"><label for="r_phone">التليفون (اختياري)</label><input id="r_phone" maxlength="30" inputmode="tel" dir="ltr"></div>
+    <div class="f c2"><label for="r_phone">الهاتف (اختياري)</label><input id="r_phone" maxlength="30" inputmode="tel" dir="ltr"></div>
     <div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>`
     :`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div><div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="sec-h">${list.length} ${R.one==='بند'?'بند':'مقاول'} · إجمالي المصروف عليهم ${fmt(totalAll)} ${CUR}</div>
-    ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>الاسم</th>${col==='contractors'?'<th>التخصص</th><th>التليفون</th>':'<th>الكود</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th>${col==='contractors'?'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع (${CUR})</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المصروف (${CUR})</th>'}<th>آخر صرف</th><th></th></tr></thead><tbody>
+    ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>الاسم</th>${col==='contractors'?'<th>التخصص</th><th>الهاتف</th>':'<th>الكود</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th>${col==='contractors'?'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع (${CUR})</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المصروف (${CUR})</th>'}<th>آخر صرف</th><th></th></tr></thead><tbody>
     ${list.map(x=>{const st=regStats(col,x.name),r=recs.get(x.name)||{};const delKey=col+'|'+x.name;
-      return `<tr><td><b>${esc(x.name)}</b>${x.reg?'':`<span class="pend">مش مسجّل</span>`}</td>${col==='contractors'?`<td>${esc(r.spec)||'—'}</td><td class="date">${esc(r.phone)||'—'}</td>`:`<td class="date">${esc(r.code)||'—'}</td>`}
+      return `<tr><td><b>${esc(x.name)}</b>${x.reg?'':`<span class="pend">غير مسجّل</span>`}</td>${col==='contractors'?`<td>${esc(r.spec)||'—'}</td><td class="date">${esc(r.phone)||'—'}</td>`:`<td class="date">${esc(r.code)||'—'}</td>`}
       <td class="num plain">${st.n}</td><td class="num plain">${st.sites}</td>${col==='contractors'?(()=>{const c=claimOf(x.name);return `<td class="num plain">${c==null?'—':fmt(c)}</td><td class="num">${fmt(st.total)}</td><td class="num strong${c!=null&&c-st.total<0?' neg':''}">${c==null?'—':fmt(c-st.total)}</td>`})():`<td class="num">${fmt(st.total)}</td>`}<td class="date">${esc(st.last)||'—'}</td>
-      <td class="acts"><button class="ghost" data-stmt="${col}" data-name="${esc(x.name)}">كشف حساب</button>${x.reg&&canEditRec(r)?`<button class="ghost" data-regedit="${col}" data-name="${esc(x.name)}">تعديل</button>`:''}${!x.reg&&canReg()?`<button class="ghost" data-regadd="${col}" data-name="${esc(x.name)}">تسجيل</button>`:''}${x.reg&&canEditRec(r)?(S.confirmReg===delKey?`<span class="confirm"><button class="danger" data-regdelyes="${col}" data-name="${esc(x.name)}">شيل من القايمة</button><button data-regdelno="1">إلغاء</button></span>`:`<button class="ghost" data-regdel="${col}" data-name="${esc(x.name)}">حذف</button>`):''}</td></tr>`}).join('')}
-    </tbody></table></div><p class="foot-note" style="margin:0">الحذف بيشيل الاسم من قايمة الاختيار بس، والحركات المسجلة عليه بتفضل زي ما هي. الأسماء اللي عليها «مش مسجّل» موجودة في حركات قديمة، وتقدر تسجّلها بدوسة.</p>`
-    :`<div class="blank" style="padding:24px"><h3>مفيش ${R.title} لسه</h3><p>${canReg()?'ضيف أول '+R.one+' من النموذج فوق.':'اطلب من المدير يضيفهم.'}</p></div>`}
+      <td class="acts"><button class="ghost" data-stmt="${col}" data-name="${esc(x.name)}">كشف حساب</button>${x.reg&&canEditRec(r)?`<button class="ghost" data-regedit="${col}" data-name="${esc(x.name)}">تعديل</button>`:''}${!x.reg&&canReg()?`<button class="ghost" data-regadd="${col}" data-name="${esc(x.name)}">تسجيل</button>`:''}${x.reg&&canEditRec(r)?(S.confirmReg===delKey?`<span class="confirm"><button class="danger" data-regdelyes="${col}" data-name="${esc(x.name)}">إزالة من القائمة</button><button data-regdelno="1">إلغاء</button></span>`:`<button class="ghost" data-regdel="${col}" data-name="${esc(x.name)}">حذف</button>`):''}</td></tr>`}).join('')}
+    </tbody></table></div><p class="foot-note" style="margin:0">الحذف يزيل الاسم من قائمة الاختيار فقط، وتبقى الحركات المسجلة عليه كما هي. الأسماء التي عليها «غير مسجّل» موجودة في حركات قديمة، ويمكنك تسجيلها بضغطة واحدة.</p>`
+    :`<div class="blank" style="padding:24px"><h3>لا يوجد ${R.title} بعد</h3><p>${canReg()?'أضف أول '+R.one+' من النموذج أعلاه.':'اطلب من المدير إضافتهم.'}</p></div>`}
   </div>`;
   const f=$('#regForm');if(f)f.onsubmit=ev=>{ev.preventDefault();const m=$('#regMsg'),name=$('#r_name').value.trim();
-    if(!name){m.className='msg err';m.textContent='اكتب الاسم.';return}
+    if(!name){m.className='msg err';m.textContent='أدخل الاسم.';return}
     const data={name};if(col==='contractors'){data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim()}
     if(S.regEdit){const old=(S[R.key]||[]).find(r=>r.id===S.regEdit.id);if(!old)return;
-      if(name!==old.name.trim()&&(S[R.key]||[]).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='الاسم ده موجود بالفعل.';return}
+      if(name!==old.name.trim()&&(S[R.key]||[]).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
       const upd={...clean(old),...data,updated:Date.now()};delete upd.id;queue(col,old.id,upd);
       logChange('edit',col,upd,old);
       if(name!==old.name.trim()){for(const e of S.exp.filter(e=>(e[R.field]||'').trim()===old.name.trim())){const ne={...clean(e),[R.field]:name,updated:Date.now()};delete ne.id;queue('expenses',e.id,ne)}}
-      S.regEdit=null;S.flash={text:'اتحفظ التعديل',until:Date.now()+6000};S.justSaved=true;render();return}
-    if(!addReg(col,data)){m.className='msg err';m.textContent='الاسم ده موجود بالفعل.';return}
-    S.flash={text:'اتضاف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
+      S.regEdit=null;S.flash={text:'تم حفظ التعديل',until:Date.now()+6000};S.justSaved=true;render();return}
+    if(!addReg(col,data)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
+    S.flash={text:'أُضيف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
   if(S.regFill&&S.regEdit){S.regFill=false;const r=(S[R.key]||[]).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');sv('#r_code',r.code);sv('#r_desc',r.desc)}
   const qg=$('#qsGo');if(qg)qg.onclick=()=>{const v=$('#qsName').value;if(!v){$('#qsName').focus();return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
   const rc=$('#regCancel');if(rc)rc.onclick=()=>{S.regEdit=null;S.justSaved=true;render()};
@@ -1917,13 +2009,13 @@ function renderStatement(col,name){
   return c!=null?`<div class="stats">
     <div class="stat"><div class="l">إجمالي المستخلص</div><div class="v plain">${fmt(c)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">المدفوع (كل المواقع)</div><div class="v">${fmt(paid)}<small>${CUR}</small></div><div class="split"><span>${all.length} حركة · ${sitesIn.length} موقع</span></div></div>
-    <div class="stat${c-paid<0?' deficit':''}"><div class="l">${c-paid<0?'مدفوع زيادة عن المستخلص':'المتبقي للمقاول'}</div><div class="v bal${c-paid<0?' neg':''}">${fmt(Math.abs(c-paid))}<small>${CUR}</small></div></div>
-  </div>${filtOn?`<p class="foot-note" style="margin:-6px 0 0">الأرقام دي لكل الحركات. الجدول تحت حسب الفلتر: ${fmt(sum(rows))} ${CUR} في ${rows.length} حركة.</p>`:''}`
+    <div class="stat${c-paid<0?' deficit':''}"><div class="l">${c-paid<0?'مدفوع بالزيادة عن المستخلص':'المتبقي للمقاول'}</div><div class="v bal${c-paid<0?' neg':''}">${fmt(Math.abs(c-paid))}<small>${CUR}</small></div></div>
+  </div>${filtOn?`<p class="foot-note" style="margin:-6px 0 0">هذه الأرقام لجميع الحركات. الجدول أدناه حسب الفلتر: ${fmt(sum(rows))} ${CUR} في ${rows.length} حركة.</p>`:''}`
   :`<div class="stats">
     <div class="stat"><div class="l">إجمالي المصروف${filtOn?' · حسب الفلتر':''}</div><div class="v">${fmt(sum(rows))}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">عدد الحركات</div><div class="v plain">${rows.length}</div></div>
     <div class="stat"><div class="l">عدد المواقع</div><div class="v plain">${new Set(rows.map(e=>e.siteId)).size}</div></div>
-  </div>${col==='contractors'&&S.isManager?`<p class="foot-note" style="margin:-6px 0 0">ممكن تضيف «إجمالي المستخلص» للمقاول ده من «تعديل» في صفحة المقاولين، وساعتها هيظهر المتبقي له.</p>`:''}`})()}
+  </div>${col==='contractors'&&S.isManager?`<p class="foot-note" style="margin:-6px 0 0">يمكنك إضافة «إجمالي المستخلص» لهذا المقاول من «تعديل» في صفحة المقاولين، وعندها سيظهر المتبقي له.</p>`:''}`})()}
   <div class="card" style="display:flex;flex-direction:column;gap:12px">
     <div class="filters">
       <div class="f"><label for="sf_site">الموقع</label><select id="sf_site"><option value="">كل المواقع</option>${sitesIn.map(id=>`<option value="${esc(id)}" ${sf.site===id?'selected':''}>${esc(siteNameOf(id))}</option>`).join('')}</select></div>
@@ -1933,7 +2025,7 @@ function renderStatement(col,name){
     </div>
     ${tr.length?`<div class="tbl-wrap"><table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>الموقع</th><th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th class="num">الإجمالي التراكمي</th></tr></thead><tbody>
     ${tr.map(e=>`<tr><td class="num">${fmt(amt(e))}<span class="mtag">${METHOD[meth(e)]}</span></td><td>${esc(e.notes)||'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><button class="linkish" data-site="${esc(e.siteId)}">${esc(siteNameOf(e.siteId))}</button></td><td>${esc(e[R.other])||'—'}</td><td>${esc(e.remarks)||'—'}</td><td class="num strong">${fmt(e.run)}</td></tr>`).join('')}
-    </tbody><tfoot><tr><td class="num">${fmt(sum(rows))}</td><td colspan="6">الإجمالي</td></tr></tfoot></table></div>`:`<div class="blank" style="padding:24px"><h3>مفيش حركات${filtOn?' للفلتر ده':''}</h3></div>`}
+    </tbody><tfoot><tr><td class="num">${fmt(sum(rows))}</td><td colspan="6">الإجمالي</td></tr></tfoot></table></div>`:`<div class="blank" style="padding:24px"><h3>لا توجد حركات${filtOn?' لهذا الفلتر':''}</h3></div>`}
   </div>
   ${rows.length?`<div class="breakdowns"><div class="card"><div class="sec-h">حسب الموقع</div>${barsHTML(bySite)}</div><div class="card"><div class="sec-h">حسب ${col==='contractors'?'البند':'المقاول'}</div>${barsHTML(byOther)}</div></div>`:''}`;
   const on=(id,ev,fn)=>{const el=$(id);if(el)el[ev]=fn};
@@ -1946,13 +2038,13 @@ async function exportStatement(col,name){
   const R=REG[col],rows=stmtRows(col,name),sf=S.sf;
   const sh={name:R.stmt.slice(0,31),rows:[],styles:{},widths:[12,13,26,20,22,22,9,14,17],freeze:4};
   sh.rows.push([R.stmt+': '+name]);sh.styles[0]=3;
-  sh.rows.push(['الفترة: '+(sf.from||'البداية')+' إلى '+(sf.to||today())+(sf.site?' · الموقع: '+siteNameOf(sf.site):'')+' · اتحفظ '+stamp(Date.now())]);
-  {const cl=col==='contractors'?claimOf(name):null;if(cl!=null){const paid=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);sh.rows.push(['إجمالي المستخلص',cl,'المدفوع (كل المواقع)',paid,cl-paid<0?'مدفوع زيادة':'المتبقي',Math.abs(cl-paid)])}else sh.rows.push([])}
+  sh.rows.push(['الفترة: '+(sf.from||'البداية')+' إلى '+(sf.to||today())+(sf.site?' · الموقع: '+siteNameOf(sf.site):'')+' · تم الحفظ '+stamp(Date.now())]);
+  {const cl=col==='contractors'?claimOf(name):null;if(cl!=null){const paid=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);sh.rows.push(['إجمالي المستخلص',cl,'المدفوع (كل المواقع)',paid,cl-paid<0?'مدفوع بالزيادة':'المتبقي',Math.abs(cl-paid)])}else sh.rows.push([])}
   sh.rows.push(['التاريخ','المبلغ','البيان','الموقع',col==='contractors'?'البند':'المقاول','ملاحظات','نقدي/بنك','الإجمالي التراكمي','وقت التسجيل']);sh.styles[3]=1;
   let run=0;for(const e of rows){run+=amt(e);sh.rows.push([e.date,amt(e),e.notes||'',siteNameOf(e.siteId),e[R.other]||'',e.remarks||'',METHOD[meth(e)],run,dt(e.created)])}
   sh.rows.push(['الإجمالي',run]);sh.styles[sh.rows.length-1]=3;
   const fn=('ADC-'+R.stmt+'-'+name+'-'+today()+'.xlsx').replace(/[\\/:*?"<>|]/g,'-').replace(/ /g,'-');
-  try{await saveFile(fn,XLSX_W.build([sh]));S.xlsxMsg='اتحفظ: '+fn;render()}catch(e){}
+  try{await saveFile(fn,XLSX_W.build([sh]));S.xlsxMsg='تم الحفظ: '+fn;render()}catch(e){}
 }
 /* ---------- import from Excel / CSV ---------- */
 const XLSX_R=(()=>{
@@ -2023,7 +2115,7 @@ const IMP_FIELDS=[
   ['item','البند',['البند','بند','item']],
   ['contractor','المقاول',['المقاول','مقاول','المورد','الجهة','contractor']],
   ['remarks','ملاحظات',['ملاحظات','الملاحظات','ملاحظة','remarks','notes']],
-  ['method','طريقة الدفع',['نقدي/بنك','طريقة الدفع','الدفع','نقدي / بنك','اتصرف من','اتودع في']]];
+  ['method','طريقة الدفع',['نقدي/بنك','طريقة الدفع','الدفع','نقدي / بنك','صُرف من','أُودع في']]];
 const normH=s=>toLatinDigits(String(s??'')).replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/\s+/g,' ').trim().toLowerCase();
 function guessMap(rows){
   let best={row:-1,score:0,map:{}};
@@ -2074,22 +2166,22 @@ function buildImport(){
 }
 function importCard(site){
   const I=S.imp;if(!I||I.siteId!==site.id)return '';
-  const head=`<div class="card imp" id="impCard"><div class="rc-h"><div class="sec-h">استيراد حركات من Excel للموقع ده</div><button class="ghost" id="impClose">قفل</button></div>`;
-  if(!I.rows)return head+`<p class="rc-sub">اختار ملف Excel (‎.xlsx) أو CSV. أول صف فيه أسماء الأعمدة، زي: المبلغ، البيان، التاريخ، البند، المقاول، ملاحظات، طريقة الدفع. ولو فيه عمود «النوع» أو عمودين «وارد» و«منصرف»، الإيداعات هتتعرف لوحدها.</p>
-    <div class="row"><span class="filebtn"><button type="button" class="primary">اختار ملف Excel</button><input type="file" id="impFile" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" aria-label="اختار ملف Excel"></span><button id="impTpl">تنزيل نموذج Excel جاهز</button></div>
+  const head=`<div class="card imp" id="impCard"><div class="rc-h"><div class="sec-h">استيراد حركات من Excel لهذا الموقع</div><button class="ghost" id="impClose">قفل</button></div>`;
+  if(!I.rows)return head+`<p class="rc-sub">اختر ملف Excel (‎.xlsx) أو CSV. يحتوي الصف الأول على أسماء الأعمدة، مثل: المبلغ، البيان، التاريخ، البند، المقاول، ملاحظات، طريقة الدفع. وإذا وُجد عمود «النوع» أو عمودان «وارد» و«منصرف»، فسيتم التعرّف على الإيداعات تلقائيًا.</p>
+    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر ملف Excel</button><input type="file" id="impFile" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" aria-label="اختر ملف Excel"></span><button id="impTpl">تنزيل نموذج Excel جاهز</button></div>
     ${I.err?`<p class="msg err">${esc(I.err)}</p>`:''}</div>`;
   const cols=(I.rows[I.headerRow]||[]).map((h,i)=>({i,h:String(h??'').trim()||('عمود '+(i+1))}));
   const L=I.list||[],ok=L.filter(x=>x.st==='ok'),bad=L.filter(x=>x.st==='err'),dup=L.filter(x=>x.st==='dup'||x.st==='dup2');
   const nExp=ok.filter(x=>x.kind==='exp'),nDep=ok.filter(x=>x.kind==='dep');
-  const ST={ok:['pill-ok','هيتضاف'],err:['pill-neg','ناقص'],dup:['pill-none','موجود قبل كده'],dup2:['pill-none','متكرر في الملف']};
-  return head+`<p class="rc-sub">الملف: <b>${esc(I.name)}</b> · ${L.length} صف. راجع الأعمدة دي، ولو فيه عمود اتقرا غلط اختار الصح.</p>
-    <div class="imp-map">${IMP_FIELDS.map(([k,l])=>`<div class="f"><label for="im_${k}">${l}</label><select id="im_${k}" data-imap="${k}"><option value="">— مش موجود —</option>${cols.map(c=>`<option value="${c.i}" ${I.map[k]===c.i?'selected':''}>${esc(c.h)}</option>`).join('')}</select></div>`).join('')}</div>
-    <label class="chk"><input type="checkbox" id="impFill" ${I.fill?'checked':''}> الخانات الإجبارية الناقصة تتملي بـ «غير محدد» (والتاريخ الناقص بتاريخ النهارده) بدل ما الصف يتساب</label>
-    <div class="imp-sum"><span class="pill-ok">${ok.length} هيتضاف</span> ${nExp.length?`<span>${nExp.length} مصروف بـ ${fmt(sum(nExp.map(x=>x.rec)))}</span>`:''} ${nDep.length?`<span>${nDep.length} إيداع بـ ${fmt(sum(nDep.map(x=>x.rec)))}</span>`:''} ${bad.length?`<span class="pill-neg">${bad.length} ناقص ومش هيتضاف</span>`:''} ${dup.length?`<span class="pill-none">${dup.length} متكرر ومش هيتضاف</span>`:''}</div>
+  const ST={ok:['pill-ok','سيُضاف'],err:['pill-neg','ناقص'],dup:['pill-none','موجود مسبقًا'],dup2:['pill-none','متكرر في الملف']};
+  return head+`<p class="rc-sub">الملف: <b>${esc(I.name)}</b> · ${L.length} صف. راجع هذه الأعمدة، وإذا قُرئ عمود بشكل خاطئ فاختر الصحيح.</p>
+    <div class="imp-map">${IMP_FIELDS.map(([k,l])=>`<div class="f"><label for="im_${k}">${l}</label><select id="im_${k}" data-imap="${k}"><option value="">— غير موجود —</option>${cols.map(c=>`<option value="${c.i}" ${I.map[k]===c.i?'selected':''}>${esc(c.h)}</option>`).join('')}</select></div>`).join('')}</div>
+    <label class="chk"><input type="checkbox" id="impFill" ${I.fill?'checked':''}> تُملأ الخانات الإجبارية الناقصة بـ «غير محدد» (والتاريخ الناقص بتاريخ اليوم) بدلًا من ترك الصف</label>
+    <div class="imp-sum"><span class="pill-ok">${ok.length} سيُضاف</span> ${nExp.length?`<span>${nExp.length} مصروف بـ ${fmt(sum(nExp.map(x=>x.rec)))}</span>`:''} ${nDep.length?`<span>${nDep.length} إيداع بـ ${fmt(sum(nDep.map(x=>x.rec)))}</span>`:''} ${bad.length?`<span class="pill-neg">${bad.length} ناقص ولن يُضاف</span>`:''} ${dup.length?`<span class="pill-none">${dup.length} متكرر ولن يُضاف</span>`:''}</div>
     <div class="tbl-wrap imp-prev"><table><thead><tr><th class="num">صف</th><th>الحالة</th><th>النوع</th><th class="num">المبلغ</th><th>البيان</th><th>التاريخ</th><th>البند</th><th>المقاول</th><th>ملاحظات</th><th>الدفع</th></tr></thead><tbody>
     ${L.slice(0,300).map(x=>`<tr class="${x.st==='err'?'row-neg':x.st!=='ok'?'row-dim':''}"><td class="num plain">${x.line}</td><td><span class="${ST[x.st][0]}">${ST[x.st][1]}</span>${x.errs.length?`<span class="note">ناقص: ${esc(x.errs.join('، '))}</span>`:''}</td><td>${x.kind==='dep'?'إيداع':'مصروف'}</td><td class="num${x.kind==='dep'?' in':''}">${x.rec.amount>0?fmt(x.rec.amount):'—'}</td><td>${esc(x.rec.notes)||'—'}</td><td class="date">${esc(x.rec.date)||'—'}</td><td>${esc(x.rec.item||'')||'—'}</td><td>${esc(x.rec.contractor||'')||'—'}</td><td>${esc(x.rec.remarks)||'—'}</td><td>${METHOD[x.rec.method]}</td></tr>`).join('')}
-    </tbody></table></div>${L.length>300?`<p class="foot-note">بيظهر أول 300 صف بس، بس الاستيراد هيشمل كل الصفوف.</p>`:''}
-    <div class="row"><button class="primary" id="impGo" ${ok.length?'':'disabled'}>إضافة ${ok.length} حركة للموقع</button><button id="impAgain">اختار ملف تاني</button></div></div>`;
+    </tbody></table></div>${L.length>300?`<p class="foot-note">يظهر أول 300 صف فقط، لكن الاستيراد سيشمل جميع الصفوف.</p>`:''}
+    <div class="row"><button class="primary" id="impGo" ${ok.length?'':'disabled'}>إضافة ${ok.length} حركة للموقع</button><button id="impAgain">اختر ملفًا آخر</button></div></div>`;
 }
 function bindImport(site){
   const on=(id,ev,fn)=>{const el=$(id);if(el)el[ev]=fn};
@@ -2105,7 +2197,7 @@ function bindImport(site){
       const g=guessMap(rows);
       if(g.row<0||!rows.length)throw {code:'nohead'};
       S.imp={siteId:site.id,name:file.name,rows,headerRow:g.row,map:g.map,fill:S.imp.fill};buildImport();
-    }catch(e){const c=e&&e.code;S.imp={siteId:site.id,fill:S.imp.fill,err:c==='xls'?'الملف ده بصيغة Excel القديمة (‎.xls). افتحه في Excel واحفظه بصيغة ‎.xlsx وجرّب تاني.':c==='nodecomp'?'المتصفح ده مش بيقرا ملفات Excel. استخدم Chrome أو Edge، أو احفظ الملف CSV.':c==='nohead'?'ما لقيتش أسماء الأعمدة في الملف. اتأكد إن أول صف فيه: المبلغ، البيان، التاريخ…':'ما قدرتش أقرا الملف ده. اتأكد إنه ملف Excel ‎.xlsx أو CSV.'}}
+    }catch(e){const c=e&&e.code;S.imp={siteId:site.id,fill:S.imp.fill,err:c==='xls'?'هذا الملف بصيغة Excel القديمة (‎.xls). افتحه في Excel واحفظه بصيغة ‎.xlsx ثم حاول مرة أخرى.':c==='nodecomp'?'هذا المتصفح لا يقرأ ملفات Excel. استخدم Chrome أو Edge، أو احفظ الملف بصيغة CSV.':c==='nohead'?'لم يتم العثور على أسماء الأعمدة في الملف. تأكد أن الصف الأول يحتوي على: المبلغ، البيان، التاريخ…':'تعذّرت قراءة هذا الملف. تأكد أنه ملف Excel ‎.xlsx أو CSV.'}}
     render();const c=$('#impCard');if(c)c.scrollIntoView({block:'start'})};
   document.querySelectorAll('[data-imap]').forEach(sel=>sel.onchange=()=>{const v=sel.value;S.imp.map[sel.dataset.imap]=v===''?undefined:+v;buildImport();render()});
   on('#impFill','onchange',e=>{S.imp.fill=e.target.checked;buildImport();render()});
@@ -2114,7 +2206,7 @@ function bindImport(site){
     let t=Date.now();const by=(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||S.myName||'';
     for(const x of ok){const rec={...x.rec,by,byId:S.uid||'',created:t++,imported:I.name};queue(x.kind==='exp'?'expenses':'deposits',newId(),rec)}
     logChange('import','files',{siteId:site.id,details:'استيراد '+ok.length+' حركة من Excel: '+I.name});
-    S.imp=null;S.flash={text:'اتضاف '+ok.length+' حركة من الملف للموقع.',until:Date.now()+9000};S.justSaved=true;render();window.scrollTo({top:0});
+    S.imp=null;S.flash={text:'أُضيف '+ok.length+' حركة من الملف للموقع.',until:Date.now()+9000};S.justSaved=true;render();window.scrollTo({top:0});
   });
 }
 /* ---------- printing / PDF ---------- */
@@ -2147,7 +2239,7 @@ function reportDoc(kind){
     const b=bal(site.id),r=recon(site.id);
     body=`<div class="tiles"><div><span>إجمالي الإيداعات</span><b>${money(b.dep)}</b></div><div><span>إجمالي المصروفات</span><b>${money(b.exp)}</b></div><div><span>الرصيد الدفتري</span><b>${money(b.total)}</b><small>نقدي ${money(b.cash)} · بنك ${money(b.bank)}</small></div><div><span>آخر جرد</span><b>${r.st==='none'?'—':ST[r.st][1]+(r.st==='short'||r.st==='over'?' '+money(Math.abs(r.d)):'')}</b><small>${r.st==='none'?'لم يتم الجرد':esc(r.c.date)}</small></div></div>
     <table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>ملاحظات</th><th>نقدي/بنك</th><th>الرصيد</th></tr></thead><tbody>
-    ${f.from?`<tr class="open">${td(esc(f.from))}<td colspan="7" class="tl">رصيد أول الفترة</td>${td(money(open),'n b')}</tr>`:''}${tr||'<tr><td colspan="9">لا توجد حركات في الفترة دي</td></tr>'}
+    ${f.from?`<tr class="open">${td(esc(f.from))}<td colspan="7" class="tl">رصيد أول الفترة</td>${td(money(open),'n b')}</tr>`:''}${tr||'<tr><td colspan="9">لا توجد حركات في هذه الفترة</td></tr>'}
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(ti),'n')}${td(money(to),'n')}<td colspan="5"></td>${td(money(run),'n')}</tr></tfoot></table>`;
     land=true;
   }else if(kind==='stmt'){
@@ -2156,13 +2248,13 @@ function reportDoc(kind){
     const parts=[];if(sf.site)parts.push('الموقع: '+siteNameOf(sf.site));parts.push('الفترة: '+(sf.from||'البداية')+' إلى '+(sf.to||today()));sub=parts.join(' · ');
     let run=0;
     const cl=col==='contractors'?claimOf(name):null,paidAll=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);
-    body=`<div class="tiles">${cl!=null?`<div><span>إجمالي المستخلص</span><b>${money(cl)}</b></div><div><span>المدفوع (كل المواقع)</span><b>${money(paidAll)}</b></div><div><span>${cl-paidAll<0?'مدفوع زيادة':'المتبقي للمقاول'}</span><b>${money(Math.abs(cl-paidAll))}</b></div>`:''}<div><span>إجمالي المصروف${sf.site||sf.from||sf.to?' (حسب الفترة)':''}</span><b>${money(sum(rows))}</b></div><div><span>عدد الحركات</span><b>${rows.length}</b></div></div>
+    body=`<div class="tiles">${cl!=null?`<div><span>إجمالي المستخلص</span><b>${money(cl)}</b></div><div><span>المدفوع (كل المواقع)</span><b>${money(paidAll)}</b></div><div><span>${cl-paidAll<0?'مدفوع بالزيادة':'المتبقي للمقاول'}</span><b>${money(Math.abs(cl-paidAll))}</b></div>`:''}<div><span>إجمالي المصروف${sf.site||sf.from||sf.to?' (حسب الفترة)':''}</span><b>${money(sum(rows))}</b></div><div><span>عدد الحركات</span><b>${rows.length}</b></div></div>
     <table><thead><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الموقع</th><th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th>طريقة الدفع</th><th>الإجمالي التراكمي</th></tr></thead><tbody>
     ${rows.map(e=>{run+=amt(e);return `<tr>${td(esc(e.date))}${td(money(amt(e)),'n')}${td(esc(e.notes||''),'tl')}${td(esc(siteNameOf(e.siteId)),'tl')}${td(esc(e[R.other]||''),'tl')}${td(esc(e.remarks||''),'tl')}${td(METHOD[meth(e)])}${td(money(run),'n b')}</tr>`}).join('')||'<tr><td colspan="8">لا توجد حركات</td></tr>'}
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(run),'n')}<td colspan="6"></td></tr></tfoot></table>`;
   }else{
     const jf=S.jf;title='دفتر اليومية';land=true;
-    const parts=[];if(jf.site)parts.push('الموقع: '+siteNameOf(jf.site));if(jf.type)parts.push(jf.type==='dep'?'وارد بس':'منصرف بس');if(jf.from||jf.to)parts.push('من '+(jf.from||'البداية')+' إلى '+(jf.to||today()));if(jf.q)parts.push('بحث: '+jf.q);
+    const parts=[];if(jf.site)parts.push('الموقع: '+siteNameOf(jf.site));if(jf.type)parts.push(jf.type==='dep'?'وارد فقط':'منصرف فقط');if(jf.from||jf.to)parts.push('من '+(jf.from||'البداية')+' إلى '+(jf.to||today()));if(jf.q)parts.push('بحث: '+jf.q);
     sub=parts.join(' · ')||'كل الحركات';
     const list=journalRows().filter(r=>(!jf.site||r.siteId===jf.site)&&(!jf.type||r.k===jf.type)&&(!jf.from||(r.date||'')>=jf.from)&&(!jf.to||(r.date||'')<=jf.to)&&(!jf.q||[r.notes,r.remarks,r.contractor,r.item,siteNameOf(r.siteId)].some(v=>(v||'').includes(jf.q)))).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created||0)-(b.created||0));
     let run=0,ti=0,to=0;
@@ -2198,9 +2290,9 @@ tfoot td{background:#eee;font-weight:bold}
 @media screen{body{padding:16px;max-width:${land?'1100px':'800px'};margin:auto}.bar{position:sticky;top:0;background:#fffbe6;border:1px solid #e5d48a;padding:8px 10px;margin-bottom:12px;border-radius:6px;font-size:12px;display:flex;gap:10px;align-items:center;justify-content:space-between}.bar button{font:inherit;padding:6px 14px;cursor:pointer}}
 @media print{.bar{display:none}}
 </style></head><body>
-<div class="bar"><span>اختار الطابعة من نافذة الطباعة، أو اختار «Save as PDF» عشان يتحفظ PDF.</span><button onclick="print()">طباعة / PDF</button></div>
+<div class="bar"><span>اختر الطابعة من نافذة الطباعة، أو اختر «Save as PDF» لحفظه بصيغة PDF.</span><button onclick="print()">طباعة / PDF</button></div>
 <div class="hd"><div><h1>${esc(title)}</h1></div>${logo?`<img src="${logo}" alt="AFAQ Development Construction">`:''}</div>
-<p class="sub">${esc(sub)}${sub?' · ':''}اتطبع: ${esc(now)}${who?' · بواسطة: '+esc(who):''} · المبالغ بالجنيه المصري</p>
+<p class="sub">${esc(sub)}${sub?' · ':''}طُبع: ${esc(now)}${who?' · بواسطة: '+esc(who):''} · المبالغ بالجنيه المصري</p>
 ${body}
 <div class="sign"><div>المحاسب</div><div>مدير الموقع</div><div>الاعتماد</div></div>
 <p class="foot">ADC Construction · حسابات المواقع</p>
@@ -2214,13 +2306,13 @@ async function printReport(kind){
     fr=document.createElement('iframe');fr.id='printFrame';fr.setAttribute('aria-hidden','true');
     fr.style.cssText='position:fixed;width:0;height:0;border:0;left:-9999px';
     fr.srcdoc=html.replace(/<script>window\.addEventListener[\s\S]*?<\/script>/,'');
-    fr.onload=()=>{try{fr.contentWindow.focus();fr.contentWindow.print()}catch(e){showBanner('الطباعة ما اشتغلتش من المتصفح ده. جرّب Chrome أو Edge.')}};
+    fr.onload=()=>{try{fr.contentWindow.focus();fr.contentWindow.print()}catch(e){showBanner('تعذّرت الطباعة من هذا المتصفح. جرّب Chrome أو Edge.')}};
     document.body.appendChild(fr);return;
   }
-  if(!S.downloads){showBanner('حفظ الملفات مش متاح في العرض ده، فالطباعة مش متاحة هنا.');return}
+  if(!S.downloads){showBanner('حفظ الملفات غير متاح في هذا العرض، لذا فالطباعة غير متاحة هنا.');return}
   const name={summary:'ملخص-المواقع',site:'كشف-حساب-'+siteNameOf(S.sel),journal:'دفتر-اليومية',stmt:S.stmt?(REG[S.stmt.col].stmt+'-'+S.stmt.name):''}[kind]||'تقرير';
   try{await S.downloads.save({filename:('ADC-'+name+'-'+today()+'.html').replace(/[\\/:*?"<>|]/g,'-'),data:new Blob([html],{type:'text/html'})});
-    S.printMsg='اتحفظ ملف الطباعة. افتحه، وهتفتح نافذة الطباعة لوحدها: اختار الطابعة، أو «Save as PDF» عشان يتحفظ PDF.';render()}catch(e){}
+    S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
 const KEEP=['r_name','r_spec','r_phone','r_claim','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
@@ -2273,7 +2365,7 @@ $('#newSiteForm').addEventListener('submit',ev=>{
   ev.preventDefault();
   if(!S.isManager&&!OFF&&!S.pfx)return;
   const inp=$('#newSiteName');const name=inp.value.trim();if(!name)return;
-  if(S.sites.some(s=>s.name===name)){showBanner('الموقع ده موجود بالفعل.');return}
+  if(S.sites.some(s=>s.name===name)){showBanner('هذا الموقع موجود بالفعل.');return}
   const id=newId();inp.value='';showBanner('');
   const site={name,created:Date.now(),byId:S.uid||''};if(OFF&&SEC.user)site.offUser=SEC.user.name;
   queue('sites',id,site);logChange('add','sites',{id,name});S.sel=id;S.justSaved=true;render();
@@ -2284,9 +2376,9 @@ $('#newSiteForm').addEventListener('submit',ev=>{
   if(OFF){
     S.downloads=true;S.loaded=false;
     SEC.mode='';SEC.locked=true;if(!(auth()||{}).users)SEC.lastUser=MAIN_USER;
-    if(!window.crypto||!crypto.subtle){showBanner('المتصفح ده مش بيدعم التشفير. افتح الملف بـ Chrome أو Edge.')}
+    if(!window.crypto||!crypto.subtle){showBanner('هذا المتصفح لا يدعم التشفير. افتح الملف بـ Chrome أو Edge.')}
     render();showLock();
-    try{localStorage.setItem('adc_probe','1');localStorage.removeItem('adc_probe')}catch(e){showBanner('المتصفح ده مش بيسمح بحفظ البيانات للملف. افتحه بـ Chrome أو Edge.')}
+    try{localStorage.setItem('adc_probe','1');localStorage.removeItem('adc_probe')}catch(e){showBanner('هذا المتصفح لا يسمح بحفظ البيانات في الملف. افتحه بـ Chrome أو Edge.')}
     return;
   }
   if(APP){await appBoot()}else{SEC.locked=true;showLock()}
@@ -2326,7 +2418,7 @@ $('#newSiteForm').addEventListener('submit',ev=>{
     S.pfx='u/'+S.uid+'/';
     try{const mk=db.doc('u/'+S.uid);const g=await mk.get();if(!g.exists&&S.canWrite)await mk.set({joined:Date.now()})}catch(e){}
     subAll(S.pfx,true);subCol('','contractors',true);subCol('','items',true);
-  }else{S.pfx=null;S.mode='off';S.loaded=true;showBanner(APP?'مش قادر أعرف حسابك. اخرج وادخل تاني.':'مش قادر أعرف حسابك. اعمل دخول على claude.ai وافتح اللينك تاني.')}
+  }else{S.pfx=null;S.mode='off';S.loaded=true;showBanner(APP?'تعذّر التعرف على حسابك. سجّل الخروج ثم سجّل الدخول مرة أخرى.':'تعذّر التعرف على حسابك. سجّل الدخول إلى claude.ai وافتح الرابط مرة أخرى.')}
   render();
 })();
 </script>
