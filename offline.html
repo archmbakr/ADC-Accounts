@@ -281,6 +281,11 @@ details.recon .rc-open{margin-inline-start:auto;font-size:13px;color:var(--accen
 details.recon:not([open]){padding-block:12px}
 @media (max-width:560px){.hdr-acts{order:3;width:100%}.hdr-acts .pop-wrap{flex:1}.hdr-acts .pop-wrap>button{width:100%;justify-content:center}.pop-tools,#addMenu{inset-inline:0;min-width:0}.pane-h .actions{margin-inline-start:0}}
 body.eng-mode .hdr-acts{display:none!important}
+.set-btn{display:inline-flex;align-items:center;gap:6px}.set-btn.on{border-color:var(--accent);color:var(--accent)}
+.hdr-sync{padding:4px 10px;font-size:13px;display:inline-flex;gap:5px;align-items:center}.hdr-sync .ic{display:inline-block;font-size:15px}.hdr-sync.spin .ic{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(-360deg)}}
+@media (max-width:560px){.hdr-acts .set-btn{flex:0 0 auto}.set-btn .set-l{display:none}}
+.qs-multi{margin-top:10px}.qs-multi>summary{cursor:pointer;color:var(--accent);font-weight:600}.qs-checks{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0;max-height:260px;overflow:auto}
 .pop>button.jbtn{border:0}
 @media (max-width:820px){.sites{flex-wrap:wrap;overflow:visible}.sites .site-btn{flex:1 1 auto;border-color:var(--line);background:var(--surface)}.site-filter{flex-basis:100%}}
 @media (max-width:560px){.pop-end{inset-inline-end:auto;inset-inline-start:0}}
@@ -294,8 +299,10 @@ body.eng-mode .layout{grid-template-columns:minmax(0,1fr)}
     <div class="hdr-acts" id="hdrActs" hidden>
       <div class="pop-wrap"><button type="button" class="primary" id="addBtn" data-pop="addMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">+</span> إضافة</button><div class="pop" id="addMenu" role="menu" hidden></div></div>
       <div class="pop-wrap"><button type="button" id="menuBtn" data-pop="toolMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">☰</span> القائمة</button><div class="pop pop-tools" id="toolMenu" role="menu" hidden></div></div>
+      <button type="button" id="setBtn" class="set-btn" data-site="__settings" title="الإعدادات" aria-label="الإعدادات"><span aria-hidden="true">⚙</span><span class="set-l"> الإعدادات</span></button>
     </div>
     <span class="status" id="status"><span class="dot"></span><span id="statusText">جاري الاتصال…</span></span>
+    <button class="ghost hdr-sync" id="hdrSync" type="button" hidden title="رفع ما سجّلته وتحميل آخر البيانات"><span class="ic" aria-hidden="true">↻</span> تحديث</button>
     <button class="ghost hdr-lock" id="hdrLock" type="button" hidden>قفل</button>
   </header>
   <div id="banner" class="banner" hidden></div>
@@ -362,7 +369,9 @@ function merge(){
   for(const c in COLS){const k=COLS[c];const pend=S.pending.filter(p=>p.col===c);const pm=new Map(pend.map(p=>[p.id,p]));
     const tag=p=>({id:p.id,...p.data,_p:p.pfx??S.pfx??'',pending:true});
     S[k]=S.srv[k].map(x=>pm.has(x.id)?{...tag(pm.get(x.id)),_p:x._p??''}:x).concat(pend.filter(p=>!m[c].has(p.id)).map(tag))}
+  S.trash=[];for(const [c,k] of [['sites','sites'],['expenses','exp'],['deposits','dep'],['counts','cnt']])S[k]=S[k].filter(x=>{if(x.deleted){S.trash.push({...x,col:c});return false}return true});
   if(typeof applyUserScope==='function')applyUserScope();
+  if(OFF&&SEC.user&&SEC.user.role!=='admin'){const me=lc(SEC.user.name),ids=new Set(S.sites.map(x=>x.id));S.trash=S.trash.filter(x=>x.col==='sites'?lc(x.offUser)===me:ids.has(x.siteId)||S.trash.some(t=>t.col==='sites'&&t.id===x.siteId&&lc(t.offUser)===me))}
 }
 function savePending(){if(OFF)vaultSave();else lsSet(LS_PEND,S.pending)}
 function saveCache(){const at=Date.now();if(lsSet(LS_CACHE,{sites:S.srv.sites,exp:S.srv.exp,dep:S.srv.dep,cnt:S.srv.cnt,log:S.srv.log,cons:S.srv.cons,items:S.srv.items,at}))S.cacheAt=at}
@@ -400,7 +409,24 @@ function bal(siteId){
   return {dep:dc+db+dd,exp:ec+eb+ed+eu,cash:dc-ec-cu.iC+cu.r,bank:db-eb-cu.iB,defer:dd-ed,cust:cu.iC+cu.iB-cu.r-eu,total:dc+db+dd-ec-eb-ed-eu,ne:e.length,nd:d.length};
 }
 
+/* «تحديث»: push everything recorded on this device, reload the latest data, and say clearly whether it is all saved */
+async function syncNow(){
+  const b=$('#hdrSync');if(!b||b.disabled)return;b.disabled=true;b.classList.add('spin');
+  const left=()=>S.pending.filter(p=>p.col!=='log').length;
+  try{
+    if(!navigator.onLine){const n=left();flash(n?'لا يوجد اتصال بالإنترنت. '+n+' تعديل محفوظ على هذا الجهاز وسيُرفع تلقائيًا عند عودة الاتصال.':'لا يوجد اتصال بالإنترنت. لا توجد تعديلات بانتظار الرفع.',!!n);return}
+    for(let i=0;i<60&&S.flushing;i++)await new Promise(r=>setTimeout(r,250));
+    await flush();
+    for(let i=0;i<60&&S.flushing;i++)await new Promise(r=>setTimeout(r,250));
+    if(APP){try{appRefreshAll(true)}catch(e){}try{if(typeof custLoad==='function')custLoad()}catch(e){}}
+    await new Promise(r=>setTimeout(r,900));
+    const n=left();
+    flash(n?'لم يُرفع '+n+' تعديل بعد. تأكد من الاتصال بالإنترنت واضغط «تحديث» مرة أخرى.':'تم التحديث ✓ كل ما سجّلته محفوظ على السيرفر، والبيانات المعروضة هي الأحدث.',!!n);
+  }catch(e){flash('تعذّر التحديث: '+String(e&&(e.message||e.code)||e).slice(0,120),1)}
+  finally{b.disabled=false;b.classList.remove('spin');render()}
+}
 function statusRender(){
+  const hs=$('#hdrSync');if(hs){hs.hidden=OFF||!!SEC.locked||!S.roleKnown;hs.onclick=syncNow}
   const hl=$('#hdrLock');if(hl){hl.hidden=!!SEC.locked||(OFF&&!SEC.user);hl.onclick=lockNow;if(APP)hl.textContent=appBioCfg()?'قفل':'خروج'}
   const el=$('#status'),t=$('#statusText');const n=S.pending.filter(p=>p.col!=='log').length;
   let cls='off',txt='';
@@ -444,8 +470,9 @@ function renderSites(){
   const all=bal(),cur=S.sel;
   const tool=(id,name,t)=>`<button class="site-btn jbtn" role="menuitem" data-site="${id}" aria-current="${cur===id}"><span class="n">${name}</span><span class="t">${t}</span></button>`;
   const tm=$('#toolMenu');
-  if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+tool('__banks','الحسابات البنكية',bankList().length||'')+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'')+tool('__settings','الإعدادات','');
-  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__custody:'العُهد',__settings:'الإعدادات'};
+  if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+tool('__banks','الحسابات البنكية',bankList().length||'')+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'')+tool('__trash','سلة المهملات',(S.trash||[]).length||'');
+  {const sb=$('#setBtn');if(sb){sb.classList.toggle('on',cur==='__settings');sb.setAttribute('aria-current',String(cur==='__settings'))}}
+  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__custody:'العُهد',__trash:'سلة المهملات'};
   const mb=$('#menuBtn');if(mb){const pend=APP&&!appIsEngineer()&&typeof custMine==='function'?custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length:0;
     mb.innerHTML=`<span aria-hidden="true">☰</span> ${TOOLS[cur]?esc(TOOLS[cur]):'القائمة'}${pend?`<span class="badge" title="مصروفات عهدة للمراجعة">${pend}</span>`:''}`;mb.classList.toggle('on',!!TOOLS[cur])}
   const am=$('#addMenu');
@@ -466,6 +493,33 @@ function renderSites(){
   $('#newSiteForm').hidden=!canAddSite();
   const ab=$('#allSitesBtn');if(ab)ab.onclick=()=>{S.allSites=!S.allSites;S.siteQ='';renderSites()};
   const sf=$('#siteFilter');if(sf){sf.oninput=()=>{S.siteQ=sf.value;const p=sf.selectionStart;renderSites();const n=$('#siteFilter');if(n){n.focus();try{n.setSelectionRange(p,p)}catch(e){}}}}
+}
+const TKIND={sites:'موقع',expenses:'مصروف',deposits:'إيداع',counts:'جرد'};
+function trashSiteName(id){const s=S.sites.find(x=>x.id===id)||(S.trash||[]).find(x=>x.col==='sites'&&x.id===id);return s?s.name:'—'}
+function renderTrash(){
+  const list=[...(S.trash||[])].sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));
+  const mine=list.filter(canEditRec);
+  const k=x=>x.col+':'+x.id;
+  $('#pane').innerHTML=`<div class="pane-h"><h2>سلة المهملات</h2>${mine.length&&!S.trashAll?`<div class="actions"><button class="ghost" id="trEmpty">إفراغ السلة</button></div>`:''}</div>
+  <p class="foot-note" style="margin:-8px 0 0">أي مصروف أو إيداع أو جرد أو موقع يُحذف ينتقل إلى هنا، ولا يدخل في أي حساب أو كشف. يمكنك استرجاعه كما كان، أو حذفه نهائيًا.</p>
+  ${S.trashAll?`<div class="card"><span class="confirm"><span class="msg err">سيُحذف نهائيًا ${mine.length} عنصر ولا يمكن استرجاعها بعد ذلك.</span><button class="danger" id="trEmptyYes">حذف الكل نهائيًا</button><button id="trEmptyNo">إلغاء</button></span></div>`:''}
+  <div class="card" style="display:flex;flex-direction:column;gap:10px">
+  ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>النوع</th><th>الموقع</th><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>تاريخ الحركة</th><th>حُذف</th><th></th></tr></thead><tbody>
+  ${list.map(x=>{const amtv=x.col==='counts'?(+x.cash||0)+(+x.bank||0):x.col==='sites'?null:amt(x);const can=canEditRec(x);
+    return `<tr><td><span class="chip">${TKIND[x.col]}</span></td><td>${esc(x.col==='sites'?x.name:trashSiteName(x.siteId))}</td><td class="num">${amtv==null?'—':fmt(amtv)}</td><td>${esc(x.col==='sites'?'':(x.notes||x.contractor||''))||'—'}${x.item?`<span class="note">${esc(x.item)}${x.contractor?' · '+esc(x.contractor):''}</span>`:''}</td><td class="date">${esc(x.date||'')||'—'}</td><td class="date">${x.deletedAt?esc(stamp(x.deletedAt)):'—'}${x.deletedBy?`<span class="note">${esc(x.deletedBy)}</span>`:''}</td>
+    <td class="acts">${can?(S.trashDel===k(x)?`<span class="confirm"><button class="danger" data-trpurgeyes="${esc(k(x))}">حذف نهائي</button><button data-trno="1">إلغاء</button></span>`:`<button class="ghost" data-trrestore="${esc(k(x))}">استرجاع</button><button class="ghost" data-trpurge="${esc(k(x))}">حذف نهائي</button>`):''}</td></tr>`}).join('')}
+  </tbody></table></div>`:'<div class="blank" style="padding:28px 8px"><h3>سلة المهملات فارغة</h3><p>عند حذف أي حركة أو موقع سيظهر هنا، ويمكن استرجاعه.</p></div>'}
+  </div>`;
+  const sp=v=>v.split(':');
+  document.querySelectorAll('[data-trrestore]').forEach(b=>b.onclick=()=>{const [c,id]=sp(b.dataset.trrestore);if(restoreDoc(c,id)){flash('تم الاسترجاع.');render()}});
+  document.querySelectorAll('[data-trpurge]').forEach(b=>b.onclick=()=>{S.trashDel=b.dataset.trpurge;render()});
+  document.querySelectorAll('[data-trno]').forEach(b=>b.onclick=()=>{S.trashDel='';render()});
+  document.querySelectorAll('[data-trpurgeyes]').forEach(b=>b.onclick=async()=>{const [c,id]=sp(b.dataset.trpurgeyes);
+    if(c==='sites')for(const x of (S.trash||[]).filter(t=>t.col!=='sites'&&t.siteId===id))await purgeDoc(x.col,x.id);
+    if(await purgeDoc(c,id)){S.trashDel='';flash('تم الحذف النهائي.');render()}});
+  const te=$('#trEmpty');if(te)te.onclick=()=>{S.trashAll=true;render()};
+  const tn=$('#trEmptyNo');if(tn)tn.onclick=()=>{S.trashAll=false;render()};
+  const ty=$('#trEmptyYes');if(ty)ty.onclick=async()=>{ty.disabled=true;let n=0;const items=(S.trash||[]).filter(canEditRec).sort((a,b)=>(a.col==='sites')-(b.col==='sites'));for(const x of items)if(await purgeDoc(x.col,x.id))n++;S.trashAll=false;flash('تم الحذف النهائي لـ '+n+' عنصر.');render()};
 }
 function bankSave(list){const d=bankDoc();const rec={...(d?clean(d):{}),name:BANK_DOC,hidden:true,banks:list,updated:Date.now()};delete rec.id;delete rec._p;queue('items',BANK_DOC,rec)}
 function renderBanks(){
@@ -733,7 +787,7 @@ function renderSite(){
     </tbody><tfoot><tr><td class="num in">${fmt(ftot)}</td><td colspan="${S.canWrite?5:4}">${filtOn?`إجمالي النتائج (${list.length})`:'إجمالي الإيداعات'}</td></tr></tfoot></table>`;
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${esc(site.name)}</h2><div class="actions">
-    ${canEditRec(site)&&S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'يجب حذف إيداعات ومصروفات وجرد الموقع أولًا.':'حذف الموقع نهائيًا؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:''}
+    ${canEditRec(site)&&S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'يجب حذف إيداعات ومصروفات وجرد الموقع أولًا.':'نقل الموقع إلى سلة المهملات؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:''}
     <div class="pop-wrap"><button type="button" class="more-btn" data-pop="siteMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">⋯</span> خيارات الموقع</button>
     <div class="pop pop-end" id="siteMenu" role="menu" hidden>
     ${S.canWrite&&canEditRec(site)?'<button role="menuitem" id="impOpen">استيراد من Excel</button>':''}
@@ -830,15 +884,37 @@ function bindSite(site){
   const dy=$('#delSiteYes');if(dy)dy.onclick=()=>removeDoc('sites',site.id).then(ok=>{if(ok){S.sel='__all';S.confirmSite=false;render()}});
 }
 
+/* delete = move to «سلة المهملات» (the record stays, marked deleted) — it can be restored or removed for good from there */
 async function removeDoc(col,id){
-  if(!canEditRec(rec)){showBanner('غير مسموح لك بالحذف من موقع غيرك.');return false}
   const rec=(S[COLS[col]]||[]).find(x=>x.id===id);
+  if(!rec)return false;
+  if(!canEditRec(rec)){showBanner('غير مسموح لك بالحذف من موقع غيرك.');return false}
+  queue(col,id,{...clean(rec),deleted:true,deletedAt:Date.now(),deletedBy:(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||S.myName||'',updated:Date.now()});
+  logChange('delete',col,rec);
+  flash('نُقل إلى سلة المهملات. يمكنك استرجاعه من «☰ القائمة» ← «سلة المهملات».');
+  return true;
+}
+function restoreDoc(col,id){
+  const rec=(S.trash||[]).find(x=>x.col===col&&x.id===id);if(!rec||!canEditRec(rec))return false;
+  if(col!=='sites'){const st=(S.trash||[]).find(x=>x.col==='sites'&&x.id===rec.siteId);if(st)restoreDoc('sites',st.id)}
+  const d={...clean(rec),updated:Date.now()};delete d.col;delete d.deleted;delete d.deletedAt;delete d.deletedBy;
+  queue(col,id,d);logChange('import',col,{...d,id});return true;
+}
+async function purgeDoc(col,id){
+  const rec=(S.trash||[]).find(x=>x.col===col&&x.id===id);
+  if(!rec||!canEditRec(rec)){showBanner('غير مسموح لك بالحذف النهائي لهذا العنصر.');return false}
   const p=S.pending.find(x=>x.col===col&&x.id===id);
-  if(p){S.pending=S.pending.filter(x=>x!==p);savePending();merge();if(rec)logChange('delete',col,rec);render();return true}
-  if(OFF){showBanner('هذه الحركة واردة من النسخة على الإنترنت، فاحذفها من هناك ثم نفّذ «تحديث» هنا.');return false}
-  if(!S.db||S.mode!=='live'){showBanner('الحذف يتطلب اتصالًا بالإنترنت. حاول مرة أخرى عند عودة الاتصال.');return false}
-  try{await withTimeout(S.db.doc(col+'/'+id).delete(),12000);showBanner('');if(rec)logChange('delete',col,rec);return true}
-  catch(e){showBanner(errText(e));return false}
+  const srvHas=(S.srv[COLS[col]]||[]).some(x=>x.id===id);
+  if(p){S.pending=S.pending.filter(x=>x!==p);savePending()}
+  if(srvHas){
+    if(OFF){S.srv[COLS[col]]=S.srv[COLS[col]].filter(x=>x.id!==id);vaultSave();}
+    else{
+      if(!S.db||S.mode!=='live'){showBanner('الحذف النهائي يتطلب اتصالًا بالإنترنت. حاول مرة أخرى عند عودة الاتصال.');if(p){S.pending.push(p);savePending()}return false}
+      try{const pf=rec._p??S.pfx??'';await withTimeout(S.db.doc(pf+col+'/'+id).delete(),12000);S.srv[COLS[col]]=S.srv[COLS[col]].filter(x=>x.id!==id);showBanner('')}
+      catch(e){showBanner(errText(e));return false}
+    }
+  }
+  merge();return true;
 }
 /* ---------- دفتر اليومية (journal) ---------- */
 function journalRows(){
@@ -1717,7 +1793,10 @@ function renderRegister(col){
   const totalAll=list.reduce((a,x)=>a+regStats(col,x.name).total,0);
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${R.title}</h2></div>
-  ${list.length?`<div class="card qs"><div class="sec-h">كشف حساب ${R.one}</div><div class="row"><select id="qsName" aria-label="اختر ال${R.one}"><option value="">اختر ال${R.one}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><button class="primary" id="qsGo">استخرج كشف الحساب</button></div></div>`:''}
+  ${list.length?`<div class="card qs"><div class="sec-h">كشف حساب ${R.one}</div><div class="row"><select id="qsName" aria-label="اختر ال${R.one}"><option value="">اختر ال${R.one}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><button class="primary" id="qsGo">استخرج كشف الحساب</button></div>
+    ${list.length>1?`<details class="qs-multi"${S.qsOpen?' open':''}><summary>كشف مجمّع لأكثر من ${R.one}</summary>
+      <div class="qs-checks">${list.map(x=>`<label class="chk"><input type="checkbox" data-qsm value="${esc(x.name)}"${(S.qsSel||[]).includes(x.name)?' checked':''}> ${esc(x.name)}</label>`).join('')}</div>
+      <div class="row"><button class="primary" id="qsMulti">استخرج الكشف المجمّع</button><span class="msg" id="qsMsg"></span></div></details>`:''}</div>`:''}
   <p class="foot-note" style="margin:-8px 0 0">${col==='contractors'?'سجّل المقاولين هنا مرة واحدة، وبعد ذلك اخترهم من القائمة أثناء تسجيل المصروف.':'سجّل بنود الصرف هنا مرة واحدة، وبعد ذلك اخترها من القائمة أثناء تسجيل المصروف.'}</p>
   ${canReg()?`<div class="card${S.regEdit?' entry-card editing':''}" id="regCard">${S.regEdit?`<div class="edit-h"><b>تعديل ${R.one}: ${esc(S.regEdit.name)}</b></div>`:''}<form class="entry" id="regForm" autocomplete="off" novalidate>
     <div class="f c2"><label for="r_name">اسم ال${R.one}</label><input id="r_name" maxlength="100" placeholder="${col==='contractors'?'مثال: مؤسسة الفتح للمباني':'مثال: خرسانة مسلحة'}"></div>
@@ -1749,27 +1828,35 @@ function renderRegister(col){
     if(!addReg(col,data)){m.className='msg err';m.textContent=regMine(col).some(x=>x.name===data.name.trim())?'هذا الاسم موجود بالفعل.':'هذا الاسم مسجّل بالفعل في القائمة العامة. اختره مباشرةً عند تسجيل المصروف، وسيظهر هنا بعد ذلك.';return}
     S.flash={text:'أُضيف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
   if(S.regFill&&S.regEdit){S.regFill=false;const r=(S[R.key]||[]).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc)}
+  {const d=document.querySelector('.qs-multi');if(d)d.ontoggle=()=>{S.qsOpen=d.open}}
+  document.querySelectorAll('[data-qsm]').forEach(c=>c.onchange=()=>{S.qsSel=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value)});
+  const qm=$('#qsMulti');if(qm)qm.onclick=()=>{const v=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value);if(v.length<2){const m=$('#qsMsg');m.className='msg err';m.textContent='اختر اثنين على الأقل.';return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
   const qg=$('#qsGo');if(qg)qg.onclick=()=>{const v=$('#qsName').value;if(!v){$('#qsName').focus();return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
   const rc=$('#regCancel');if(rc)rc.onclick=()=>{S.regEdit=null;S.justSaved=true;render()};
   if(S.flash&&S.flash.until>Date.now()&&$('#regMsg')){$('#regMsg').className='msg ok';$('#regMsg').textContent=S.flash.text}
 }
+/* a statement is for one name or, combined, for several (array) */
+const NM=n=>Array.isArray(n)?n:[n];
+const nmLabel=n=>NM(n).join(' + ');
+const isMulti=n=>NM(n).length>1;
 function stmtRows(col,name){
-  const R=REG[col],sf=S.sf;
-  return S.exp.filter(e=>(e[R.field]||'').trim()===name&&(!sf.site||e.siteId===sf.site)&&(!sf.from||(e.date||'')>=sf.from)&&(!sf.to||(e.date||'')<=sf.to))
+  const R=REG[col],sf=S.sf,set=new Set(NM(name));
+  return S.exp.filter(e=>set.has((e[R.field]||'').trim())&&(!sf.site||e.siteId===sf.site)&&(!sf.from||(e.date||'')>=sf.from)&&(!sf.to||(e.date||'')<=sf.to))
     .sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created||0)-(b.created||0));
 }
 function renderStatement(col,name){
-  const R=REG[col],sf=S.sf,rows=stmtRows(col,name);
-  const all=S.exp.filter(e=>(e[R.field]||'').trim()===name);
+  const R=REG[col],sf=S.sf,rows=stmtRows(col,name),multi=isMulti(name),nset=new Set(NM(name));
+  const all=S.exp.filter(e=>nset.has((e[R.field]||'').trim()));
   const sitesIn=[...new Set(all.map(e=>e.siteId))];
   let run=0;const tr=rows.map(e=>{run+=amt(e);return {...e,run}}).reverse();
-  const r=(S[R.key]||[]).find(x=>x.name.trim()===name&&!x.hidden)||{};
+  const r=multi?{}:((S[R.key]||[]).find(x=>x.name.trim()===name&&!x.hidden)||{});
+  const byName=multi?NM(name).map(n=>{const l=rows.filter(e=>(e[R.field]||'').trim()===n);return [n,sum(l),l.length]}):[];
   const bySite=groupSum(rows.map(e=>({...e,_s:siteNameOf(e.siteId)})),'_s'),byOther=groupSum(rows,R.other);
   const filtOn=sf.site||sf.from||sf.to;
   $('#pane').innerHTML=`
-  <div class="pane-h"><div><button class="ghost back" id="stmtBack">→ ${R.title}</button><h2>${R.stmt}: ${esc(name)}</h2>${col==='contractors'&&(r.spec||r.phone)?`<p class="foot-note" style="margin:2px 0 0">${esc([r.spec,r.phone].filter(Boolean).join(' · '))}</p>`:''}</div>
+  <div class="pane-h"><div><button class="ghost back" id="stmtBack">→ ${R.title}</button><h2>${R.stmt}${multi?' مجمّع':''}: ${esc(nmLabel(name))}</h2>${col==='contractors'&&(r.spec||r.phone)?`<p class="foot-note" style="margin:2px 0 0">${esc([r.spec,r.phone].filter(Boolean).join(' · '))}</p>`:''}</div>
     <div class="actions"><button data-print="stmt">طباعة / PDF</button>${S.downloads?'<button id="stmtXl">Excel</button>':''}</div></div>
-  ${(()=>{const c=col==='contractors'?claimOf(name):null,paid=sum(all);
+  ${(()=>{const c=col==='contractors'&&!multi?claimOf(name):null,paid=sum(all);
   return c!=null?`<div class="stats">
     <div class="stat"><div class="l">إجمالي المستخلص</div><div class="v plain">${fmt(c)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">المدفوع (كل المواقع)</div><div class="v">${fmt(paid)}<small>${CUR}</small></div><div class="split"><span>${all.length} حركة · ${sitesIn.length} موقع</span></div></div>
@@ -1779,7 +1866,7 @@ function renderStatement(col,name){
     <div class="stat"><div class="l">إجمالي المصروف${filtOn?' · حسب الفلتر':''}</div><div class="v">${fmt(sum(rows))}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">عدد الحركات</div><div class="v plain">${rows.length}</div></div>
     <div class="stat"><div class="l">عدد المواقع</div><div class="v plain">${new Set(rows.map(e=>e.siteId)).size}</div></div>
-  </div>${col==='contractors'&&S.isManager?`<p class="foot-note" style="margin:-6px 0 0">يمكنك إضافة «إجمالي المستخلص» لهذا المقاول من «تعديل» في صفحة المقاولين، وعندها سيظهر المتبقي له.</p>`:''}`})()}
+  </div>${multi?`<div class="card" style="display:flex;flex-direction:column;gap:8px"><div class="sec-h">الإجمالي لكل ${R.one}${filtOn?' · حسب الفلتر':''}</div><div class="tbl-wrap"><table><thead><tr><th>ال${R.one}</th><th class="num">عدد الحركات</th><th class="num">الإجمالي (${CUR})</th></tr></thead><tbody>${byName.map(([n,t,k])=>`<tr><td><b>${esc(n)}</b></td><td class="num plain">${k}</td><td class="num">${fmt(t)}</td></tr>`).join('')}</tbody><tfoot><tr><td>الإجمالي</td><td class="num plain">${rows.length}</td><td class="num">${fmt(sum(rows))}</td></tr></tfoot></table></div></div>`:''}${col==='contractors'&&S.isManager&&!multi?`<p class="foot-note" style="margin:-6px 0 0">يمكنك إضافة «إجمالي المستخلص» لهذا المقاول من «تعديل» في صفحة المقاولين، وعندها سيظهر المتبقي له.</p>`:''}`})()}
   <div class="card" style="display:flex;flex-direction:column;gap:12px">
     <div class="filters">
       <div class="f"><label for="sf_site">الموقع</label><select id="sf_site"><option value="">كل المواقع</option>${sitesIn.map(id=>`<option value="${esc(id)}" ${sf.site===id?'selected':''}>${esc(siteNameOf(id))}</option>`).join('')}</select></div>
@@ -1787,9 +1874,9 @@ function renderStatement(col,name){
       <div class="f"><label for="sf_to">إلى تاريخ</label><input id="sf_to" type="date" value="${esc(sf.to)}"></div>
       ${filtOn?'<button class="ghost" id="sfClear">مسح الفلتر</button>':''}
     </div>
-    ${tr.length?`<div class="tbl-wrap"><table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>الموقع</th><th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th class="num">الإجمالي التراكمي</th></tr></thead><tbody>
-    ${tr.map(e=>`<tr><td class="num">${fmt(amt(e))}<span class="mtag">${mlabel(e)}</span></td><td>${esc(e.notes)||'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><button class="linkish" data-site="${esc(e.siteId)}">${esc(siteNameOf(e.siteId))}</button></td><td>${esc(e[R.other])||'—'}</td><td>${esc(e.remarks)||'—'}</td><td class="num strong">${fmt(e.run)}</td></tr>`).join('')}
-    </tbody><tfoot><tr><td class="num">${fmt(sum(rows))}</td><td colspan="6">الإجمالي</td></tr></tfoot></table></div>`:`<div class="blank" style="padding:24px"><h3>لا توجد حركات${filtOn?' لهذا الفلتر':''}</h3></div>`}
+    ${tr.length?`<div class="tbl-wrap"><table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>الموقع</th>${multi?`<th>ال${R.one}</th>`:''}<th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th class="num">الإجمالي التراكمي</th></tr></thead><tbody>
+    ${tr.map(e=>`<tr><td class="num">${fmt(amt(e))}<span class="mtag">${mlabel(e)}</span></td><td>${esc(e.notes)||'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><button class="linkish" data-site="${esc(e.siteId)}">${esc(siteNameOf(e.siteId))}</button></td>${multi?`<td><b>${esc(e[R.field])}</b></td>`:''}<td>${esc(e[R.other])||'—'}</td><td>${esc(e.remarks)||'—'}</td><td class="num strong">${fmt(e.run)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td class="num">${fmt(sum(rows))}</td><td colspan="${multi?7:6}">الإجمالي</td></tr></tfoot></table></div>`:`<div class="blank" style="padding:24px"><h3>لا توجد حركات${filtOn?' لهذا الفلتر':''}</h3></div>`}
   </div>
   ${rows.length?`<div class="breakdowns"><div class="card"><div class="sec-h">حسب الموقع</div>${barsHTML(bySite)}</div><div class="card"><div class="sec-h">حسب ${col==='contractors'?'البند':'المقاول'}</div>${barsHTML(byOther)}</div></div>`:''}`;
   const on=(id,ev,fn)=>{const el=$(id);if(el)el[ev]=fn};
@@ -1799,15 +1886,16 @@ function renderStatement(col,name){
   on('#stmtXl','onclick',()=>exportStatement(col,name));
 }
 async function exportStatement(col,name){
-  const R=REG[col],rows=stmtRows(col,name),sf=S.sf;
-  const sh={name:R.stmt.slice(0,31),rows:[],styles:{},widths:[12,13,26,20,22,22,9,14,17],freeze:4};
-  sh.rows.push([R.stmt+': '+name]);sh.styles[0]=3;
+  const R=REG[col],rows=stmtRows(col,name),sf=S.sf,multi=isMulti(name);
+  const sh={name:R.stmt.slice(0,31),rows:[],styles:{},widths:multi?[12,13,26,20,20,22,22,9,14,17]:[12,13,26,20,22,22,9,14,17],freeze:4};
+  sh.rows.push([R.stmt+(multi?' مجمّع':'')+': '+nmLabel(name)]);sh.styles[0]=3;
   sh.rows.push(['الفترة: '+(sf.from||'البداية')+' إلى '+(sf.to||today())+(sf.site?' · الموقع: '+siteNameOf(sf.site):'')+' · تم الحفظ '+stamp(Date.now())]);
-  {const cl=col==='contractors'?claimOf(name):null;if(cl!=null){const paid=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);sh.rows.push(['إجمالي المستخلص',cl,'المدفوع (كل المواقع)',paid,cl-paid<0?'مدفوع بالزيادة':'المتبقي',Math.abs(cl-paid)])}else sh.rows.push([])}
-  sh.rows.push(['التاريخ','المبلغ','البيان','الموقع',col==='contractors'?'البند':'المقاول','ملاحظات','نقدي/بنك','الإجمالي التراكمي','وقت التسجيل']);sh.styles[3]=1;
-  let run=0;for(const e of rows){run+=amt(e);sh.rows.push([e.date,amt(e),e.notes||'',siteNameOf(e.siteId),e[R.other]||'',e.remarks||'',mlabel(e),run,dt(e.created)])}
+  {const cl=col==='contractors'&&!multi?claimOf(name):null;if(cl!=null){const paid=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);sh.rows.push(['إجمالي المستخلص',cl,'المدفوع (كل المواقع)',paid,cl-paid<0?'مدفوع بالزيادة':'المتبقي',Math.abs(cl-paid)])}else sh.rows.push([])}
+  sh.rows.push(['التاريخ','المبلغ','البيان','الموقع',...(multi?['ال'+R.one]:[]),col==='contractors'?'البند':'المقاول','ملاحظات','نقدي/بنك','الإجمالي التراكمي','وقت التسجيل']);sh.styles[3]=1;
+  let run=0;for(const e of rows){run+=amt(e);sh.rows.push([e.date,amt(e),e.notes||'',siteNameOf(e.siteId),...(multi?[e[R.field]||'']:[]),e[R.other]||'',e.remarks||'',mlabel(e),run,dt(e.created)])}
   sh.rows.push(['الإجمالي',run]);sh.styles[sh.rows.length-1]=3;
-  const fn=('ADC-'+R.stmt+'-'+name+'-'+today()+'.xlsx').replace(/[\\/:*?"<>|]/g,'-').replace(/ /g,'-');
+  if(multi){sh.rows.push([]);sh.rows.push(['الإجمالي لكل '+R.one,'المبلغ','عدد الحركات']);sh.styles[sh.rows.length-1]=1;for(const n of NM(name)){const l=rows.filter(e=>(e[R.field]||'').trim()===n);sh.rows.push([n,sum(l),l.length])}}
+  const fn=('ADC-'+R.stmt+(multi?'-مجمع':'')+'-'+(multi?NM(name).length+'-'+(R.one==='بند'?'بنود':'مقاولين'):name)+'-'+today()+'.xlsx').replace(/[\\/:*?"<>|]/g,'-').replace(/ /g,'-');
   try{await saveFile(fn,XLSX_W.build([sh]));S.xlsxMsg='تم الحفظ: '+fn;render()}catch(e){}
 }
 /* ---------- import from Excel / CSV ---------- */
@@ -2020,15 +2108,16 @@ function reportDoc(kind){
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(ti),'n')}${td(money(to),'n')}<td colspan="5"></td>${td(money(run),'n')}</tr></tfoot></table>`;
     land=true;
   }else if(kind==='stmt'){
-    const col=S.stmt.col,name=S.stmt.name,R=REG[col],sf=S.sf,rows=stmtRows(col,name);
-    title=R.stmt+': '+name;land=true;
+    const col=S.stmt.col,name=S.stmt.name,R=REG[col],sf=S.sf,rows=stmtRows(col,name),multi=isMulti(name);
+    title=R.stmt+(multi?' مجمّع':'')+': '+nmLabel(name);land=true;
     const parts=[];if(sf.site)parts.push('الموقع: '+siteNameOf(sf.site));parts.push('الفترة: '+(sf.from||'البداية')+' إلى '+(sf.to||today()));sub=parts.join(' · ');
     let run=0;
-    const cl=col==='contractors'?claimOf(name):null,paidAll=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);
+    const cl=col==='contractors'&&!multi?claimOf(name):null,paidAll=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);
     body=`<div class="tiles">${cl!=null?`<div><span>إجمالي المستخلص</span><b>${money(cl)}</b></div><div><span>المدفوع (كل المواقع)</span><b>${money(paidAll)}</b></div><div><span>${cl-paidAll<0?'مدفوع بالزيادة':'المتبقي للمقاول'}</span><b>${money(Math.abs(cl-paidAll))}</b></div>`:''}<div><span>إجمالي المصروف${sf.site||sf.from||sf.to?' (حسب الفترة)':''}</span><b>${money(sum(rows))}</b></div><div><span>عدد الحركات</span><b>${rows.length}</b></div></div>
-    <table><thead><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الموقع</th><th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th>طريقة الدفع</th><th>الإجمالي التراكمي</th></tr></thead><tbody>
-    ${rows.map(e=>{run+=amt(e);return `<tr>${td(esc(e.date))}${td(money(amt(e)),'n')}${td(esc(e.notes||''),'tl')}${td(esc(siteNameOf(e.siteId)),'tl')}${td(esc(e[R.other]||''),'tl')}${td(esc(e.remarks||''),'tl')}${td(mlabel(e))}${td(money(run),'n b')}</tr>`}).join('')||'<tr><td colspan="8">لا توجد حركات</td></tr>'}
-    </tbody><tfoot><tr>${td('الإجمالي')}${td(money(run),'n')}<td colspan="6"></td></tr></tfoot></table>`;
+    ${multi?`<table style="margin-bottom:10px;width:auto;min-width:50%"><thead><tr><th>ال${R.one}</th><th>عدد الحركات</th><th>الإجمالي</th></tr></thead><tbody>${NM(name).map(n=>{const l=rows.filter(e=>(e[R.field]||'').trim()===n);return `<tr>${td(esc(n),'tl b')}${td(l.length,'n')}${td(money(sum(l)),'n b')}</tr>`}).join('')}</tbody><tfoot><tr>${td('الإجمالي')}${td(rows.length,'n')}${td(money(sum(rows)),'n')}</tr></tfoot></table>`:''}
+    <table><thead><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الموقع</th>${multi?`<th>ال${R.one}</th>`:''}<th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th>طريقة الدفع</th><th>الإجمالي التراكمي</th></tr></thead><tbody>
+    ${rows.map(e=>{run+=amt(e);return `<tr>${td(esc(e.date))}${td(money(amt(e)),'n')}${td(esc(e.notes||''),'tl')}${td(esc(siteNameOf(e.siteId)),'tl')}${multi?td(esc(e[R.field]||''),'tl b'):''}${td(esc(e[R.other]||''),'tl')}${td(esc(e.remarks||''),'tl')}${td(mlabel(e))}${td(money(run),'n b')}</tr>`}).join('')||`<tr><td colspan="${multi?9:8}">لا توجد حركات</td></tr>`}
+    </tbody><tfoot><tr>${td('الإجمالي')}${td(money(run),'n')}<td colspan="${multi?7:6}"></td></tr></tfoot></table>`;
   }else{
     const jf=S.jf;title='دفتر اليومية';land=true;
     const parts=[];if(jf.site)parts.push('الموقع: '+siteNameOf(jf.site));if(jf.type)parts.push(jf.type==='dep'?'وارد فقط':'منصرف فقط');if(jf.from||jf.to)parts.push('من '+(jf.from||'البداية')+' إلى '+(jf.to||today()));if(jf.q)parts.push('بحث: '+jf.q);
@@ -2094,7 +2183,7 @@ async function printReport(kind){
     document.body.appendChild(fr);return;
   }
   if(!S.downloads){showBanner('حفظ الملفات غير متاح في هذا العرض، لذا فالطباعة غير متاحة هنا.');return}
-  const name={summary:'ملخص-المواقع',site:'كشف-حساب-'+siteNameOf(S.sel),journal:'دفتر-اليومية',stmt:S.stmt?(REG[S.stmt.col].stmt+'-'+S.stmt.name):''}[kind]||'تقرير';
+  const name={summary:'ملخص-المواقع',site:'كشف-حساب-'+siteNameOf(S.sel),journal:'دفتر-اليومية',stmt:S.stmt?(REG[S.stmt.col].stmt+(isMulti(S.stmt.name)?'-مجمع-'+NM(S.stmt.name).length:'-'+S.stmt.name)):''}[kind]||'تقرير';
   try{await S.downloads.save({filename:('ADC-'+name+'-'+today()+'.html').replace(/[\\/:*?"<>|]/g,'-'),data:new Blob([html],{type:'text/html'})});
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
@@ -2132,7 +2221,7 @@ function render(){
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
-  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__settings'?renderSettings():renderSite();
+  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__trash'?renderTrash():S.sel==='__settings'?renderSettings():renderSite();
   const bar=(APP&&appIsEngineer())?'':excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
