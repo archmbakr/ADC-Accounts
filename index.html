@@ -372,9 +372,27 @@ async function appResolve(session){
   appLs(LS_ME,{...me,owner,approved:APPU.approved});
   return APPU.approved;
 }
+const appWithTO=(pr,ms)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej({message:'timeout'}),ms))]);
+const appNetErr=e=>!navigator.onLine||/fetch|network|timeout|load failed|offline|ERR_/i.test(String(e&&(e.message||e.name||e)));
+const APP_OFF_MSG='لا يوجد اتصال بالإنترنت. يعمل التطبيق على آخر نسخة محفوظة على هذا الجهاز، وستُرفع الحركات التي تسجّلها تلقائيًا عند عودة الاتصال.';
+function appEnterOffline(c){
+  APPU.me=c;APPU.owner=!!c.owner;APPU.approved=true;APPU.offline=true;
+  appHide();showBanner(APP_OFF_MSG);
+  if(appEnter){const f=appEnter;appEnter=null;f()}
+}
+async function appPing(){
+  if(!navigator.onLine)return false;
+  try{await appWithTO(fetch(APPCFG.url+'/auth/v1/health',{headers:{apikey:APPCFG.key},cache:'no-store'}),5000);return true}catch(e){return false}
+}
 async function appTryEnter(session){
   try{
-    const ok=await appResolve(session);
+    let ok;
+    try{ok=await appWithTO(appResolve(session),9000)}
+    catch(e){
+      const c=appLs(LS_ME);
+      if(appNetErr(e)&&c&&c.id===session.user.id&&c.approved){appEnterOffline(c);return true}
+      throw e;
+    }
     if(!ok){APPU.mode='wait';appShow();return false}
     appHide();if(appEnter){const f=appEnter;appEnter=null;f()}return true;
   }catch(e){APPU.msg=authErr(e);APPU.mode='login';appShow();return false}
@@ -390,9 +408,10 @@ async function appBoot(){
     else if(ev==='SIGNED_OUT'&&!SEC.locked){location.reload()}
   });
   let ses=null;
-  try{ses=(await SB.auth.getSession()).data.session}catch(e){}
+  try{ses=(await appWithTO(SB.auth.getSession(),7000)).data.session}catch(e){}
   const recovery=/type=recovery/.test(location.hash+location.search);
-  if(!ses&&cached&&cached.approved&&!navigator.onLine){APPU.me=cached;APPU.owner=!!cached.owner;APPU.approved=true;APPU.offline=true;await appBioGate();return}
+  let hadSes=false;try{hadSes=!!localStorage.getItem('adc-app-auth')}catch(e){}
+  if(!ses&&!recovery&&cached&&cached.approved&&hadSes&&!(await appPing())){APPU.me=cached;await appBioGate();appEnterOffline(cached);return}
   if(ses&&!recovery&&cached&&cached.id===ses.user.id){APPU.me=cached;await appBioGate()}
   const wait=new Promise(res=>{appEnter=res});
   if(ses&&!recovery){if(await appTryEnter(ses))return}
@@ -559,7 +578,7 @@ async function appRefresh(col){
   const L=APPLIS.get(col);if(!L)return;
   if(L.busy){L.again=true;return}
   L.busy=true;
-  try{L.rows=await appFetchCol(col,L);L.ok=true;L.errSent=false;appEmit(col)}
+  try{L.rows=await appFetchCol(col,L);L.ok=true;L.errSent=false;if(APPU.offline){APPU.offline=false;showBanner('')}appEmit(col)}
   catch(e){if(!L.errSent){L.errSent=true;for(const h of L.cbs)if(h.err)try{h.err(e)}catch(x){}}}
   finally{L.busy=false;if(L.again){L.again=false;appRefresh(col)}}
 }
@@ -628,8 +647,8 @@ const APPASSETS={
     return {id:path};
   }
 };
-async function appBlob(id){if(!SB||!String(id).includes('/'))return null;try{const {data,error}=await SB.storage.from('receipts').download(id);return error?null:data}catch(e){return null}}
-async function appBlobUrl(id){if(!SB||!String(id).includes('/'))return null;try{const {data,error}=await SB.storage.from('receipts').createSignedUrl(id,3600);return error?null:data.signedUrl}catch(e){return null}}
+async function appBlob(id){if(String(id).startsWith('Q')){const r=await rcGetRaw(id);return r&&r.blob||null}if(!SB||!String(id).includes('/'))return null;try{const {data,error}=await SB.storage.from('receipts').download(id);return error?null:data}catch(e){return null}}
+async function appBlobUrl(id){if(String(id).startsWith('Q')){const b=await appBlob(id);return b?URL.createObjectURL(b):null}if(!SB||!String(id).includes('/'))return null;try{const {data,error}=await SB.storage.from('receipts').createSignedUrl(id,3600);return error?null:data.signedUrl}catch(e){return null}}
 const APPDL={
   async save({filename,data}){
     const file=new File([data],filename,{type:data.type||'application/octet-stream'});
@@ -682,7 +701,7 @@ async function appBioEnable(){
   render();
 }
 let appBioResolve=null;
-function appBioDone(){APPU.bioPw=false;APPU.hiddenAt=0;APPU.msg='';appHide();APPU.lastActive=Date.now();if(appBioResolve){const f=appBioResolve;appBioResolve=null;f()}}
+function appBioDone(){APPU.bioPw=false;APPU.hiddenAt=0;APPU.msg='';appHide();APPU.lastActive=Date.now();try{if(S.loaded)render()}catch(e){}if(appBioResolve){const f=appBioResolve;appBioResolve=null;f()}}
 async function appBioVerify(auto){
   const c=appBioCfg();if(!c){appBioDone();return}
   const btn=document.getElementById('apBioBtn');if(btn)btn.disabled=true;
@@ -720,6 +739,38 @@ document.addEventListener('visibilitychange',()=>{
   if(APPU.picking&&Date.now()-APPU.picking<10*60000){APPU.picking=0;return}
   if(Date.now()-APPU.hiddenAt>=(c.after??1)*60000)appBioLockNow();
 });
+
+/* ---------- receipts taken without internet: kept on the device, uploaded when the connection returns ---------- */
+async function rcDelRaw(id){try{const d=await idb2();await new Promise(r=>{const t=d.transaction('rc','readwrite');t.objectStore('rc').delete(id);t.oncomplete=r;t.onerror=r})}catch(e){}}
+async function appStoreReceipt(blob,type){
+  if(navigator.onLine&&SB){
+    try{const r=await appWithTO(APPASSETS.upload(blob,{type}),20000);return {id:r.id,type}}
+    catch(e){if(e&&e.code&&e.code!=='unavailable'&&e.message!=='timeout')throw e}
+  }
+  const id='Q'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  await rcSetRaw(id,{blob,type,at:Date.now()});
+  return {id,type};
+}
+let appRcBusy=false;
+async function appSyncReceipts(){
+  if(appRcBusy||!SB||!navigator.onLine||!(await appHasSes()))return;
+  appRcBusy=true;
+  try{
+    for(const [k,col] of [['exp','expenses'],['dep','deposits']]){
+      for(const rec of (S[k]||[])){
+        const id=rec.receipt;if(!id||!String(id).startsWith('Q'))continue;
+        const raw=await rcGetRaw(id);if(!raw||!raw.blob)continue;
+        let up;try{up=await appWithTO(APPASSETS.upload(raw.blob,{type:raw.type}),30000)}catch(e){return}
+        const cur=(S[k]||[]).find(x=>x.id===rec.id)||rec;
+        queue(col,rec.id,{...cur,receipt:up.id,receiptType:raw.type,updated:Date.now()});
+        await rcDelRaw(id);
+      }
+    }
+  }finally{appRcBusy=false}
+}
+window.addEventListener('online',()=>setTimeout(appSyncReceipts,1500));
+setInterval(()=>{if(S.pending.length===0||navigator.onLine)appSyncReceipts()},45000);
+setTimeout(appSyncReceipts,6000);
 
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
@@ -1231,6 +1282,7 @@ async function uploadReceipt(file){
   const ok=/^image\/(jpeg|png|webp|gif)$/.test(file.type)||file.type==='application/pdf';
   if(!ok)throw {code:'unsupported_type'};
   const blob=await shrinkImage(file);const type=blob.type||file.type;
+  if(APP)return appStoreReceipt(blob,type);
   const r=await S.assets.upload(blob,{type});return {id:r.id,type};
 }
 function uploadErr(e){
@@ -2423,5 +2475,5 @@ $('#newSiteForm').addEventListener('submit',ev=>{
 })();
 </script>
 
-<script>if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(function(){})}</script>
+<script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(function(){})}</script>
 </body></html>
