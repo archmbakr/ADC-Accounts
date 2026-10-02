@@ -12,7 +12,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const sum = l => l.reduce((a, x) => a + num(x.amount), 0);
 const meth = x => METHOD[x.method] && x.method !== 'cash' ? x.method : 'cash';
 const notDue = (x, d) => x.method === 'deferred' && (x.due || '') > d;
-const mlabel = (x, today) => METHOD[meth(x)] + (x.method === 'deferred' && x.due ? ' · ' + (notDue(x, today) ? 'يستحق ' : 'استُحق ') + x.due + (x.chq ? ' · شيك ' + x.chq : '') : '');
+const mlabel = (x, today) => METHOD[meth(x)] + (['bank', 'transfer', 'deferred'].includes(x.method) && x.bank ? ' · ' + x.bank : '') + (x.method === 'deferred' && x.due ? ' · ' + (notDue(x, today) ? 'يستحق ' : 'استُحق ') + x.due + (x.chq ? ' · شيك ' + x.chq : '') : '');
 const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.created || 0) - (b.created || 0);
 
 /* data = { sites, expenses, deposits, counts, log } كل موقع فيه owner (اسم المستخدم) اختياري */
