@@ -944,7 +944,8 @@ async function exportExcel(siteId,auto){
      jr.rows.push([r.no,r.date,siteNameOf(r.siteId),r.k==='dep'?'إيداع':'مصروف',r.k==='dep'?v:'',r.k==='exp'?v:'',r.notes||(r.k==='dep'?'إيداع من المالك':''),r.item||'',r.contractor||'',r.remarks||'',mlabel(r),run,r.by||'',dt(r.created)])}
    T(jr,['','','','الإجمالي',ti,to,'','','','','',run])}
   const blob=XLSX_W.build([sum1,jr,ex,dp,ct,lg]);
-  const d=new Date(now),fn='ADC-حسابات-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كل-المواقع')+'-'+today()+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
+  const lm=Math.max(0,...pick(S.log).map(l=>+l.at||0),...[...pick(S.exp),...pick(S.dep),...pick(S.cnt)].map(x=>Math.max(+x.updated||0,+x.created||0)))||now;
+  const d=new Date(lm),fn='ADC-كشف-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كامل')+'-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
   try{await saveFile(fn,blob);if(!siteId){lsSet(LS_XLSX,now);S.xlsxMsg=(auto?'تم حفظ ملف Excel تلقائيًا: ':'تم الحفظ: ')+fn}render()}catch(e){}
 }
 function excelBar(){
@@ -965,6 +966,7 @@ function logCard(){
 }
 /* ---------- files ---------- */
 async function saveFile(filename,blob){
+  if(APP&&await appSaveToDir(filename,blob))return;
   if(OFF&&await saveToFolder(filename,blob))return;
   if(OFF){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return}
   await S.downloads.save({filename,data:blob});

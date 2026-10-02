@@ -520,6 +520,7 @@ function appSecurityCard(){
     </form>
     ${appBioCard()}
     ${appPushCard()}
+    ${appRepCard()}
     <div class="row">${installEvt&&!isStandalone()?'<button type="button" class="primary" data-app="install">تثبيت التطبيق على الجهاز</button>':''}<button type="button" class="danger" data-app="signout">تسجيل الخروج</button></div>
     ${isStandalone()?'':isIOS()?'<p class="note">للتثبيت على الآيفون: من Safari اضغط زر المشاركة، ثم «إضافة إلى الشاشة الرئيسية».</p>':installEvt?'':'<p class="note">للتثبيت: من قائمة المتصفح (⋮) اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».</p>'}
     ${users}</div>`;
@@ -541,6 +542,10 @@ document.addEventListener('click',async ev=>{
   else if(a==='bio-pw'){APPU.bioPw=true;APPU.msg='';appShow()}
   else if(a==='bio-on')appBioEnable();
   else if(a==='push-on')appPushEnable();
+  else if(a==='rep-pick')repPick();
+  else if(a==='rep-grant')repSync(true);
+  else if(a==='rep-dl')repDownload(b.dataset.f);
+  else if(a==='rep-now')exportExcel(null);
   else if(a==='push-off')appPushDisable();
   else if(a==='push-test')appPushTest();
   else if(a==='bio-off'){appLs(LS_BIO,null);APPU.bioMsg={ok:1,t:'تم إلغاء الفتح بالبصمة على هذا الجهاز.'};render()}
@@ -822,6 +827,69 @@ function appPushCard(){
   return head+`<p class="note">فعّل الإشعارات لتصلك رسالة على هذا الجهاز قبل موعد استحقاق كل شيك آجل بيوم، حتى لو كان التطبيق مغلقًا.${isIOS()&&!isStandalone()?' على الآيفون يجب تثبيت التطبيق على الشاشة الرئيسية أولًا.':''}</p>
     <div class="row"><button type="button" class="primary" data-app="push-on">تفعيل الإشعارات</button></div>${msg}`;
 }
+
+/* ---------- weekly full statements: a copy saved on this device, in a folder the user picks ---------- */
+const LS_REPSAVED='adc_rep_saved_v1';
+const pickerOk=()=>'showDirectoryPicker' in window;
+let repDir=null,repPerm='';
+const repFolder=()=>APPU.owner?'owner':(APPU.me&&APPU.me.id);
+const repName=f=>'ADC-كشف-كامل-'+f;
+const repLabel=f=>{const m=f.match(/^(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)\.(\w+)$/);return m?`كشف كامل · آخر تعديل <bdi>${m[1]} ${m[2]}:${m[3]}</bdi> · ${m[4].toUpperCase()}`:esc(f)};
+async function repInit(){if(!pickerOk())return;try{repDir=await hGet('appdir');if(repDir)repPerm=await repDir.queryPermission({mode:'readwrite'})}catch(e){repDir=null}}
+async function repWrite(name,blob){
+  if(!repDir)return false;
+  if(repPerm!=='granted'){try{repPerm=await repDir.requestPermission({mode:'readwrite'})}catch(e){}}
+  if(repPerm!=='granted')return false;
+  try{const fh=await repDir.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return true}catch(e){return false}
+}
+async function appSaveToDir(name,blob){return repDir&&repPerm==='granted'?repWrite(name,blob):false}
+async function repPick(){
+  try{const h=await window.showDirectoryPicker({id:'adc-reports',mode:'readwrite'});await hSet('appdir',h);repDir=h;repPerm=await h.requestPermission({mode:'readwrite'});
+    APPU.repMsg={ok:1,t:'ستُحفظ الكشوف في المجلد «'+h.name+'».'};render();repSync(true)}
+  catch(e){if(!e||e.name!=='AbortError'){APPU.repMsg={t:'تعذّر اختيار المجلد.'};render()}}
+}
+async function repList(){
+  if(!SB||!APPU.me)return [];
+  try{const {data,error}=await SB.storage.from('reports').list(repFolder(),{limit:40,sortBy:{column:'name',order:'desc'}});return error?[]:(data||[]).filter(f=>/^\d{4}-\d\d-\d\d_\d\d-\d\d\.(xlsx|pdf)$/.test(f.name))}catch(e){return []}
+}
+async function repFetch(f){try{const {data,error}=await SB.storage.from('reports').download(repFolder()+'/'+f);return error?null:data}catch(e){return null}}
+async function repDownload(f){
+  const blob=await repFetch(f);if(!blob){APPU.repMsg={t:'تعذّر تنزيل الملف. تأكد من الاتصال بالإنترنت.'};return render()}
+  if(!(await repWrite(repName(f),blob)))await APPDL.save({filename:repName(f),data:blob});
+  const sv=new Set(appLs(LS_REPSAVED)||[]);sv.add(f);appLs(LS_REPSAVED,[...sv]);APPU.repMsg={ok:1,t:'تم حفظ الملف '+repName(f)};render();
+}
+let repBusy=false;
+async function repSync(gesture){
+  if(repBusy||!SB||!navigator.onLine||!APPU.me||!APPU.approved)return;repBusy=true;
+  try{
+    const files=await repList();APPU.repFiles=files;
+    const sv=new Set(appLs(LS_REPSAVED)||[]);
+    if(!appLs(LS_REPSAVED)){files.slice(2).forEach(f=>sv.add(f.name));appLs(LS_REPSAVED,[...sv])}   // first run: only the latest statement
+    const fresh=files.filter(f=>!sv.has(f.name));
+    if(!fresh.length)return;
+    if(repDir&&(repPerm==='granted'||gesture)){
+      let n=0;for(const f of fresh){const b=await repFetch(f.name);if(b&&await repWrite(repName(f.name),b)){sv.add(f.name);n++}}
+      appLs(LS_REPSAVED,[...sv]);if(n)APPU.repMsg={ok:1,t:'تم حفظ '+n+' ملف في المجلد «'+repDir.name+'».'};
+    }else{showBanner('يوجد كشف أسبوعي جديد. احفظه من «الإعدادات» ثم «نسخة الكشف على الجهاز».')}
+  }finally{repBusy=false;try{if(S.sel==='__settings')render()}catch(e){}}
+}
+function appRepCard(){
+  const m=APPU.repMsg,msg=m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:'';
+  if(APPU.repFiles===undefined&&!repBusy)setTimeout(()=>repSync(false),0);
+  const files=(APPU.repFiles||[]).slice(0,6),sv=new Set(appLs(LS_REPSAVED)||[]);
+  const dir=pickerOk()?(repDir?`<p>مجلد الحفظ: <b>${esc(repDir.name)}</b>${repPerm==='granted'?' ✔':' · <button type="button" class="ghost" data-app="rep-grant">السماح بالحفظ</button>'}</p>
+      <div class="row"><button type="button" class="ghost" data-app="rep-pick">تغيير المجلد</button></div>`
+    :`<div class="row"><button type="button" class="primary" data-app="rep-pick">اختيار مجلد الحفظ</button></div>`)
+    :'<p class="note">على الهاتف تُحفظ الملفات في مجلد التنزيلات (Downloads).</p>';
+  return `<div class="sec-h" style="margin-top:14px">نسخة الكشف على الجهاز</div>
+  <p class="note">كل أسبوع يُجهَّز كشف حساب كامل (Excel و PDF)، يُرسل إليك بالبريد، وتُحفظ نسخة منه على هذا الجهاز. اسم كل ملف يحمل تاريخ ووقت آخر تعديل.</p>
+  ${dir}
+  ${files.length?`<div class="tbl-wrap"><table><thead><tr><th>الملف</th><th></th></tr></thead><tbody>${files.map(f=>`<tr><td>${repLabel(f.name)}</td><td>${sv.has(f.name)?'<span class="msg ok">محفوظ</span> ':''}<button type="button" class="ghost" data-app="rep-dl" data-f="${esc(f.name)}">تنزيل</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note">لا توجد كشوف أسبوعية بعد. أول كشف يُجهَّز يوم الخميس.</p>'}
+  <div class="row"><button type="button" data-app="rep-now">حفظ كشف كامل الآن (Excel)</button></div>${msg}`;
+}
+repInit();
+setTimeout(()=>repSync(false),9000);
+window.addEventListener('online',()=>setTimeout(()=>repSync(false),3000));
 
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
@@ -1494,7 +1562,8 @@ async function exportExcel(siteId,auto){
      jr.rows.push([r.no,r.date,siteNameOf(r.siteId),r.k==='dep'?'إيداع':'مصروف',r.k==='dep'?v:'',r.k==='exp'?v:'',r.notes||(r.k==='dep'?'إيداع من المالك':''),r.item||'',r.contractor||'',r.remarks||'',mlabel(r),run,r.by||'',dt(r.created)])}
    T(jr,['','','','الإجمالي',ti,to,'','','','','',run])}
   const blob=XLSX_W.build([sum1,jr,ex,dp,ct,lg]);
-  const d=new Date(now),fn='ADC-حسابات-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كل-المواقع')+'-'+today()+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
+  const lm=Math.max(0,...pick(S.log).map(l=>+l.at||0),...[...pick(S.exp),...pick(S.dep),...pick(S.cnt)].map(x=>Math.max(+x.updated||0,+x.created||0)))||now;
+  const d=new Date(lm),fn='ADC-كشف-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كامل')+'-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
   try{await saveFile(fn,blob);if(!siteId){lsSet(LS_XLSX,now);S.xlsxMsg=(auto?'تم حفظ ملف Excel تلقائيًا: ':'تم الحفظ: ')+fn}render()}catch(e){}
 }
 function excelBar(){
@@ -1515,6 +1584,7 @@ function logCard(){
 }
 /* ---------- files ---------- */
 async function saveFile(filename,blob){
+  if(APP&&await appSaveToDir(filename,blob))return;
   if(OFF&&await saveToFolder(filename,blob))return;
   if(OFF){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return}
   await S.downloads.save({filename,data:blob});
