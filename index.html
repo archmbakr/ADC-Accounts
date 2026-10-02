@@ -835,8 +835,9 @@ const LS_REPSAVED='adc_rep_saved_v1';
 const pickerOk=()=>'showDirectoryPicker' in window;
 let repDir=null,repPerm='';
 const repFolder=()=>APPU.owner?'owner':(APPU.me&&APPU.me.id);
-const repName=f=>'ADC-كشف-كامل-'+f;
-const repLabel=f=>{const m=f.match(/^(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)\.(\w+)$/);return m?`كشف كامل · آخر تعديل <bdi>${m[1]} ${m[2]}:${m[3]}</bdi> · ${m[4].toUpperCase()}`:esc(f)};
+const repIsBak=f=>/\.json$/.test(f),repIsDb=f=>/-db\.json$/.test(f);
+const repName=f=>repIsDb(f)?'ADC-قاعدة-البيانات-كاملة-'+f.replace('-db.json','.json'):repIsBak(f)?'ADC-نسخة-احتياطية-'+f:'ADC-كشف-كامل-'+f;
+const repLabel=f=>{const m=f.match(/^(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)(-db)?\.(\w+)$/);return m?`${m[4]?'نسخة كاملة من قاعدة البيانات (كل المستخدمين)':m[5]==='json'?'نسخة احتياطية (للاسترجاع)':'كشف كامل'} · آخر تعديل <bdi>${m[1]} ${m[2]}:${m[3]}</bdi> · ${m[5].toUpperCase()}`:esc(f)};
 async function repInit(){if(!pickerOk())return;try{repDir=await hGet('appdir');if(repDir)repPerm=await repDir.queryPermission({mode:'readwrite'})}catch(e){repDir=null}}
 async function repWrite(name,blob){
   if(!repDir)return false;
@@ -853,7 +854,7 @@ async function repPick(){
 }
 async function repList(){
   if(!SB||!APPU.me)return [];
-  try{const {data,error}=await SB.storage.from('reports').list(repFolder(),{limit:40,sortBy:{column:'name',order:'desc'}});return error?[]:(data||[]).filter(f=>/^\d{4}-\d\d-\d\d_\d\d-\d\d\.(xlsx|pdf)$/.test(f.name))}catch(e){return []}
+  try{const {data,error}=await SB.storage.from('reports').list(repFolder(),{limit:40,sortBy:{column:'name',order:'desc'}});return error?[]:(data||[]).filter(f=>/^\d{4}-\d\d-\d\d_\d\d-\d\d(\.(xlsx|pdf|json)|-db\.json)$/.test(f.name))}catch(e){return []}
 }
 async function repFetch(f){try{const {data,error}=await SB.storage.from('reports').download(repFolder()+'/'+f);return error?null:data}catch(e){return null}}
 async function repDownload(f){
@@ -867,7 +868,7 @@ async function repSync(gesture){
   try{
     const files=await repList();APPU.repFiles=files;
     const sv=new Set(appLs(LS_REPSAVED)||[]);
-    if(!appLs(LS_REPSAVED)){files.slice(2).forEach(f=>sv.add(f.name));appLs(LS_REPSAVED,[...sv])}   // first run: only the latest statement
+    if(!appLs(LS_REPSAVED)){files.slice(4).forEach(f=>sv.add(f.name));appLs(LS_REPSAVED,[...sv])}   // first run: only the latest statement
     const fresh=files.filter(f=>!sv.has(f.name));
     if(!fresh.length)return;
     if(repDir&&(repPerm==='granted'||gesture)){
@@ -885,7 +886,7 @@ function appRepCard(){
     :`<div class="row"><button type="button" class="primary" data-app="rep-pick">اختيار مجلد الحفظ</button></div>`)
     :'<p class="note">على الهاتف تُحفظ الملفات في مجلد التنزيلات (Downloads).</p>';
   return `<div class="sec-h" style="margin-top:14px">نسخة الكشف على الجهاز</div>
-  <p class="note">كل أسبوع يُجهَّز كشف حساب كامل (Excel و PDF)، يُرسل إليك بالبريد، وتُحفظ نسخة منه على هذا الجهاز. اسم كل ملف يحمل تاريخ ووقت آخر تعديل.</p>
+  <p class="note">كل أسبوع يُجهَّز كشف حساب كامل (Excel و PDF) ومعه ملف نسخة احتياطية، يُرسل إليك بالبريد، وتُحفظ نسخة منها على هذا الجهاز. اسم كل ملف يحمل تاريخ ووقت آخر تعديل. لاسترجاع البيانات من النسخة الاحتياطية استخدم «استرجاع من ملف».</p>
   ${dir}
   ${files.length?`<div class="tbl-wrap"><table><thead><tr><th>الملف</th><th></th></tr></thead><tbody>${files.map(f=>`<tr><td>${repLabel(f.name)}</td><td>${sv.has(f.name)?'<span class="msg ok">محفوظ</span> ':''}<button type="button" class="ghost" data-app="rep-dl" data-f="${esc(f.name)}">تنزيل</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note">لا توجد كشوف أسبوعية بعد. أول كشف يُجهَّز يوم الخميس.</p>'}
   <div class="row"><button type="button" data-app="rep-now">حفظ كشف كامل الآن (Excel)</button></div>${msg}`;
@@ -1813,7 +1814,7 @@ const okId=x=>x&&typeof x.id==='string'&&/^[A-Za-z0-9_\-.~:@+]{1,200}$/.test(x.i
 function parseBackup(text){
   const d=JSON.parse(text);
   if(d.app!=='ADC-site-accounts'||!Array.isArray(d.sites)||!Array.isArray(d.expenses))throw 0;
-  return {at:d.exportedAt,sites:d.sites.filter(okId),exp:d.expenses.filter(okId),dep:Array.isArray(d.deposits)?d.deposits.filter(okId):[],cnt:Array.isArray(d.counts)?d.counts.filter(okId):[],receipts:(d.receipts&&typeof d.receipts==='object')?d.receipts:{},log:Array.isArray(d.log)?d.log.filter(okId):[],cons:Array.isArray(d.contractors)?d.contractors.filter(okId):[],items:Array.isArray(d.items)?d.items.filter(okId):[]};
+  return {at:d.exportedAt,account:typeof d.account==='string'?d.account:'',sites:d.sites.filter(okId),exp:d.expenses.filter(okId),dep:Array.isArray(d.deposits)?d.deposits.filter(okId):[],cnt:Array.isArray(d.counts)?d.counts.filter(okId):[],receipts:(d.receipts&&typeof d.receipts==='object')?d.receipts:{},log:Array.isArray(d.log)?d.log.filter(okId):[],cons:Array.isArray(d.contractors)?d.contractors.filter(okId):[],items:Array.isArray(d.items)?d.items.filter(okId):[]};
 }
 function readFile(file,cb){if(!file)return;const r=new FileReader();r.onload=()=>cb(r.result);r.readAsText(file)}
 
@@ -1822,18 +1823,19 @@ async function saveBackup(){
   const n=rcIdsOf([...S.exp,...S.dep]).length;
   if(n){S.xlsxMsg='جاري تجهيز الملف مع '+n+' صورة إيصال…';render()}
   const receipts=n?await collectReceipts(false):{};
-  try{await saveFile('ADC-نسخة-احتياطية-'+today()+'.json',new Blob([JSON.stringify(fullData({receipts}))],{type:'application/json'}));lsSet(LS_BACKUP,Date.now());S.xlsxMsg='تم حفظ ملف النسخة الاحتياطية'+(n?' ومعه '+Object.keys(receipts).length+' صورة إيصال':'')+'.';render()}catch(e){}
+  try{await saveFile('ADC-نسخة-احتياطية-'+today()+'.json',new Blob([JSON.stringify(fullData({receipts,...(APP&&S.uid?{account:S.isManager?'owner':S.uid}:{})}))],{type:'application/json'}));lsSet(LS_BACKUP,Date.now());S.xlsxMsg='تم حفظ ملف النسخة الاحتياطية'+(n?' ومعه '+Object.keys(receipts).length+' صورة إيصال':'')+'.';render()}catch(e){}
 }
+const canRestore=()=>S.isManager||(APP&&!!S.pfx&&S.canWrite);
 function readImport(file){
   readFile(file,t=>{
-    try{const d=parseBackup(t);const mp=l=>new Map(l.map(x=>[x.id,x]));const nw=(list,cur)=>{const m=mp(cur);return list.filter(x=>{const c=m.get(x.id);return !c||(x.updated||0)>(c.updated||0)})};
+    try{const d=parseBackup(t);if(APP&&d.account&&d.account!==(S.isManager?'owner':S.uid)){S.importData={err:'هذه النسخة الاحتياطية تخص حسابًا آخر، ولا يمكن استرجاعها في هذا الحساب.'};render();return}const mp=l=>new Map(l.map(x=>[x.id,x]));const nw=(list,cur)=>{const m=mp(cur);return list.filter(x=>{const c=m.get(x.id);return !c||(x.updated||0)>(c.updated||0)})};
       S.importData={at:d.at,receipts:d.receipts,sites:nw(d.sites,S.sites),exp:nw(d.exp,S.exp),dep:nw(d.dep,S.dep),cnt:nw(d.cnt,S.cnt),log:nw(d.log,S.log),cons:nw(d.cons,S.cons),items:nw(d.items,S.items)}}
     catch(e){S.importData={err:'هذا الملف ليس ملف نسخة احتياطية من التطبيق.'}}
     render();
   });
 }
 async function applyImport(){
-  const d=S.importData;if(!d||d.err||!S.isManager)return;
+  const d=S.importData;if(!d||d.err||!canRestore())return;
   const strip=o=>{const {id,pending,...rest}=o;return rest};
   /* upload receipt images that were taken on the computer */
   const need=[...d.exp,...d.dep].filter(x=>x.receipt&&(isLocalRc(x.receipt)||(APP&&!String(x.receipt).includes('/'))));let up=0,miss=0;
@@ -1865,7 +1867,7 @@ async function exportLocal(){
 }
 function readUpdate(file){
   readFile(file,t=>{
-    try{const d=parseBackup(t);if(S.baseAt&&d.at&&d.at<S.baseAt){S.update={at:d.at,data:d};render();return}applyUpdate(d)}
+    try{const d=parseBackup(t);if(APP&&d.account&&d.account!==(S.isManager?'owner':S.uid)){S.importData={err:'هذه النسخة الاحتياطية تخص حسابًا آخر، ولا يمكن استرجاعها في هذا الحساب.'};render();return}if(S.baseAt&&d.at&&d.at<S.baseAt){S.update={at:d.at,data:d};render();return}applyUpdate(d)}
     catch(e){S.update={err:'هذا الملف ليس ملف نسخة احتياطية من تطبيق حسابات المواقع.'};render()}
   });
 }
@@ -1907,7 +1909,7 @@ function backupHTML(){
     <p>آخر ملف نسخة احتياطية: ${last?`<b>${stamp(last)}</b>${days>=7?` <span class="warn">(من ${days} يوم، يُفضَّل حفظ نسخة جديدة)</span>`:''}`:'<span class="warn">لم يُحفظ ملف بعد</span>'}</p>
     <div class="row">
       ${S.downloads?'<button class="primary" id="saveBackup">حفظ ملف نسخة احتياطية</button><button id="dlOffline">تنزيل نسخة الكمبيوتر</button>':'<span class="msg">حفظ الملفات غير متاح في هذا العرض.</span>'}
-      ${S.isManager?'<span class="filebtn"><button type="button">استرجاع من ملف</button><input type="file" id="importFile" accept=".json,application/json" aria-label="اختر ملف النسخة الاحتياطية"></span>':''}
+      ${canRestore()?'<span class="filebtn"><button type="button">استرجاع من ملف</button><input type="file" id="importFile" accept=".json,application/json" aria-label="اختر ملف النسخة الاحتياطية"></span>':''}
     </div>
     ${imp?`<div class="row"><span class="msg">${imp.err?`<span class="msg err">${esc(imp.err)}</span>`:`الملف من ${stamp(imp.at)}: ستتم إضافته أو تحديثه <b>${imp.sites.length}</b> موقع و<b>${imp.dep.length}</b> إيداع و<b>${imp.exp.length}</b> مصروف و<b>${imp.cnt.length}</b> جرد.`}</span>
       ${imp.busy?`<span class="msg">${esc(imp.busy)}</span>`:''}${!imp.busy&&!imp.err&&(imp.sites.length||imp.exp.length||imp.dep.length||imp.cnt.length||(imp.cons||[]).length||(imp.items||[]).length)?'<button class="primary" id="importYes">استرجاع</button>':''}<button id="importNo">إلغاء</button></div>`:''}
@@ -2360,7 +2362,8 @@ function bindConItem(conId,itemId){
   });
   it.addEventListener('change',()=>{it.dataset.auto=''});
 }
-function claimOf(name){const r=(S.cons||[]).find(x=>x.name.trim()===name&&!x.hidden);return r&&r.claim>0?+r.claim:null}
+/* the claim total covers all sites; a regular user only sees his own payments, so he sees a claim only on a contractor he registered himself */
+function claimOf(name){const r=(S.cons||[]).find(x=>x.name.trim()===name&&!x.hidden);if(!r||!(r.claim>0))return null;if(!S.isManager&&!OFF&&S.pfx&&(r._p??'')!==S.pfx)return null;return +r.claim}
 function regStats(col,name){
   const f=REG[col].field,l=S.exp.filter(e=>(e[f]||'').trim()===name);
   return {n:l.length,total:sum(l),sites:new Set(l.map(e=>e.siteId)).size,last:l.map(e=>e.date).sort().pop()||''};
