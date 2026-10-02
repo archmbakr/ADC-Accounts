@@ -249,6 +249,8 @@ button.in-btn{background:var(--ok);border-color:var(--ok);color:var(--on-accent)
 select.auto-flash{animation:autoFlash 1.2s ease-out}
 
 .due-card{border-color:#e5c07b}.due-card .sec-h{color:#8a5a00}
+
+body.eng-mode .rail{display:none}body.eng-mode .layout{grid-template-columns:minmax(0,1fr)}
 </style>
 
 <div class="wrap">
@@ -370,10 +372,10 @@ async function appResolve(session){
   const me={id:u.id,email:u.email||'',name:(meta.name||'').trim()||(u.email||'').split('@')[0]};
   let owner=false,row=null;
   const r1=await SB.rpc('am_owner');if(r1.error)throw r1.error;owner=!!r1.data;
-  const r2=await SB.from('members').select('id,email,name,approved').eq('id',u.id).maybeSingle();if(r2.error)throw r2.error;row=r2.data;
+  const r2=await SB.from('members').select('*').eq('id',u.id).maybeSingle();if(r2.error)throw r2.error;row=r2.data;
   if(!owner&&!row){const r3=await SB.from('members').insert({id:u.id,email:me.email,name:me.name});if(r3.error&&!/duplicate/i.test(r3.error.message||''))throw r3.error;row={approved:false,name:me.name}}
   if(row&&row.name)me.name=row.name;
-  APPU.me=me;APPU.owner=owner;APPU.approved=owner||!!(row&&row.approved);
+  APPU.me=me;APPU.owner=owner;APPU.approved=owner||!!(row&&row.approved);APPU.role=owner?'owner':((row&&row.role)||'user');me.role=APPU.role;
   appLs(LS_ME,{...me,owner,approved:APPU.approved});
   return APPU.approved;
 }
@@ -381,7 +383,7 @@ const appWithTO=(pr,ms)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>re
 const appNetErr=e=>!navigator.onLine||/fetch|network|timeout|load failed|offline|ERR_/i.test(String(e&&(e.message||e.name||e)));
 const APP_OFF_MSG='لا يوجد اتصال بالإنترنت. يعمل التطبيق على آخر نسخة محفوظة على هذا الجهاز، وستُرفع الحركات التي تسجّلها تلقائيًا عند عودة الاتصال.';
 function appEnterOffline(c){
-  APPU.me=c;APPU.owner=!!c.owner;APPU.approved=true;APPU.offline=true;
+  APPU.me=c;APPU.owner=!!c.owner;APPU.role=c.role||(c.owner?'owner':'user');APPU.approved=true;APPU.offline=true;
   appHide();showBanner(APP_OFF_MSG);
   if(appEnter){const f=appEnter;appEnter=null;f()}
 }
@@ -405,7 +407,7 @@ async function appTryEnter(session){
 async function appBoot(){
   const cached=appLs(LS_ME);
   if(!sbClient()){
-    if(cached&&cached.approved){APPU.me=cached;APPU.owner=!!cached.owner;APPU.approved=true;APPU.offline=true;await appBioGate();showBanner('لا يوجد اتصال بالإنترنت. أنت تعمل على آخر نسخة محفوظة على الجهاز، وأي شيء تسجّله سيُرفع عند فتح التطبيق مع توفر الإنترنت.');return}
+    if(cached&&cached.approved){APPU.me=cached;APPU.owner=!!cached.owner;APPU.role=cached.role||'user';APPU.approved=true;APPU.offline=true;await appBioGate();showBanner('لا يوجد اتصال بالإنترنت. أنت تعمل على آخر نسخة محفوظة على الجهاز، وأي شيء تسجّله سيُرفع عند فتح التطبيق مع توفر الإنترنت.');return}
     APPU.mode='nolib';appShow();return new Promise(()=>{});
   }
   SB.auth.onAuthStateChange((ev,ses)=>{
@@ -487,7 +489,7 @@ document.addEventListener('submit',async ev=>{
 /* ---------- settings card for the app ---------- */
 async function appLoadMembers(){
   if(!APPU.owner||APPU.membersBusy||!SB)return;APPU.membersBusy=true;
-  try{const {data,error}=await SB.from('members').select('id,email,name,approved,created_at').order('created_at');if(!error)APPU.members=data||[]}catch(e){}
+  try{const {data,error}=await SB.from('members').select('*').order('created_at');if(!error)APPU.members=data||[]}catch(e){}
   APPU.membersBusy=false;
   const waiting=(APPU.members||[]).filter(m=>!m.approved).length;
   if(waiting&&S.sel!=='__settings')showBanner('يوجد '+waiting+' مستخدم بانتظار موافقتك. افتح «الإعدادات» للموافقة عليهم.');
@@ -503,8 +505,8 @@ function appSecurityCard(){
     users=`<div class="sec-h" style="margin-top:14px">المستخدمون</div>
     <p class="note">أرسل هذا الرابط إلى أي شخص تريده أن يستخدم التطبيق. سيُنشئ حسابًا ببريده الإلكتروني، ويبقى بانتظار موافقتك هنا. كل مستخدم يعرض ويعدّل مواقعه فقط، وأنت ترى كل شيء.</p>
     <div class="row"><input readonly dir="ltr" value="${esc(link)}" aria-label="رابط التطبيق" style="flex:1;min-width:200px"><button type="button" data-app="copy">نسخ الرابط</button>${APPU.copyMsg?`<span class="msg ok">${esc(APPU.copyMsg)}</span>`:''}</div>
-    ${list.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد الإلكتروني</th><th>الحالة</th><th></th></tr></thead><tbody>
-    ${list.map(m=>`<tr><td>${esc(m.name||'')}</td><td dir="ltr">${esc(m.email||'')}</td><td>${m.approved?'<span class="msg ok">مفعّل</span>':'<b class="neg">بانتظار موافقتك</b>'}</td>
+    ${list.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد الإلكتروني</th><th>النوع</th><th>الحالة</th><th></th></tr></thead><tbody>
+    ${list.map(m=>`<tr><td>${esc(m.name||'')}</td><td dir="ltr">${esc(m.email||'')}</td><td><select data-role-id="${esc(m.id)}" aria-label="نوع المستخدم"><option value="user" ${m.role!=='engineer'?'selected':''}>مستخدم (مواقع)</option><option value="engineer" ${m.role==='engineer'?'selected':''}>مهندس عهدة</option></select></td><td>${m.approved?'<span class="msg ok">مفعّل</span>':'<b class="neg">بانتظار موافقتك</b>'}</td>
       <td>${m.approved?`<button type="button" class="ghost" data-app="block" data-id="${esc(m.id)}">إيقاف</button>`:`<button type="button" class="primary" data-app="approve" data-id="${esc(m.id)}">وافق</button>`}</td></tr>`).join('')}</tbody></table></div>`
     :`<p class="note">${APPU.members===null?'جاري التحميل…':'لا يوجد مستخدمون غيرك بعد.'}</p>`}
     <div class="row"><button type="button" class="ghost" data-app="members">تحديث القائمة</button></div>
@@ -891,11 +893,220 @@ repInit();
 setTimeout(()=>repSync(false),9000);
 window.addEventListener('online',()=>setTimeout(()=>repSync(false),3000));
 
+/* ===================== العُهد (engineers' petty-cash custody) ===================== */
+const LS_CUST='adc_cust_cache_v1',LS_CUSTQ='adc_cust_q_v1';
+const CU={rows:[],engs:null,loaded:false,ch:null,busy:false,msg:null,claimMsg:null,rejecting:'',returning:'',pick:null};
+function appIsEngineer(){return (APPU.role||(APPU.me&&APPU.me.role))==='engineer'}
+const custQ=()=>appLs(LS_CUSTQ)||[];
+function custMerged(){
+  const m=new Map(CU.rows.map(r=>[r.id,r]));
+  for(const op of custQ()){if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}
+  return [...m.values()];
+}
+async function custLoad(){
+  if(!SB||!navigator.onLine||!(await appHasSes())){const c=appLs(LS_CUST);if(c)CU.rows=c;CU.loaded=true;return}
+  try{const {data,error}=await SB.from('custody').select('*').order('updated_at',{ascending:true}).limit(5000);
+    if(!error){CU.rows=data||[];appLs(LS_CUST,CU.rows);CU.missing=false}else if(/custody|relation|does not exist|schema cache/i.test(error.message||''))CU.missing=true}catch(e){}
+  CU.loaded=true;
+}
+async function custEngs(){
+  if(!SB||APPU.role==='engineer')return;
+  try{const {data}=await SB.from('members').select('*').eq('role','engineer').eq('approved',true);CU.engs=(data||[]).filter(m=>m.approved&&m.role==='engineer')}catch(e){CU.engs=CU.engs||[]}
+}
+let custT=null;
+function custRefresh(){clearTimeout(custT);custT=setTimeout(async()=>{await custLoad();await custFlush();try{render()}catch(e){}},300)}
+function custChannel(){
+  if(CU.ch||!SB)return;
+  CU.ch=SB.channel('adc-cust').on('postgres_changes',{event:'*',schema:'public',table:'custody'},()=>custRefresh()).subscribe();
+}
+async function custFlush(){
+  if(CU.busy||!SB||!navigator.onLine||!(await appHasSes()))return;
+  let q=custQ();if(!q.length)return;CU.busy=true;
+  try{
+    for(const op of q){
+      try{
+        if(op.op==='del'){const {error}=await SB.from('custody').delete().eq('id',op.id);if(error)throw error}
+        else{
+          const row={...op.row};delete row._local;delete row.updated_at;
+          if(row.data&&String(row.data.receipt||'').startsWith('Q')){const raw=await rcGetRaw(row.data.receipt);if(raw&&raw.blob){const up=await APPASSETS.upload(raw.blob,{type:raw.type});await rcDelRaw(row.data.receipt);row.data={...row.data,receipt:up.id}}}
+          const {error}=await SB.from('custody').upsert(row,{onConflict:'id'});if(error)throw error;
+        }
+        q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);
+      }catch(e){const m=String(e&&e.message||'');if(/row-level|permission|violates/i.test(m)){q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);showBanner('تعذّر حفظ حركة عهدة: غير مسموح.')}break}
+    }
+  }finally{CU.busy=false}
+  await custLoad();try{render()}catch(e){}
+}
+function custPut(row){const q=custQ().filter(x=>!(x.id===row.id&&x.op==='put'));q.push({qid:newId(),op:'put',id:row.id,row});appLs(LS_CUSTQ,q);custFlush();try{render()}catch(e){}}
+function custDel(id){const q=custQ().filter(x=>x.id!==id);q.push({qid:newId(),op:'del',id});appLs(LS_CUSTQ,q);custFlush();try{render()}catch(e){}}
+/* site money: custody issued from / returned to a site (for balances) */
+function custHook(siteId,date){
+  const o={iC:0,iB:0,r:0};
+  for(const r of custMerged()){
+    if(siteId&&r.site_id!==siteId)continue;
+    const d=r.data||{};if(date&&(d.date||'')>date)continue;
+    if(r.kind==='issue'){if(d.source==='bank')o.iB+=+d.amount||0;else o.iC+=+d.amount||0}
+    else if(r.kind==='return')o.r+=+d.amount||0;
+  }
+  return o;
+}
+function custSummary(rows){
+  const by=new Map();
+  for(const r of rows){
+    const k=r.engineer;if(!by.has(k))by.set(k,{eng:k,name:(r.data||{}).engName||'',issued:0,returned:0,approved:0,pending:0,rejected:0});
+    const s=by.get(k),a=+(r.data||{}).amount||0;if((r.data||{}).engName)s.name=r.data.engName;
+    if(r.kind==='issue')s.issued+=a;else if(r.kind==='return')s.returned+=a;
+    else if(r.status==='approved')s.approved+=a;else if(r.status==='pending')s.pending+=a;else s.rejected+=a;
+  }
+  for(const s of by.values()){s.left=s.issued-s.returned-s.approved;s.avail=s.left-s.pending}
+  return [...by.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+}
+const custMine=()=>custMerged().filter(r=>APPU.owner||r.manager===(APPU.me&&APPU.me.id)||r.engineer===(APPU.me&&APPU.me.id));
+function appCustNavBtn(){
+  if(appIsEngineer())return '';
+  const n=custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length;
+  return `<button class="site-btn jbtn" data-site="__custody" aria-current="${S.sel==='__custody'}"><span class="n">العُهد</span><span class="t">${n?`<b class="neg">${n} للمراجعة</b>`:''}</span></button>`;
+}
+const cuMoney=v=>fmt(v)+' '+CUR;
+const stTag=r=>r.kind==='issue'?'<span class="pill-ok">صرف عهدة</span>':r.kind==='return'?'<span class="pill-none">رد مبلغ</span>':r.status==='pending'?'<span class="pill-over">تحت المراجعة</span>':r.status==='approved'?'<span class="pill-ok">معتمد</span>':'<span class="pill-neg">مرفوض</span>';
+function custReceiptBtn(d){return d.receipt?`<button class="ghost rcpt" data-receipt="${esc(d.receipt)}" data-rtype="${esc(d.receiptType||'')}">الإيصال</button>`:''}
+function custNeedSql(){return CU.missing?`<div class="card"><p class="msg err">جدول العُهد غير موجود في قاعدة البيانات بعد. شغّل ملف «ADC-إعداد-العهد.sql» في Supabase.</p></div>`:''}
+
+/* ---------- صفحة العُهد للمدير وصاحب الموقع ---------- */
+function appRenderCustody(){
+  if(!CU.loaded){custLoad().then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
+  if(CU.engs===null){CU.engs=[];custEngs().then(()=>render())}
+  const rows=custMine(),sum=custSummary(rows),pend=rows.filter(r=>r.kind==='claim'&&r.status==='pending').sort((a,b)=>(a.data.date||'').localeCompare(b.data.date||''));
+  const mySites=S.sites.filter(s=>APPU.owner||(s._p||'')===S.pfx);
+  const engs=CU.engs||[];
+  const m=CU.msg;CU.msg=null;
+  $('#pane').innerHTML=`<div class="pane-h"><h2>العُهد</h2></div>${custNeedSql()}
+  <div class="card"><div class="sec-h">صرف عهدة لمهندس</div>
+  ${engs.length?`<form id="cuIssue" class="entry" novalidate>
+    <div class="f c2"><label for="cu_eng">المهندس</label><select id="cu_eng"><option value="">اختر المهندس</option>${engs.map(e=>`<option value="${esc(e.id)}">${esc(e.name||e.email)}</option>`).join('')}</select></div>
+    <div class="f c2"><label for="cu_site">الموقع</label><select id="cu_site"><option value="">اختر الموقع</option>${mySites.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="f c1"><label for="cu_amount">المبلغ (${CUR})</label><input id="cu_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    <div class="f c1"><label for="cu_date">التاريخ</label><input id="cu_date" type="date" value="${today()}"></div>
+    <div class="f c1 half"><label for="cu_src">صُرفت من</label><select id="cu_src"><option value="cash">نقدي</option><option value="bank">بنك</option></select></div>
+    <div class="f c3"><label for="cu_notes">البيان</label><input id="cu_notes" maxlength="200" placeholder="مثال: عهدة مصروفات الموقع"></div>
+    <div class="form-foot"><button class="primary" type="submit">صرف العهدة</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div></form>`
+  :`<p class="note">لا يوجد مهندسون بعد. اطلب من المهندس إنشاء حساب من رابط التطبيق، ثم ${APPU.owner?'اجعل نوعه «مهندس عهدة» من «الإعدادات» ← «المستخدمون» ووافق عليه.':'اطلب من المدير اعتماده كمهندس عهدة.'}</p>`}</div>
+  ${pend.length?`<div class="card due-card"><div class="sec-h">مصروفات عهدة تحت المراجعة (${pend.length})</div><div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th>البند</th><th>المقاول</th><th></th></tr></thead><tbody>
+    ${pend.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${esc(d.engName||'')}</td><td>${esc(d.siteName||siteNameOf(r.site_id))}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.remarks?`<span class="note"> · ${esc(d.remarks)}</span>`:''}</td><td>${esc(d.item||'')}</td><td>${esc(d.contractor||'')}</td>
+      <td class="acts">${custReceiptBtn(d)}${CU.rejecting===r.id?`<input id="cu_rej" placeholder="سبب الرفض" maxlength="120"><button class="danger" data-cu="rejyes" data-id="${esc(r.id)}">رفض</button><button data-cu="rejno">إلغاء</button>`:`<button class="primary" data-cu="approve" data-id="${esc(r.id)}">اعتماد</button><button class="ghost" data-cu="reject" data-id="${esc(r.id)}">رفض</button>`}</td></tr>`}).join('')}
+    </tbody></table></div><p class="note">عند الاعتماد يُسجَّل المبلغ مصروفًا على الموقع بطريقة دفع «من العهدة»، ويقل رصيد عهدة المهندس.</p></div>`:''}
+  <div class="card"><div class="sec-h">أرصدة العُهد</div>
+  ${sum.length?`<div class="tbl-wrap"><table><thead><tr><th>المهندس</th><th class="num">المصروف له</th><th class="num">المعتمد</th><th class="num">تحت المراجعة</th><th class="num">المردود</th><th class="num">المتبقي معه</th><th></th></tr></thead><tbody>
+    ${sum.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="num">${fmt(s.issued)}</td><td class="num">${fmt(s.approved)}</td><td class="num">${fmt(s.pending)}</td><td class="num">${fmt(s.returned)}</td><td class="num strong${s.left<0?' neg':''}">${fmt(s.left)}</td>
+      <td class="acts">${CU.returning===s.eng?`<input id="cu_ret" type="number" inputmode="decimal" min="0" step="0.01" placeholder="المبلغ المردود" style="width:130px"><button class="primary" data-cu="retyes" data-eng="${esc(s.eng)}">حفظ</button><button data-cu="retno">إلغاء</button>`:`<button class="ghost" data-cu="ret" data-eng="${esc(s.eng)}">تسجيل رد مبلغ</button>`}</td></tr>`).join('')}
+    </tbody></table></div>`:'<p class="note">لم تُصرف عُهد بعد.</p>'}</div>
+  <div class="card"><div class="sec-h">آخر حركات العُهد</div>
+  ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
+    ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,60).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.engName||'')}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${r.status==='rejected'&&d.reason?`<span class="note"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}</td></tr>`}).join('')}
+    </tbody></table></div>`:'<p class="note">لا توجد حركات.</p>'}</div>`;
+  const f=$('#cuIssue');if(f)f.onsubmit=ev=>{ev.preventDefault();
+    const eng=$('#cu_eng').value,site=$('#cu_site').value,amount=parseFloat($('#cu_amount').value),date=$('#cu_date').value,notes=$('#cu_notes').value.trim();
+    if(!eng||!site||!(amount>0)||!date){CU.msg={t:'اختر المهندس والموقع واكتب المبلغ والتاريخ.'};return render()}
+    const st=S.sites.find(s=>s.id===site),e=(CU.engs||[]).find(x=>x.id===eng)||{};
+    const manager=st&&st._p?st._p.split('/')[1]:null;
+    custPut({id:'c'+newId(),kind:'issue',engineer:eng,manager,site_id:site,status:'ok',data:{amount,date,source:$('#cu_src').value,notes:notes||'عهدة',siteName:st?st.name:'',engName:e.name||e.email||'',by:myBy(),at:Date.now()}});
+    logChange('add','files',{details:'صرف عهدة '+fmtPlain(amount)+' للمهندس '+(e.name||'')+' — '+(st?st.name:'')});
+    CU.msg={ok:1,t:'تم صرف العهدة.'};S.justSaved=true;render()};
+}
+async function custApprove(id){
+  const r=custMerged().find(x=>x.id===id);if(!r)return;const d=r.data||{};
+  const st=S.sites.find(s=>s.id===r.site_id);
+  if(!st){showBanner('الموقع الخاص بهذا المصروف غير موجود لديك.');return}
+  const expId=newId();
+  queue('expenses',expId,{siteId:st.id,_p:st._p,amount:+d.amount||0,date:d.date||today(),method:'custody',notes:d.notes||'',item:d.item||'',contractor:d.contractor||'',remarks:[d.remarks,'عهدة: '+(d.engName||'')].filter(Boolean).join(' · '),receipt:d.receipt||'',receiptType:d.receiptType||'',by:d.engName||'',custodyId:r.id,created:Date.now()});
+  logChange('add','expenses',{siteId:st.id,amount:+d.amount||0,date:d.date,notes:d.notes,item:d.item,contractor:d.contractor,method:'custody'});
+  const row={...r,status:'approved',data:{...d,expenseId:expId,approvedBy:myBy(),approvedAt:Date.now()}};delete row._local;
+  custPut(row);
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-cu]');if(!b)return;const a=b.dataset.cu,id=b.dataset.id;
+  if(a==='approve')custApprove(id);
+  else if(a==='reject'){CU.rejecting=id;render()}
+  else if(a==='rejno'){CU.rejecting='';render()}
+  else if(a==='rejyes'){const r=custMerged().find(x=>x.id===id);if(r){const row={...r,status:'rejected',data:{...r.data,reason:($('#cu_rej')||{}).value||'',rejectedBy:myBy()}};delete row._local;custPut(row)}CU.rejecting='';render()}
+  else if(a==='ret'){CU.returning=b.dataset.eng;render()}
+  else if(a==='retno'){CU.returning='';render()}
+  else if(a==='retyes'){
+    const v=parseFloat(($('#cu_ret')||{}).value),eng=b.dataset.eng;if(!(v>0))return;
+    const iss=custMine().filter(r=>r.kind==='issue'&&r.engineer===eng).sort((x,y)=>(y.data.date||'').localeCompare(x.data.date||''))[0];if(!iss)return;
+    custPut({id:'c'+newId(),kind:'return',engineer:eng,manager:iss.manager,site_id:iss.site_id,status:'ok',data:{amount:v,date:today(),notes:'رد مبلغ من العهدة',siteName:iss.data.siteName||'',engName:iss.data.engName||'',by:myBy(),at:Date.now()}});
+    CU.returning='';render();
+  }
+  else if(a==='del'){custDel(id)}
+  else if(a==='eng-settings'){CU.engSettings=!CU.engSettings;render()}
+});
+
+/* ---------- شاشة «عهدتي» للمهندس ---------- */
+function appRenderEngineer(){
+  document.body.classList.add('eng-mode');
+  if(!CU.loaded){custLoad().then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
+  const me=APPU.me||{},rows=custMerged().filter(r=>r.engineer===me.id),s=custSummary(rows)[0]||{issued:0,returned:0,approved:0,pending:0,left:0,avail:0};
+  const sites=new Map();for(const r of rows.filter(r=>r.kind==='issue'))sites.set(r.site_id,{id:r.site_id,name:(r.data||{}).siteName||'',manager:r.manager});
+  const m=CU.claimMsg;
+  const its=regNames('items'),cons=regNames('contractors');
+  $('#pane').innerHTML=`<div class="pane-h"><h2>عهدتي</h2><div class="actions"><button class="ghost" data-cu="eng-settings">${CU.engSettings?'إخفاء الإعدادات':'الإعدادات'}</button></div></div>${custNeedSql()}
+  ${CU.engSettings?appSecurityCard():''}
+  <div class="stats">
+    <div class="stat"><div class="l">إجمالي العهد المستلمة</div><div class="v in">${fmt(s.issued)}<small>${CUR}</small></div></div>
+    <div class="stat"><div class="l">مصروفات معتمدة</div><div class="v">${fmt(s.approved)}<small>${CUR}</small></div>${s.pending?`<div class="split"><span>تحت المراجعة <b>${fmt(s.pending)}</b></span></div>`:''}</div>
+    <div class="stat"><div class="l">المتبقي معك</div><div class="v bal${s.left<0?' neg':''}">${fmt(s.left)}<small>${CUR}</small></div><div class="split"><span>بعد المراجعة <b>${fmt(s.avail)}</b></span>${s.returned?`<span>مردود <b>${fmt(s.returned)}</b></span>`:''}</div></div>
+  </div>
+  ${sites.size?`<div class="card entry-card"><div class="sec-h">تسجيل مصروف من العهدة</div>
+  <form id="enForm" class="entry" novalidate>
+    <div class="f c2"><label for="en_site">الموقع</label><select id="en_site">${[...sites.values()].map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="f c1"><label for="en_amount">المبلغ (${CUR})</label><input id="en_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    <div class="f c1"><label for="en_date">التاريخ</label><input id="en_date" type="date" value="${today()}"></div>
+    <div class="f c2"><label for="en_item">البند</label><select id="en_item"><option value="">اختر البند</option>${its.map(x=>`<option>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="f c2"><label for="en_con">المقاول / المورد (اختياري)</label><input id="en_con" list="en_cons" maxlength="100"><datalist id="en_cons">${cons.map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist></div>
+    <div class="f c4"><label for="en_notes">البيان</label><input id="en_notes" maxlength="200" placeholder="مثال: شراء مسامير ولوازم نجارة"></div>
+    <div class="f c4"><label for="en_photo">صورة الإيصال</label><input id="en_photo" type="file" accept="image/*,application/pdf" capture="environment">${CU.pick?`<span class="note ok-note">تم اختيار: ${esc(CU.pick.name)}</span>`:''}</div>
+    <div class="f c4"><label for="en_rem">ملاحظات (اختياري)</label><input id="en_rem" maxlength="200"></div>
+    <div class="form-foot"><button class="primary" type="submit" id="enSave">إرسال للمراجعة</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
+  </form></div>`:'<div class="card blank"><h3>لا توجد عهدة مصروفة لك بعد</h3><p>عندما يصرف لك المدير أو صاحب الموقع عهدة ستظهر هنا، ويمكنك بعدها تسجيل مصروفاتك منها.</p></div>'}
+  <div class="card"><div class="sec-h">حركات عهدتي</div>
+  ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
+  ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.kind==='claim'&&r.status==='pending'?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
+  </tbody></table></div>`:'<p class="note">لا توجد حركات بعد.</p>'}</div>`;
+  const ph=$('#en_photo');if(ph)ph.onchange=e=>{CU.pick=e.target.files&&e.target.files[0]||null;render()};
+  const f=$('#enForm');if(f)f.onsubmit=async ev=>{ev.preventDefault();
+    const site=$('#en_site').value,amount=parseFloat($('#en_amount').value),date=$('#en_date').value,item=$('#en_item').value,notes=$('#en_notes').value.trim();
+    const miss=[];if(!(amount>0))miss.push('المبلغ');if(!date)miss.push('التاريخ');if(!item)miss.push('البند');if(!notes)miss.push('البيان');
+    if(miss.length){CU.claimMsg={t:'يجب أن تكتب: '+miss.join('، ')+'.'};return render()}
+    const sv=sites.get(site);const btn=$('#enSave');if(btn)btn.disabled=true;
+    let receipt='',receiptType='';
+    if(CU.pick){try{const blob=await shrinkImage(CU.pick);const r=await appStoreReceipt(blob,blob.type||CU.pick.type);receipt=r.id;receiptType=r.type}catch(e){CU.claimMsg={t:uploadErr(e)};return render()}}
+    custPut({id:'c'+newId(),kind:'claim',engineer:me.id,manager:sv?sv.manager:null,site_id:site,status:'pending',data:{amount,date,item,contractor:$('#en_con').value.trim(),notes,remarks:$('#en_rem').value.trim(),receipt,receiptType,siteName:sv?sv.name:'',engName:me.name||'',at:Date.now()}});
+    CU.pick=null;CU.claimMsg={ok:1,t:'تم الإرسال للمراجعة.'};S.justSaved=true;render();
+  };
+}
+function custStart(){
+  CUST_HOOK=custHook;
+  for(const id of ['cu_eng','cu_site','cu_amount','cu_date','cu_src','cu_notes','en_site','en_amount','en_date','en_item','en_con','en_notes','en_rem'])KEEP.push(id);
+  custLoad().then(()=>{custFlush();try{render()}catch(e){}});custChannel();
+  if(!appIsEngineer())custEngs().then(()=>{const n=custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length;if(n)showBanner('يوجد '+n+' مصروف عهدة تحت المراجعة. افتح «العُهد» لاعتمادها.');try{render()}catch(e){}});
+}
+window.addEventListener('online',()=>setTimeout(custFlush,2000));
+setInterval(()=>{if(custQ().length)custFlush()},30000);
+
+document.addEventListener('change',async ev=>{
+  const t=ev.target;if(!t||!t.dataset||!t.dataset.roleId||!SB)return;
+  const {error}=await SB.from('members').update({role:t.value}).eq('id',t.dataset.roleId);
+  if(error){showBanner(/role/.test(error.message||'')?'شغّل ملف «ADC-إعداد-العهد.sql» في Supabase أولًا.':'تعذّر تغيير نوع المستخدم.');APPU.members=null;appLoadMembers();return}
+  const m=(APPU.members||[]).find(x=>x.id===t.dataset.roleId);if(m)m.role=t.value;CU.engs=null;render();
+});
+
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
 const LS_CACHE='adc_cache_v1',LS_PEND='adc_pending_v1',LS_BACKUP='adc_last_backup',LS_BY='adc_by';
 const LS_BASE='adc_off_base_v1',LS_LOCAL='adc_off_local_v1',LS_EXPORT='adc_off_last_export';
-const METHOD={cash:'نقدي',bank:'بنك',transfer:'تحويل',deferred:'آجل (شيك)'};
+const METHOD={cash:'نقدي',bank:'بنك',transfer:'تحويل',deferred:'آجل (شيك)',custody:'من العهدة'};
+let CUST_HOOK=null;   /* app edition: engineers' custody issued/returned per site */
+const custOf=(siteId,date)=>CUST_HOOK?CUST_HOOK(siteId,date):{iC:0,iB:0,r:0};
 const S={db:null,canWrite:true,downloads:null,
   srv:{sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[]},pending:[],sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[],stmt:null,sf:{site:'',from:'',to:''},confirmReg:'',pfx:OFF?'':null,parts:{},subbed:new Set(),xlsxMsg:'',autoT:0,isManager:false,roleKnown:OFF,uid:null,user:null,assets:null,names:{},asked:new Set(),editing:null,fillEdit:false,pickedFile:null,imp:null,jf:{site:'',type:'',from:'',to:'',q:''},jKeep:{type:'exp',site:'',date:'',method:'cash'},jLimit:200,viewer:null,busy:false,countMsg:'',
   mode:OFF?'offline':'loading',cacheAt:null,baseAt:null,loaded:OFF,got:{s:false,e:false,d:false,c:false,l:false,k:false,i:false},
@@ -964,8 +1175,9 @@ async function flush(){
 }
 function bal(siteId){
   const e=siteId?S.exp.filter(x=>x.siteId===siteId):S.exp, d=siteId?S.dep.filter(x=>x.siteId===siteId):S.dep;
-  const ec=sum(e.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x))),eb=sum(e)-ec-ed,dc=sum(d.filter(x=>meth(x)==='cash')),dd=sum(d.filter(x=>notDue(x))),db=sum(d)-dc-dd;
-  return {dep:dc+db+dd,exp:ec+eb+ed,cash:dc-ec,bank:db-eb,defer:dd-ed,total:dc+db+dd-ec-eb-ed,ne:e.length,nd:d.length};
+  const ec=sum(e.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x))),eu=sum(e.filter(x=>x.method==='custody')),eb=sum(e)-ec-ed-eu,dc=sum(d.filter(x=>meth(x)==='cash')),dd=sum(d.filter(x=>notDue(x))),db=sum(d)-dc-dd;
+  const cu=custOf(siteId);
+  return {dep:dc+db+dd,exp:ec+eb+ed+eu,cash:dc-ec-cu.iC+cu.r,bank:db-eb-cu.iB,defer:dd-ed,cust:cu.iC+cu.iB-cu.r-eu,total:dc+db+dd-ec-eb-ed-eu,ne:e.length,nd:d.length};
 }
 
 function statusRender(){
@@ -987,7 +1199,7 @@ function statusRender(){
 const PEND=OFF?'غير مرفوع':'بانتظار الرفع';
 function renderSites(){
   const all=bal();
-  let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regNames('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regNames('items').length}</span></button><button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
+  let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regNames('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regNames('items').length}</span></button>${APP?appCustNavBtn():''}<button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
   if(!OFF&&S.isManager)wantNames(S.sites.filter(s=>s._p).map(s=>s.byId));
   for(const s of S.sites){const b=bal(s.id);const owner=!OFF&&S.isManager&&s._p?(S.names[s.byId]||'مستخدم'):(OFF&&S.isManager&&s.offUser&&lc(s.offUser)!==lc(SEC.user&&SEC.user.name)?s.offUser:'');h+=`<button class="site-btn" data-site="${esc(s.id)}" aria-current="${S.sel===s.id}"><span class="n">${esc(s.name)}${owner?`<span class="owner-tag">${esc(owner)}</span>`:''}${s.pending?'<span class="pend">محلي</span>':''}</span><span class="t${recon(s.id).st==='short'?' neg':''}">${fmt(b.total)}</span></button>`}
   $('#sites').innerHTML=h;
@@ -1013,7 +1225,7 @@ function balTiles(b,mine){
     <div class="stat"><div class="l">${mine?'إيداعاتك':'إجمالي الإيداعات'}</div><div class="v in">${fmt(b.dep)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">${mine?'مصروفاتك':'إجمالي المصروفات'}</div><div class="v">${fmt(b.exp)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">${mine?'رصيدك (الإيداعات − المصروفات)':'الرصيد الدفتري'}</div><div class="v bal${negCls(b.total)}">${fmt(b.total)}<small>${CUR}</small></div>
-      <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span>${b.defer?`<span>شيكات لم تُستحق <b class="${negCls(b.defer)}">${fmt(b.defer)}</b></span>`:''}</div></div>
+      <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span>${b.defer?`<span>شيكات لم تُستحق <b class="${negCls(b.defer)}">${fmt(b.defer)}</b></span>`:''}${b.cust?`<span>عهد لدى المهندسين <b>${fmt(b.cust)}</b></span>`:''}</div></div>
   </div>`;
 }
 const myBy=()=>(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
@@ -1045,8 +1257,9 @@ function userBalCard(){
 /* ---------- reconciliation (الجرد) ---------- */
 function balAt(siteId,date){
   const e=S.exp.filter(x=>x.siteId===siteId&&(x.date||'')<=date),d=S.dep.filter(x=>x.siteId===siteId&&(x.date||'')<=date);
-  const ec=sum(e.filter(x=>meth(x)==='cash')),dc=sum(d.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x,date))),dd=sum(d.filter(x=>notDue(x,date)));
-  return {cash:dc-ec,bank:(sum(d)-dc-dd)-(sum(e)-ec-ed)};
+  const ec=sum(e.filter(x=>meth(x)==='cash')),dc=sum(d.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x,date))),dd=sum(d.filter(x=>notDue(x,date))),eu=sum(e.filter(x=>x.method==='custody'));
+  const cu=custOf(siteId,date);
+  return {cash:dc-ec-cu.iC+cu.r,bank:(sum(d)-dc-dd)-(sum(e)-ec-ed-eu)-cu.iB};
 }
 function countsOf(siteId){return S.cnt.filter(c=>c.siteId===siteId).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||0)-(a.created||0))}
 function reconOf(c){
@@ -2544,8 +2757,9 @@ function render(){
   if(!S.justSaved)for(const id of KEEP){const el=document.getElementById(id);if(el)keep[id]=el.value}
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
-  S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__settings'?renderSettings():renderSite();
-  const bar=excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
+  if(APP&&appIsEngineer()){appRenderEngineer()}else
+  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__settings'?renderSettings():renderSite();
+  const bar=(APP&&appIsEngineer())?'':excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
@@ -2631,6 +2845,7 @@ $('#newSiteForm').addEventListener('submit',ev=>{
       if(w===false)S.canWrite=false;S.isManager=!!own;S.uid=id||null;S.myName=nm||'';if(id&&nm)S.names[id]=nm}catch(e){}
   }
   S.roleKnown=true;
+  if(APP)custStart();
   if(S.isManager){
     S.pfx='';subAll('',true);
     need++;let firstU=true;

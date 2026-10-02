@@ -247,6 +247,8 @@ button.in-btn{background:var(--ok);border-color:var(--ok);color:var(--on-accent)
 select.auto-flash{animation:autoFlash 1.2s ease-out}
 
 .due-card{border-color:#e5c07b}.due-card .sec-h{color:#8a5a00}
+
+body.eng-mode .rail{display:none}body.eng-mode .layout{grid-template-columns:minmax(0,1fr)}
 </style>
 
 <div class="wrap">
@@ -277,7 +279,9 @@ const EDITION='offline'; const OFF=EDITION==='offline'; const APP=EDITION==='app
 const CUR='ج.م';
 const LS_CACHE='adc_cache_v1',LS_PEND='adc_pending_v1',LS_BACKUP='adc_last_backup',LS_BY='adc_by';
 const LS_BASE='adc_off_base_v1',LS_LOCAL='adc_off_local_v1',LS_EXPORT='adc_off_last_export';
-const METHOD={cash:'نقدي',bank:'بنك',transfer:'تحويل',deferred:'آجل (شيك)'};
+const METHOD={cash:'نقدي',bank:'بنك',transfer:'تحويل',deferred:'آجل (شيك)',custody:'من العهدة'};
+let CUST_HOOK=null;   /* app edition: engineers' custody issued/returned per site */
+const custOf=(siteId,date)=>CUST_HOOK?CUST_HOOK(siteId,date):{iC:0,iB:0,r:0};
 const S={db:null,canWrite:true,downloads:null,
   srv:{sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[]},pending:[],sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[],stmt:null,sf:{site:'',from:'',to:''},confirmReg:'',pfx:OFF?'':null,parts:{},subbed:new Set(),xlsxMsg:'',autoT:0,isManager:false,roleKnown:OFF,uid:null,user:null,assets:null,names:{},asked:new Set(),editing:null,fillEdit:false,pickedFile:null,imp:null,jf:{site:'',type:'',from:'',to:'',q:''},jKeep:{type:'exp',site:'',date:'',method:'cash'},jLimit:200,viewer:null,busy:false,countMsg:'',
   mode:OFF?'offline':'loading',cacheAt:null,baseAt:null,loaded:OFF,got:{s:false,e:false,d:false,c:false,l:false,k:false,i:false},
@@ -338,6 +342,7 @@ async function flush(){
       try{const pf=p.pfx??S.pfx;if(p.pfx==null)p.pfx=pf;await withTimeout(S.db.doc(pf+p.col+'/'+p.id).set(p.data),12000)}
       catch(e){
         if(e&&e.code==='invalid_argument'){S.pending=S.pending.filter(x=>x!==p);savePending();showBanner('توجد عملية لم تُرفع لأن حسابك غير مسموح له بالتعديل في هذا المكان. التعديل في مواقع غيرك متاح للمستخدم الرئيسي فقط.');continue}
+        if(APP&&navigator.onLine&&e&&(e.message||e.code))showBanner('تعذّر رفع التعديلات حتى الآن ('+String(e.message||e.code).slice(0,160)+'). ستتم المحاولة تلقائيًا كل 30 ثانية.');
         break;
       }
     }
@@ -345,8 +350,9 @@ async function flush(){
 }
 function bal(siteId){
   const e=siteId?S.exp.filter(x=>x.siteId===siteId):S.exp, d=siteId?S.dep.filter(x=>x.siteId===siteId):S.dep;
-  const ec=sum(e.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x))),eb=sum(e)-ec-ed,dc=sum(d.filter(x=>meth(x)==='cash')),dd=sum(d.filter(x=>notDue(x))),db=sum(d)-dc-dd;
-  return {dep:dc+db+dd,exp:ec+eb+ed,cash:dc-ec,bank:db-eb,defer:dd-ed,total:dc+db+dd-ec-eb-ed,ne:e.length,nd:d.length};
+  const ec=sum(e.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x))),eu=sum(e.filter(x=>x.method==='custody')),eb=sum(e)-ec-ed-eu,dc=sum(d.filter(x=>meth(x)==='cash')),dd=sum(d.filter(x=>notDue(x))),db=sum(d)-dc-dd;
+  const cu=custOf(siteId);
+  return {dep:dc+db+dd,exp:ec+eb+ed+eu,cash:dc-ec-cu.iC+cu.r,bank:db-eb-cu.iB,defer:dd-ed,cust:cu.iC+cu.iB-cu.r-eu,total:dc+db+dd-ec-eb-ed-eu,ne:e.length,nd:d.length};
 }
 
 function statusRender(){
@@ -368,7 +374,7 @@ function statusRender(){
 const PEND=OFF?'غير مرفوع':'بانتظار الرفع';
 function renderSites(){
   const all=bal();
-  let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regNames('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regNames('items').length}</span></button><button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
+  let h=`<button class="site-btn" data-site="__all" aria-current="${S.sel==='__all'}"><span class="n">${isUserView()?'ملخص مواقعك':'ملخص كل المواقع'}</span><span class="t${negCls(all.total)}">${fmt(all.total)}</span></button><button class="site-btn jbtn" data-site="__journal" aria-current="${S.sel==='__journal'}"><span class="n">دفتر اليومية</span><span class="t">${S.exp.length+S.dep.length} حركة</span></button><button class="site-btn jbtn" data-site="__contractors" aria-current="${S.sel==='__contractors'}"><span class="n">المقاولين</span><span class="t">${regNames('contractors').length}</span></button><button class="site-btn jbtn" data-site="__items" aria-current="${S.sel==='__items'}"><span class="n">البنود</span><span class="t">${regNames('items').length}</span></button>${APP?appCustNavBtn():''}<button class="site-btn jbtn" data-site="__settings" aria-current="${S.sel==='__settings'}"><span class="n">الإعدادات</span><span class="t"></span></button>`;
   if(!OFF&&S.isManager)wantNames(S.sites.filter(s=>s._p).map(s=>s.byId));
   for(const s of S.sites){const b=bal(s.id);const owner=!OFF&&S.isManager&&s._p?(S.names[s.byId]||'مستخدم'):(OFF&&S.isManager&&s.offUser&&lc(s.offUser)!==lc(SEC.user&&SEC.user.name)?s.offUser:'');h+=`<button class="site-btn" data-site="${esc(s.id)}" aria-current="${S.sel===s.id}"><span class="n">${esc(s.name)}${owner?`<span class="owner-tag">${esc(owner)}</span>`:''}${s.pending?'<span class="pend">محلي</span>':''}</span><span class="t${recon(s.id).st==='short'?' neg':''}">${fmt(b.total)}</span></button>`}
   $('#sites').innerHTML=h;
@@ -394,7 +400,7 @@ function balTiles(b,mine){
     <div class="stat"><div class="l">${mine?'إيداعاتك':'إجمالي الإيداعات'}</div><div class="v in">${fmt(b.dep)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">${mine?'مصروفاتك':'إجمالي المصروفات'}</div><div class="v">${fmt(b.exp)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">${mine?'رصيدك (الإيداعات − المصروفات)':'الرصيد الدفتري'}</div><div class="v bal${negCls(b.total)}">${fmt(b.total)}<small>${CUR}</small></div>
-      <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span>${b.defer?`<span>شيكات لم تُستحق <b class="${negCls(b.defer)}">${fmt(b.defer)}</b></span>`:''}</div></div>
+      <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span>${b.defer?`<span>شيكات لم تُستحق <b class="${negCls(b.defer)}">${fmt(b.defer)}</b></span>`:''}${b.cust?`<span>عهد لدى المهندسين <b>${fmt(b.cust)}</b></span>`:''}</div></div>
   </div>`;
 }
 const myBy=()=>(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
@@ -426,8 +432,9 @@ function userBalCard(){
 /* ---------- reconciliation (الجرد) ---------- */
 function balAt(siteId,date){
   const e=S.exp.filter(x=>x.siteId===siteId&&(x.date||'')<=date),d=S.dep.filter(x=>x.siteId===siteId&&(x.date||'')<=date);
-  const ec=sum(e.filter(x=>meth(x)==='cash')),dc=sum(d.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x,date))),dd=sum(d.filter(x=>notDue(x,date)));
-  return {cash:dc-ec,bank:(sum(d)-dc-dd)-(sum(e)-ec-ed)};
+  const ec=sum(e.filter(x=>meth(x)==='cash')),dc=sum(d.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x,date))),dd=sum(d.filter(x=>notDue(x,date))),eu=sum(e.filter(x=>x.method==='custody'));
+  const cu=custOf(siteId,date);
+  return {cash:dc-ec-cu.iC+cu.r,bank:(sum(d)-dc-dd)-(sum(e)-ec-ed-eu)-cu.iB};
 }
 function countsOf(siteId){return S.cnt.filter(c=>c.siteId===siteId).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||0)-(a.created||0))}
 function reconOf(c){
@@ -1925,8 +1932,9 @@ function render(){
   if(!S.justSaved)for(const id of KEEP){const el=document.getElementById(id);if(el)keep[id]=el.value}
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
-  S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__settings'?renderSettings():renderSite();
-  const bar=excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
+  if(APP&&appIsEngineer()){appRenderEngineer()}else
+  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__settings'?renderSettings():renderSite();
+  const bar=(APP&&appIsEngineer())?'':excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
@@ -2012,6 +2020,7 @@ $('#newSiteForm').addEventListener('submit',ev=>{
       if(w===false)S.canWrite=false;S.isManager=!!own;S.uid=id||null;S.myName=nm||'';if(id&&nm)S.names[id]=nm}catch(e){}
   }
   S.roleKnown=true;
+  if(APP)custStart();
   if(S.isManager){
     S.pfx='';subAll('',true);
     need++;let firstU=true;
