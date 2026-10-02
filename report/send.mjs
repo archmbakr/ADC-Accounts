@@ -77,6 +77,7 @@ function group(docs) {
     const [col, id] = rest;
     if (!G.has(owner)) G.set(owner, { sites: [], expenses: [], deposits: [], counts: [], log: [], push: [], contractors: [], items: [] });
     const g = G.get(owner);
+    if (data && data.deleted) continue;            // في سلة المهملات: لا يدخل في الكشوف
     if (g[col]) g[col].push({ id, ...data });
   }
   return G;
