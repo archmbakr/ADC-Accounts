@@ -325,10 +325,14 @@ body.eng-mode .layout{grid-template-columns:minmax(0,1fr)}
 const APPCFG={url:'https://ifsupnuwtkyfyughcudi.supabase.co',key:'sb_publishable_a9bNBNCAi5C8Zds4OqH6zw_SsXyRkJz',vapid:'BPUb7BqcmmftBrGx2_CFgm8S_vGFwFdrrfedfKEdhfqoiQezDKkOv-lx6j4roBJQvV1LFh7cI6xrVWGyjLHW91w'};
 const LS_ME='adc_app_me_v1';
 let SB=null,installEvt=null;
+/* the browser lock supabase uses can stay held for a few seconds after a refresh, which made the saved session look missing.
+   one app window at a time is the normal case, so a simple in-page queue is enough */
+let appLockQ=Promise.resolve();
+function appAuthLock(name,timeout,fn){const run=appLockQ.then(()=>fn(),()=>fn());appLockQ=run.catch(()=>{});return run}
 const APPU={me:null,owner:false,approved:false,mode:'login',msg:'',info:'',email:'',offline:false,members:null,membersBusy:false,pwMsg:'',copyMsg:''};
 function sbClient(){
   if(!SB&&window.supabase&&window.supabase.createClient){
-    try{SB=window.supabase.createClient(APPCFG.url,APPCFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'adc-app-auth'}})}catch(e){SB=null}
+    try{SB=window.supabase.createClient(APPCFG.url,APPCFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'adc-app-auth',lock:appAuthLock}})}catch(e){SB=null}
   }
   return SB;
 }
@@ -458,11 +462,15 @@ async function appBoot(){
     if(ev==='PASSWORD_RECOVERY'){APPU.mode='newpw';APPU.msg='';appShow()}
     else if(ev==='SIGNED_OUT'&&!SEC.locked){location.reload()}
   });
-  let ses=null;
-  try{ses=(await appWithTO(SB.auth.getSession(),7000)).data.session}catch(e){}
+  let ses=null,sesSlow=false;
   const recovery=/type=recovery/.test(location.hash+location.search);
   let hadSes=false;try{hadSes=!!localStorage.getItem('adc-app-auth')}catch(e){}
-  if(!ses&&!recovery&&cached&&cached.approved&&hadSes&&!(await appPing())){APPU.me=cached;await appBioGate();appEnterOffline(cached);return}
+  for(let i=0;i<(hadSes?3:1)&&!ses;i++){
+    sesSlow=false;try{ses=(await appWithTO(SB.auth.getSession(),i?12000:8000)).data.session}catch(e){sesSlow=true}
+    if(ses||!sesSlow)break;
+  }
+  /* a saved sign-in that could not be checked right now (slow or no internet) keeps the user signed in on the saved copy */
+  if(!ses&&!recovery&&cached&&cached.approved&&hadSes&&(sesSlow||!(await appPing()))){APPU.me=cached;await appBioGate();appEnterOffline(cached);return}
   if(ses&&!recovery&&cached&&cached.id===ses.user.id){APPU.me=cached;await appBioGate()}
   const wait=new Promise(res=>{appEnter=res});
   if(ses&&!recovery){if(await appTryEnter(ses))return}
