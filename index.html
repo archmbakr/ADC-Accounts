@@ -244,6 +244,9 @@ tr.row-neg td{background:var(--danger-soft)}
 .mtag{display:block;font-size:11px;font-weight:400;color:var(--muted)}
 button.in-btn{background:var(--ok);border-color:var(--ok);color:var(--on-accent)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+@keyframes autoFlash{0%{box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}100%{box-shadow:none}}
+select.auto-flash{animation:autoFlash 1.2s ease-out}
 </style>
 
 <div class="wrap">
@@ -1131,7 +1134,7 @@ function bindSite(site){
     const r=(S[COLS[S.editing.col]]||[]).find(x=>x.id===S.editing.id);S.fillEdit=false;
     if(r){const setv=(id,v)=>{const el=$(id);if(el)el.value=v??''};setv('#e_amount',r.amount);setv('#e_date',r.date);setv('#e_method',meth(r));setv('#e_notes',r.notes);setv('#e_remarks',r.remarks);setRegFromRecord('e_contractor','contractors',r.contractor);setRegFromRecord('e_item','items',r.item)}
   }
-  bindRegSelect('e_contractor','contractors');bindRegSelect('e_item','items');
+  bindRegSelect('e_contractor','contractors');bindRegSelect('e_item','items');bindConItem('e_contractor','e_item');
   const ce=$('#cancelEdit');if(ce)ce.onclick=()=>{S.editing=null;S.pickedFile=null;S.justSaved=true;render()};
   const pf=$('#e_photo');if(pf)pf.onchange=()=>{S.pickedFile=pf.files&&pf.files[0]||null;render()};
   const mb=$('#moreBox');if(mb)mb.ontoggle=()=>{S.moreOpen=mb.open};
@@ -1232,7 +1235,7 @@ function bindJournal(){
   on('#jMore','onclick',()=>{S.jLimit+=200;render()});
   on('#j_type','onchange',e=>{S.jKeep.type=e.target.value;document.querySelectorAll('.j-exp').forEach(x=>x.hidden=e.target.value!=='exp');const n=$('#j_notes');if(n)n.placeholder=e.target.value==='exp'?'وصف المصروف':'مثال: دفعة من المالك على حساب الموقع'});
   on('#j_site','onchange',e=>{S.jKeep.site=e.target.value});
-  bindRegSelect('j_item','items');bindRegSelect('j_contractor','contractors');
+  bindRegSelect('j_item','items');bindRegSelect('j_contractor','contractors');bindConItem('j_contractor','j_item');
   {const mb=$('#moreBox');if(mb)mb.ontoggle=()=>{S.moreOpen=mb.open}}
   on('#j_photo','onchange',e=>{S.pickedFile=e.target.files&&e.target.files[0]||null;render()});
   if(S.flash&&S.flash.until>Date.now()&&$('#jMsg')){$('#jMsg').className='msg ok';$('#jMsg').textContent=S.flash.text}
@@ -1979,7 +1982,7 @@ function regValue(id,col){
   if(sel.value!=='__new')return sel.value.trim();
   const v=(document.getElementById(id+'_new')||{}).value||'';return v.trim();
 }
-function commitNewRegs(pairs){for(const [id,col] of pairs){const sel=document.getElementById(id);if(sel&&sel.value==='__new'){const n=((document.getElementById(id+'_new')||{}).value||'').trim();if(n)addReg(col,{name:n})}}}
+function commitNewRegs(pairs){for(const [id,col] of pairs){const sel=document.getElementById(id);if(sel&&sel.value==='__new'){const n=((document.getElementById(id+'_new')||{}).value||'').trim();if(n){const d={name:n};if(col==='contractors'){const iid=id.replace('contractor','item'),iv=regValue(iid,'items');if(iv)d.item=iv}addReg(col,d)}}}}
 function addReg(col,data){
   const R=REG[col],name=data.name.trim();
   const ex=(S[R.key]||[]).find(r=>r.name.trim()===name);
@@ -1992,6 +1995,19 @@ function setRegFromRecord(id,col,val){
   const sel=document.getElementById(id);if(!sel)return;
   if(val&&![...sel.options].some(o=>o.value===val)){const o=document.createElement('option');o.value=val;o.textContent=val;sel.insertBefore(o,sel.lastElementChild)}
   sel.value=val||'';
+}
+function defItemOf(name){const r=(S.cons||[]).find(x=>x.name.trim()===(name||'').trim()&&!x.hidden);return r&&r.item?String(r.item).trim():''}
+/* picking a contractor fills in his usual item; it can still be changed */
+function bindConItem(conId,itemId){
+  const c=document.getElementById(conId),it=document.getElementById(itemId);if(!c||!it)return;
+  c.addEventListener('change',()=>{
+    const d=defItemOf(c.value);if(!d)return;
+    if(it.value&&it.value!=='__new'&&it.dataset.auto!=='1')return;
+    setRegFromRecord(itemId,'items',d);it.dataset.auto='1';
+    const nw=document.getElementById(itemId+'_new');if(nw)nw.hidden=true;
+    it.classList.remove('auto-flash');void it.offsetWidth;it.classList.add('auto-flash');
+  });
+  it.addEventListener('change',()=>{it.dataset.auto=''});
 }
 function claimOf(name){const r=(S.cons||[]).find(x=>x.name.trim()===name&&!x.hidden);return r&&r.claim>0?+r.claim:null}
 function regStats(col,name){
@@ -2012,14 +2028,15 @@ function renderRegister(col){
     <div class="f c2"><label for="r_name">اسم ال${R.one}</label><input id="r_name" maxlength="100" placeholder="${col==='contractors'?'مثال: مؤسسة الفتح للمباني':'مثال: خرسانة مسلحة'}"></div>
     ${col==='contractors'?`<div class="f c2"><label for="r_spec">التخصص (اختياري)</label><input id="r_spec" maxlength="80" placeholder="مباني، كهرباء، نجارة…"></div>
     <div class="f c2"><label for="r_phone">الهاتف (اختياري)</label><input id="r_phone" maxlength="30" inputmode="tel" dir="ltr"></div>
-    <div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>`
+    <div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    <div class="f c2"><label for="r_item">البند الأساسي (اختياري)</label><select id="r_item"><option value="">— بدون —</option>${regNames('items').map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`
     :`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div><div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="sec-h">${list.length} ${R.one==='بند'?'بند':'مقاول'} · إجمالي المصروف عليهم ${fmt(totalAll)} ${CUR}</div>
-    ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>الاسم</th>${col==='contractors'?'<th>التخصص</th><th>الهاتف</th>':'<th>الكود</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th>${col==='contractors'?'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع (${CUR})</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المصروف (${CUR})</th>'}<th>آخر صرف</th><th></th></tr></thead><tbody>
+    ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>الاسم</th>${col==='contractors'?'<th>البند الأساسي</th><th>التخصص</th><th>الهاتف</th>':'<th>الكود</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th>${col==='contractors'?'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المصروف ('+CUR+')</th>'}<th>آخر صرف</th><th></th></tr></thead><tbody>
     ${list.map(x=>{const st=regStats(col,x.name),r=recs.get(x.name)||{};const delKey=col+'|'+x.name;
-      return `<tr><td><b>${esc(x.name)}</b>${x.reg?'':`<span class="pend">غير مسجّل</span>`}</td>${col==='contractors'?`<td>${esc(r.spec)||'—'}</td><td class="date">${esc(r.phone)||'—'}</td>`:`<td class="date">${esc(r.code)||'—'}</td>`}
+      return `<tr><td><b>${esc(x.name)}</b>${x.reg?'':`<span class="pend">غير مسجّل</span>`}</td>${col==='contractors'?`<td>${esc(r.item)||'—'}</td><td>${esc(r.spec)||'—'}</td><td class="date">${esc(r.phone)||'—'}</td>`:`<td class="date">${esc(r.code)||'—'}</td>`}
       <td class="num plain">${st.n}</td><td class="num plain">${st.sites}</td>${col==='contractors'?(()=>{const c=claimOf(x.name);return `<td class="num plain">${c==null?'—':fmt(c)}</td><td class="num">${fmt(st.total)}</td><td class="num strong${c!=null&&c-st.total<0?' neg':''}">${c==null?'—':fmt(c-st.total)}</td>`})():`<td class="num">${fmt(st.total)}</td>`}<td class="date">${esc(st.last)||'—'}</td>
       <td class="acts"><button class="ghost" data-stmt="${col}" data-name="${esc(x.name)}">كشف حساب</button>${x.reg&&canEditRec(r)?`<button class="ghost" data-regedit="${col}" data-name="${esc(x.name)}">تعديل</button>`:''}${!x.reg&&canReg()?`<button class="ghost" data-regadd="${col}" data-name="${esc(x.name)}">تسجيل</button>`:''}${x.reg&&canEditRec(r)?(S.confirmReg===delKey?`<span class="confirm"><button class="danger" data-regdelyes="${col}" data-name="${esc(x.name)}">إزالة من القائمة</button><button data-regdelno="1">إلغاء</button></span>`:`<button class="ghost" data-regdel="${col}" data-name="${esc(x.name)}">حذف</button>`):''}</td></tr>`}).join('')}
     </tbody></table></div><p class="foot-note" style="margin:0">الحذف يزيل الاسم من قائمة الاختيار فقط، وتبقى الحركات المسجلة عليه كما هي. الأسماء التي عليها «غير مسجّل» موجودة في حركات قديمة، ويمكنك تسجيلها بضغطة واحدة.</p>`
@@ -2027,7 +2044,7 @@ function renderRegister(col){
   </div>`;
   const f=$('#regForm');if(f)f.onsubmit=ev=>{ev.preventDefault();const m=$('#regMsg'),name=$('#r_name').value.trim();
     if(!name){m.className='msg err';m.textContent='أدخل الاسم.';return}
-    const data={name};if(col==='contractors'){data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim()}
+    const data={name};if(col==='contractors'){data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();data.item=($('#r_item')||{}).value||'';const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim()}
     if(S.regEdit){const old=(S[R.key]||[]).find(r=>r.id===S.regEdit.id);if(!old)return;
       if(name!==old.name.trim()&&(S[R.key]||[]).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
       const upd={...clean(old),...data,updated:Date.now()};delete upd.id;queue(col,old.id,upd);
@@ -2036,7 +2053,7 @@ function renderRegister(col){
       S.regEdit=null;S.flash={text:'تم حفظ التعديل',until:Date.now()+6000};S.justSaved=true;render();return}
     if(!addReg(col,data)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
     S.flash={text:'أُضيف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
-  if(S.regFill&&S.regEdit){S.regFill=false;const r=(S[R.key]||[]).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');sv('#r_code',r.code);sv('#r_desc',r.desc)}
+  if(S.regFill&&S.regEdit){S.regFill=false;const r=(S[R.key]||[]).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc)}
   const qg=$('#qsGo');if(qg)qg.onclick=()=>{const v=$('#qsName').value;if(!v){$('#qsName').focus();return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
   const rc=$('#regCancel');if(rc)rc.onclick=()=>{S.regEdit=null;S.justSaved=true;render()};
   if(S.flash&&S.flash.until>Date.now()&&$('#regMsg')){$('#regMsg').className='msg ok';$('#regMsg').textContent=S.flash.text}
@@ -2207,6 +2224,7 @@ function buildImport(){
     if(!rec.date){if(I.fill)rec.date=today();else errs.push('التاريخ')}
     const fillTxt='غير محدد';
     if(!rec.notes){if(I.fill)rec.notes=kind==='dep'?'إيداع من المالك':fillTxt;else errs.push('البيان')}
+    if(kind==='exp'&&!rec.item&&rec.contractor)rec.item=defItemOf(rec.contractor);
     if(kind==='exp'){for(const [k,l] of [['item','البند'],['contractor','المقاول']])if(!rec[k]){if(I.fill)rec[k]=fillTxt;else errs.push(l)}}
     const s=sig(rec);let st=errs.length?'err':'ok';
     if(st==='ok'&&(existing.has(s)))st='dup';
@@ -2367,7 +2385,7 @@ async function printReport(kind){
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
-const KEEP=['r_name','r_spec','r_phone','r_claim','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
 function render(){
   statusRender();renderSites();
   if(!S.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري تحميل الحسابات…</h3></div>';return}
