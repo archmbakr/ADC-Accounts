@@ -44,14 +44,20 @@ async function sbGet(q) {
   }
   return out;
 }
+async function sbGetSoft(q) {
+  const r = await fetch(`${SB_URL}/rest/v1/${q}`, { headers: headers() });
+  return r.ok ? r.json() : [];
+}
 async function sbPut(pathKey, data) {
   const r = await fetch(`${SB_URL}/rest/v1/docs?on_conflict=path`, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify({ path: pathKey, data }) });
   if (!r.ok) die('حفظ حالة الإرسال فشل: ' + r.status);
 }
 async function loadAll() {
   if (MOCK) return JSON.parse(fs.readFileSync(MOCK, 'utf8'));
-  const [docs, members, owners] = await Promise.all([sbGet('docs?select=path,data&order=path'), sbGet('members?select=id,email,name,approved'), sbGet('app_owner?select=email')]);
-  return { docs, members, owners };
+  const [docs, members, owners] = await Promise.all([sbGet('docs?select=path,data&order=path'), sbGet('members?select=*'), sbGet('app_owner?select=email')]);
+  let custody = [];
+  try { custody = await sbGetSoft('custody?select=*'); } catch { }
+  return { docs, members, owners, custody };
 }
 
 /* ---------- تجهيز البيانات ---------- */
@@ -208,7 +214,7 @@ async function remind(now, c) {
     if (wd !== WEEKDAY || c.h < HOUR) { log('ليس وقت التقرير الأسبوعي (' + c.hm + ' بتوقيت القاهرة).'); return; }
     end = cairoInstant(c.y, c.m, c.d, HOUR); start = end - WEEK;
   }
-  const { docs, members, owners } = await loadAll();
+  const { docs, members, owners, custody = [] } = await loadAll();
   const state = docs.find(d => d.path === 'sys/report');
   if (!FORCE && state && state.data && state.data.day === day) { log('تقرير اليوم أُرسل بالفعل.'); return; }
 
@@ -220,7 +226,7 @@ async function remind(now, c) {
   const lastModOf = data => { let t = 0; for (const k of ['sites', 'expenses', 'deposits', 'counts']) for (const x of data[k]) t = Math.max(t, x.updated || 0, x.created || 0); for (const l of data.log) t = Math.max(t, l.at || 0); return t; };
   const stampOf = t => { const z = cairo(new Date(t)); return z.day + '_' + z.hm.replace(':', '-'); };
   const merge = (uids, tag) => {
-    const out = { sites: [], expenses: [], deposits: [], counts: [], log: [] };
+    const out = { sites: [], expenses: [], deposits: [], counts: [], log: [], custody };
     for (const uid of uids) { const g = G.get(uid); if (!g) continue; const nm = tag ? uname(uid) : '';
       out.sites.push(...g.sites.map(s => ({ ...s, owner: nm }))); for (const k of ['expenses', 'deposits', 'counts', 'log']) out[k].push(...g[k]); }
     return out;

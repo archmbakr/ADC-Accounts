@@ -2,7 +2,7 @@
 import { XLSX_W } from './xlsx.mjs';
 
 export const CUR = 'ج.م';
-const METHOD = { cash: 'نقدي', bank: 'بنك', transfer: 'تحويل', deferred: 'آجل (شيك)' };
+const METHOD = { cash: 'نقدي', bank: 'بنك', transfer: 'تحويل', deferred: 'آجل (شيك)', custody: 'من العهدة' };
 const ACT = { add: 'إضافة', edit: 'تعديل', delete: 'حذف', import: 'استرجاع' };
 const KIND = { expenses: 'مصروف', deposits: 'إيداع', counts: 'جرد', sites: 'موقع', files: 'من ملف', contractors: 'مقاول', items: 'بند' };
 const ST = { none: 'لم يتم الجرد', ok: 'مطابق', short: 'عجز', over: 'زيادة' };
@@ -19,7 +19,9 @@ const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.create
 export function computeSites(data, today) {
   return data.sites.map(s => {
     const e = data.expenses.filter(x => x.siteId === s.id), d = data.deposits.filter(x => x.siteId === s.id);
-    const ec = sum(e.filter(x => meth(x) === 'cash')), ed = sum(e.filter(x => notDue(x, today))), eb = sum(e) - ec - ed;
+    const ec = sum(e.filter(x => meth(x) === 'cash')), ed = sum(e.filter(x => notDue(x, today))), eu = sum(e.filter(x => x.method === 'custody')), eb = sum(e) - ec - ed - eu;
+    const cu = (data.custody || []).filter(r => r.site_id === s.id && r.kind !== 'claim');
+    const iC = cu.filter(r => r.kind === 'issue' && (r.data || {}).source !== 'bank').reduce((a, r) => a + num(r.data.amount), 0), iB = cu.filter(r => r.kind === 'issue' && (r.data || {}).source === 'bank').reduce((a, r) => a + num(r.data.amount), 0), rt = cu.filter(r => r.kind === 'return').reduce((a, r) => a + num(r.data.amount), 0);
     const dc = sum(d.filter(x => meth(x) === 'cash')), dd = sum(d.filter(x => notDue(x, today))), db = sum(d) - dc - dd;
     const cs = data.counts.filter(c => c.siteId === s.id).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.created || 0) - (a.created || 0));
     let rc = { st: 'none' };
@@ -32,7 +34,7 @@ export function computeSites(data, today) {
       const diff = (num(c.cash) + num(c.bank)) - (bookCash + bookBank);
       rc = { st: Math.abs(diff) < 0.005 ? 'ok' : diff < 0 ? 'short' : 'over', date: dt, actual: num(c.cash) + num(c.bank), diff };
     }
-    return { id: s.id, name: s.name || '', owner: s.owner || '', dep: dc + db + dd, exp: ec + eb + ed, cash: dc - ec, bank: db - eb, defer: dd - ed, total: dc + db + dd - ec - eb - ed, rc };
+    return { id: s.id, name: s.name || '', owner: s.owner || '', dep: dc + db + dd, exp: ec + eb + ed + eu, cash: dc - ec - iC + rt, bank: db - eb - iB, defer: dd - ed, cust: iC + iB - rt - eu, total: dc + db + dd - ec - eb - ed - eu, rc };
   }).sort((a, b) => (a.owner || '').localeCompare(b.owner || '', 'ar') || a.name.localeCompare(b.name, 'ar'));
 }
 const siteLabel = s => s.name + (s.owner ? ' (' + s.owner + ')' : '');
