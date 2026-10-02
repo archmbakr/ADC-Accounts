@@ -404,7 +404,7 @@ async function appSignOut(){
     if(S.pending.some(p=>p.col!=='log')&&!confirm('توجد تعديلات لم تُرفع بعد لعدم وجود اتصال بالإنترنت. إذا خرجت الآن فستضيع. هل تريد الخروج على أي حال؟'))return}
   SEC.locked=true;
   try{await SB.auth.signOut()}catch(e){}
-  appLs(LS_ME,null);appLs(LS_BIO,null);
+  appLs(LS_ME,null);
   try{localStorage.removeItem(LS_CACHE);localStorage.removeItem(LS_PEND)}catch(e){}
   location.reload();
 }
@@ -420,7 +420,7 @@ document.addEventListener('submit',async ev=>{
       if(!email||!password){APPU.msg='أدخل البريد الإلكتروني وكلمة المرور.';return appShow()}
       const {data,error}=await SB.auth.signInWithPassword({email,password});
       if(error){APPU.msg=authErr(error);return appShow()}
-      await appTryEnter(data.session);return;
+      if(await appTryEnter(data.session))appBioSupported().then(ok=>{if(ok&&!appBioCfg())showBanner('يمكنك فتح التطبيق بالبصمة بدل كلمة المرور. فعّلها من «الإعدادات» ثم «الفتح بالبصمة».')});return;
     }
     if(kind==='signup'){
       const name=q('ap_name').trim(),email=q('ap_email').trim().toLowerCase(),a=q('ap_pw'),b=q('ap_pw2');APPU.email=email;APPU.nameDraft=name;
@@ -794,7 +794,7 @@ function bal(siteId){
 }
 
 function statusRender(){
-  const hl=$('#hdrLock');if(hl){hl.hidden=!!SEC.locked||(OFF&&!SEC.user);hl.onclick=lockNow;if(APP)hl.textContent='خروج'}
+  const hl=$('#hdrLock');if(hl){hl.hidden=!!SEC.locked||(OFF&&!SEC.user);hl.onclick=lockNow;if(APP)hl.textContent=appBioCfg()?'قفل':'خروج'}
   const el=$('#status'),t=$('#statusText');const n=S.pending.filter(p=>p.col!=='log').length;
   let cls='off',txt='';
   if(OFF){txt=(SEC.user?'المستخدم: '+SEC.user.name+(SEC.user.role==='admin'?' (رئيسي)':'')+' · ':'')+'نسخة الكمبيوتر · آخر تحديث: '+(S.baseAt?stamp(S.baseAt):'لم يتم بعد');if(n)txt+=' · '+n+' تعديل جديد غير مرفوع'}
@@ -1702,7 +1702,7 @@ function bindLock(){
     S.srv={sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[]};S.pending=[];S.baseAt=null;merge();SEC.mode='';SEC.forgot=false;SEC.msg='';SEC.lastUser=MAIN_USER;showLock()};
 }
 function lockNow(){
-  if(APP){appSignOut();return}
+  if(APP){if(appBioCfg())appBioLockNow();else appSignOut();return}
   SEC.locked=true;SEC.forgot=false;
   if(OFF){SEC.key=null;SEC.user=null;DEK_RAW=null;S.srv={sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[]};S.pending=[];merge();S.loaded=false;$('#pane').innerHTML='';$('#sites').innerHTML=''}
   showLock();
