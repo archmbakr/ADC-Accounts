@@ -75,7 +75,7 @@ function group(docs) {
     if (seg[0] === 'u') { if (seg.length < 4) continue; owner = seg[1]; rest = seg.slice(2); }
     if (rest.length !== 2) continue;
     const [col, id] = rest;
-    if (!G.has(owner)) G.set(owner, { sites: [], expenses: [], deposits: [], counts: [], log: [], push: [] });
+    if (!G.has(owner)) G.set(owner, { sites: [], expenses: [], deposits: [], counts: [], log: [], push: [], contractors: [], items: [] });
     const g = G.get(owner);
     if (g[col]) g[col].push({ id, ...data });
   }
@@ -133,7 +133,7 @@ function mailBody(title, sub, week, lastMod) {
   return `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;color:#111;line-height:1.7">
   <h2 style="margin:0 0 6px">${esc(title)}</h2><p style="margin:0 0 10px;color:#444">${esc(sub)}</p>
   <p>تعديلات هذا الأسبوع: <b>${t.n}</b> · مصروفات أُضيفت: <b>${fmt(t.exp)} ${CUR}</b> · إيداعات أُضيفت: <b>${fmt(t.dep)} ${CUR}</b></p>
-  <p>مرفق الكشف الكامل (Excel و PDF) حتى آخر تعديل بتاريخ <b dir="ltr">${esc(lastMod)}</b>.</p>
+  <p>مرفق الكشف الكامل (Excel و PDF) حتى آخر تعديل بتاريخ <b dir="ltr">${esc(lastMod)}</b>، ومعه ملف نسخة احتياطية (JSON) يمكن استرجاع البيانات منه من «الإعدادات» ← «استرجاع من ملف».</p>
   <p style="color:#777;font-size:12px">رسالة آلية من تطبيق ADC حسابات المواقع.</p></div>`;
 }
 async function upload(key, buf, type) {
@@ -233,7 +233,13 @@ async function remind(now, c) {
   };
   const sub = 'من ' + cairo(new Date(start)).day + ' إلى ' + cairo(new Date(end)).day + ' (بتوقيت القاهرة)';
   let sent = 0;
-  const deliver = async (to, folder, who, data) => {
+  const bakOf = (uid, at) => {                       // نسخة احتياطية بنفس صيغة «استرجاع من ملف» في التطبيق
+    const g = G.get(uid) || {}, root = G.get('') || {}, L = k => g[k] || [];
+    const shared = k => uid ? [...(root[k] || []), ...L(k)] : L(k);
+    return Buffer.from(JSON.stringify({ app: 'ADC-site-accounts', version: 2, exportedAt: at, source: 'weekly-report', account: uid || 'owner', sites: L('sites'), expenses: L('expenses'), deposits: L('deposits'), counts: L('counts'), log: L('log'), contractors: shared('contractors'), items: shared('items') }));
+  };
+  const dumpOf = at => Buffer.from(JSON.stringify({ app: 'ADC-db-dump', version: 1, exportedAt: at, docs: docs.filter(d => !/(^|\/)push\//.test(d.path)), members, custody }));
+  const deliver = async (to, folder, who, data, extra = []) => {
     const week = data.log.filter(inWeek).sort((a, b) => a.at - b.at);
     const lm = lastModOf(data), lastMod = lm ? stampOf(lm) : stampNow.replace(' ', '_').replace(':', '-');
     const title = 'كشف حساب كامل' + (who ? ' — ' + who : '');
@@ -243,8 +249,10 @@ async function remind(now, c) {
     const base = 'ADC-كشف-كامل-' + lastMod;
     await upload(`${folder}/${lastMod}.xlsx`, xlsx, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     await upload(`${folder}/${lastMod}.pdf`, pdf, 'application/pdf');
+    const more = extra.map(x => ({ filename: x.name(lastMod), content: x.buf }));
+    for (const x of extra) await upload(`${folder}/${lastMod}${x.suffix}`, x.buf, 'application/json');
     if (!week.length) return;                       // لا تعديلات هذا الأسبوع: لا يُرسل بريد
-    await send(to, `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }]);
+    await send(to, `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }, ...more]);
     sent++;
   };
   const anyWeek = [...G.values()].some(g => g.log.some(inWeek));
@@ -253,9 +261,11 @@ async function remind(now, c) {
     for (const [uid] of G) {
       if (!uid) continue;
       const m = mem.get(uid);
-      if (m && m.approved && m.email) await deliver(m.email, uid, '', merge([uid], false));
+      if (m && m.approved && m.email && m.role !== 'engineer') await deliver(m.email, uid, '', merge([uid], false), [{ suffix: '.json', buf: bakOf(uid, end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' }]);
     }
-    for (const o of owners) if (o.email) await deliver(o.email, 'owner', 'كل المواقع', merge([...G.keys()], true));
+    for (const o of owners) if (o.email) await deliver(o.email, 'owner', 'كل المواقع', merge([...G.keys()], true), [
+      { suffix: '.json', buf: bakOf('', end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' },
+      { suffix: '-db.json', buf: dumpOf(end), name: lm => 'ADC-قاعدة-البيانات-كاملة-' + lm + '.json' }]);
   }
   if (!FORCE && !MOCK) await sbPut('sys/report', { day, at: Date.now(), sent });
   log('تم. عدد الرسائل المرسلة: ' + sent);
