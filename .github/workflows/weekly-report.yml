@@ -1,0 +1,38 @@
+name: weekly-report
+on:
+  schedule:
+    - cron: '3 19 * * 4'
+    - cron: '3 20 * * 4'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send last 7 days now (test)'
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency: weekly-report
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Arabic fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-core > /dev/null
+      - name: Install mailer
+        working-directory: report
+        run: npm install --no-save --no-audit --no-fund nodemailer@6 > /dev/null
+      - name: Send weekly report
+        working-directory: report
+        env:
+          MODE: weekly
+          SUPABASE_URL: https://ifsupnuwtkyfyughcudi.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+        run: node send.mjs
