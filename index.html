@@ -2524,7 +2524,9 @@ const IMP_FIELDS=[
   ['item','البند',['البند','بند','item']],
   ['contractor','المقاول',['المقاول','مقاول','المورد','الجهة','contractor']],
   ['remarks','ملاحظات',['ملاحظات','الملاحظات','ملاحظة','remarks','notes']],
-  ['method','طريقة الدفع',['نقدي/بنك','طريقة الدفع','الدفع','نقدي / بنك','صُرف من','أُودع في']]];
+  ['method','طريقة الدفع',['نقدي/بنك','طريقة الدفع','الدفع','نقدي / بنك','صُرف من','أُودع في']],
+  ['due','تاريخ الاستحقاق',['تاريخ الاستحقاق','الاستحقاق','due']],
+  ['chq','رقم الشيك',['رقم الشيك','الشيك','cheque']]];
 const normH=s=>toLatinDigits(String(s??'')).replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/\s+/g,' ').trim().toLowerCase();
 function guessMap(rows){
   let best={row:-1,score:0,map:{}};
@@ -2543,7 +2545,7 @@ function parseDate(v){
   m=/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/.exec(s);if(m){let y=+m[3];if(y<100)y+=2000;return y+'-'+pad(+m[2])+'-'+pad(+m[1])}
   return '';
 }
-const parseMethod=v=>{const s=String(v||'');return /تحويل|transfer/i.test(s)?'transfer':/بنك|شيك|bank/i.test(s)?'bank':'cash'};
+const parseMethod=v=>{const s=String(v||'');return /آجل|اجل|deferred/i.test(s)?'deferred':/تحويل|transfer/i.test(s)?'transfer':/بنك|شيك|bank/i.test(s)?'bank':'cash'};
 function buildImport(){
   const I=S.imp;if(!I||!I.rows)return;
   const m=I.map,site=I.siteId,rows=I.rows.slice(I.headerRow+1);
@@ -2553,11 +2555,12 @@ function buildImport(){
   rows.forEach((row,i)=>{
     const g=k=>m[k]!==undefined&&m[k]!==''?row[m[k]]:'';
     if(!row.some(c=>String(c??'').trim()!==''))return;
-    let kind='exp',amount=NaN;
-    const vin=parseAmount(g('in')),vout=parseAmount(g('out'));
-    if(m.in!==undefined&&vin>0){kind='dep';amount=vin}else if(m.out!==undefined&&vout>0){kind='exp';amount=vout}
-    else{amount=parseAmount(g('amount'));if(/ايداع|إيداع|وارد|dep/i.test(String(g('type'))))kind='dep';if(amount<0){amount=-amount}}
+    const kind=I.kind==='dep'?'dep':'exp';
+    let amount=parseAmount(g('amount'));
+    if(!(amount>0)){const vin=parseAmount(g('in')),vout=parseAmount(g('out'));amount=kind==='dep'?(vin>0?vin:amount):(vout>0?vout:amount)}
+    if(amount<0)amount=-amount;
     const rec={siteId:site,amount,date:parseDate(g('date')),method:parseMethod(g('method')),notes:String(g('notes')||'').trim(),remarks:String(g('remarks')||'').trim()};
+    if(rec.method==='deferred'){rec.due=parseDate(g('due'));const cq=String(g('chq')||'').trim();if(cq)rec.chq=cq}
     if(kind==='exp'){rec.item=String(g('item')||'').trim();rec.contractor=String(g('contractor')||'').trim()}
     const errs=[];
     if(!(amount>0))errs.push('المبلغ');
@@ -2565,6 +2568,7 @@ function buildImport(){
     const fillTxt='غير محدد';
     if(!rec.notes){if(I.fill)rec.notes=kind==='dep'?'إيداع من المالك':fillTxt;else errs.push('البيان')}
     if(kind==='exp'&&!rec.item&&rec.contractor)rec.item=defItemOf(rec.contractor);
+    if(rec.method==='deferred'&&!rec.due)errs.push('تاريخ الاستحقاق');
     if(kind==='exp'){for(const [k,l] of [['item','البند'],['contractor','المقاول']])if(!rec[k]){if(I.fill)rec[k]=fillTxt;else errs.push(l)}}
     const s=sig(rec);let st=errs.length?'err':'ok';
     if(st==='ok'&&(existing.has(s)))st='dup';
@@ -2577,15 +2581,16 @@ function buildImport(){
 function importCard(site){
   const I=S.imp;if(!I||I.siteId!==site.id)return '';
   const head=`<div class="card imp" id="impCard"><div class="rc-h"><div class="sec-h">استيراد حركات من Excel لهذا الموقع</div><button class="ghost" id="impClose">قفل</button></div>`;
-  if(!I.rows)return head+`<p class="rc-sub">اختر ملف Excel (‎.xlsx) أو CSV. يحتوي الصف الأول على أسماء الأعمدة، مثل: المبلغ، البيان، التاريخ، البند، المقاول، ملاحظات، طريقة الدفع. وإذا وُجد عمود «النوع» أو عمودان «وارد» و«منصرف»، فسيتم التعرّف على الإيداعات تلقائيًا.</p>
-    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر ملف Excel</button><input type="file" id="impFile" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" aria-label="اختر ملف Excel"></span><button id="impTpl">تنزيل نموذج Excel جاهز</button></div>
+  const kindSeg=`<div class="seg" role="tablist" aria-label="نوع الملف"><button role="tab" data-impkind="exp" aria-selected="${I.kind!=='dep'}">ملف مصروفات</button><button role="tab" data-impkind="dep" aria-selected="${I.kind==='dep'}">ملف إيداعات</button></div>`;
+  if(!I.rows)return head+`${kindSeg}<p class="rc-sub">${I.kind==='dep'?'ملف الإيداعات: يحتوي الصف الأول على أسماء الأعمدة: المبلغ، البيان، التاريخ، أُودع في (نقدي/بنك/تحويل)، ملاحظات. كل صفوف الملف ستُسجَّل إيداعات.':'ملف المصروفات: يحتوي الصف الأول على أسماء الأعمدة: المبلغ، البيان، التاريخ، البند، المقاول، طريقة الدفع، ملاحظات. وللشيكات الآجلة اكتب «آجل» في طريقة الدفع وأضف «تاريخ الاستحقاق» و«رقم الشيك». كل صفوف الملف ستُسجَّل مصروفات.'}</p>
+    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر ${I.kind==='dep'?'ملف الإيداعات':'ملف المصروفات'}</button><input type="file" id="impFile" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" aria-label="اختر ملف Excel"></span><button id="impTpl">تنزيل ${I.kind==='dep'?'نموذج الإيداعات':'نموذج المصروفات'}</button></div>
     ${I.err?`<p class="msg err">${esc(I.err)}</p>`:''}</div>`;
   const cols=(I.rows[I.headerRow]||[]).map((h,i)=>({i,h:String(h??'').trim()||('عمود '+(i+1))}));
   const L=I.list||[],ok=L.filter(x=>x.st==='ok'),bad=L.filter(x=>x.st==='err'),dup=L.filter(x=>x.st==='dup'||x.st==='dup2');
   const nExp=ok.filter(x=>x.kind==='exp'),nDep=ok.filter(x=>x.kind==='dep');
   const ST={ok:['pill-ok','سيُضاف'],err:['pill-neg','ناقص'],dup:['pill-none','موجود مسبقًا'],dup2:['pill-none','متكرر في الملف']};
-  return head+`<p class="rc-sub">الملف: <b>${esc(I.name)}</b> · ${L.length} صف. راجع هذه الأعمدة، وإذا قُرئ عمود بشكل خاطئ فاختر الصحيح.</p>
-    <div class="imp-map">${IMP_FIELDS.map(([k,l])=>`<div class="f"><label for="im_${k}">${l}</label><select id="im_${k}" data-imap="${k}"><option value="">— غير موجود —</option>${cols.map(c=>`<option value="${c.i}" ${I.map[k]===c.i?'selected':''}>${esc(c.h)}</option>`).join('')}</select></div>`).join('')}</div>
+  return head+`${kindSeg}<p class="rc-sub">الملف: <b>${esc(I.name)}</b> · ${L.length} صف · سيُسجَّل كـ <b>${I.kind==='dep'?'إيداعات':'مصروفات'}</b>. راجع هذه الأعمدة، وإذا قُرئ عمود بشكل خاطئ فاختر الصحيح.</p>
+    <div class="imp-map">${IMP_FIELDS.filter(([k])=>!['type','in','out'].includes(k)&&!(I.kind==='dep'&&['item','contractor','due','chq'].includes(k))).map(([k,l])=>`<div class="f"><label for="im_${k}">${l}</label><select id="im_${k}" data-imap="${k}"><option value="">— غير موجود —</option>${cols.map(c=>`<option value="${c.i}" ${I.map[k]===c.i?'selected':''}>${esc(c.h)}</option>`).join('')}</select></div>`).join('')}</div>
     <label class="chk"><input type="checkbox" id="impFill" ${I.fill?'checked':''}> تُملأ الخانات الإجبارية الناقصة بـ «غير محدد» (والتاريخ الناقص بتاريخ اليوم) بدلًا من ترك الصف</label>
     <div class="imp-sum"><span class="pill-ok">${ok.length} سيُضاف</span> ${nExp.length?`<span>${nExp.length} مصروف بـ ${fmt(sum(nExp.map(x=>x.rec)))}</span>`:''} ${nDep.length?`<span>${nDep.length} إيداع بـ ${fmt(sum(nDep.map(x=>x.rec)))}</span>`:''} ${bad.length?`<span class="pill-neg">${bad.length} ناقص ولن يُضاف</span>`:''} ${dup.length?`<span class="pill-none">${dup.length} متكرر ولن يُضاف</span>`:''}</div>
     <div class="tbl-wrap imp-prev"><table><thead><tr><th class="num">صف</th><th>الحالة</th><th>النوع</th><th class="num">المبلغ</th><th>البيان</th><th>التاريخ</th><th>البند</th><th>المقاول</th><th>ملاحظات</th><th>الدفع</th></tr></thead><tbody>
@@ -2596,9 +2601,13 @@ function importCard(site){
 function bindImport(site){
   const on=(id,ev,fn)=>{const el=$(id);if(el)el[ev]=fn};
   on('#impClose','onclick',()=>{S.imp=null;render()});
-  on('#impAgain','onclick',()=>{S.imp={siteId:site.id,fill:S.imp.fill};render()});
-  on('#impTpl','onclick',async()=>{const sh={name:'حركات الموقع',rows:[['النوع','المبلغ','البيان','التاريخ','البند','المقاول','ملاحظات','طريقة الدفع'],['مصروف',12500,'توريد طوب',today(),'مباني','مؤسسة الفتح للمباني','مستخلص رقم 1','نقدي'],['إيداع',100000,'دفعة من المالك',today(),'','','شيك رقم 1020','بنك']],styles:{0:1},widths:[10,12,26,12,18,24,20,12],freeze:1};
-    try{await saveFile('ADC-نموذج-استيراد-حركات.xlsx',XLSX_W.build([sh]))}catch(e){}});
+  on('#impAgain','onclick',()=>{S.imp={siteId:site.id,fill:S.imp.fill,kind:S.imp.kind};render()});
+  on('#impTpl','onclick',async()=>{
+    const dep=S.imp&&S.imp.kind==='dep';
+    const sh=dep?{name:'إيداعات',rows:[['المبلغ','البيان','التاريخ','أُودع في','ملاحظات'],[100000,'دفعة من المالك',today(),'بنك','شيك رقم 1020'],[50000,'دفعة نقدية',today(),'نقدي','']],styles:{0:1},widths:[14,30,13,12,24],freeze:1}
+      :{name:'مصروفات',rows:[['المبلغ','البيان','التاريخ','البند','المقاول','طريقة الدفع','ملاحظات','تاريخ الاستحقاق','رقم الشيك'],[12500,'توريد طوب',today(),'مباني','مؤسسة الفتح للمباني','نقدي','مستخلص رقم 1','',''],[40000,'دفعة مستخلص',today(),'خرسانة مسلحة','م. أحمد سعيد','آجل',' ',addDays(today(),30),'778899']],styles:{0:1},widths:[13,26,13,18,24,12,20,15,12],freeze:1};
+    try{await saveFile(dep?'ADC-نموذج-إيداعات.xlsx':'ADC-نموذج-مصروفات.xlsx',XLSX_W.build([sh]))}catch(e){}});
+  document.querySelectorAll('[data-impkind]').forEach(b=>b.onclick=()=>{S.imp.kind=b.dataset.impkind;if(S.imp.rows)buildImport();render()});
   const f=$('#impFile');if(f)f.onchange=async()=>{const file=f.files&&f.files[0];if(!file)return;
     try{let rows;
       if(/\.csv$/i.test(file.name)||file.type==='text/csv')rows=XLSX_R.csv(await file.text());
@@ -2606,8 +2615,9 @@ function bindImport(site){
       else rows=await XLSX_R.read(await file.arrayBuffer());
       const g=guessMap(rows);
       if(g.row<0||!rows.length)throw {code:'nohead'};
-      S.imp={siteId:site.id,name:file.name,rows,headerRow:g.row,map:g.map,fill:S.imp.fill};buildImport();
-    }catch(e){const c=e&&e.code;S.imp={siteId:site.id,fill:S.imp.fill,err:c==='xls'?'هذا الملف بصيغة Excel القديمة (‎.xls). افتحه في Excel واحفظه بصيغة ‎.xlsx ثم حاول مرة أخرى.':c==='nodecomp'?'هذا المتصفح لا يقرأ ملفات Excel. استخدم Chrome أو Edge، أو احفظ الملف بصيغة CSV.':c==='nohead'?'لم يتم العثور على أسماء الأعمدة في الملف. تأكد أن الصف الأول يحتوي على: المبلغ، البيان، التاريخ…':'تعذّرت قراءة هذا الملف. تأكد أنه ملف Excel ‎.xlsx أو CSV.'}}
+      let kind=S.imp.kind||'exp';if(g.map.item===undefined&&g.map.contractor===undefined&&(/ايداع|إيداع|وارد/.test(file.name)||(rows[g.row]||[]).some(h=>/أُودع|اودع|أودع/.test(String(h||'')))))kind='dep';else if(g.map.item!==undefined||g.map.contractor!==undefined)kind='exp';
+      S.imp={siteId:site.id,name:file.name,rows,headerRow:g.row,map:g.map,fill:S.imp.fill,kind};buildImport();
+    }catch(e){const c=e&&e.code;S.imp={siteId:site.id,fill:S.imp.fill,kind:S.imp.kind,err:c==='xls'?'هذا الملف بصيغة Excel القديمة (‎.xls). افتحه في Excel واحفظه بصيغة ‎.xlsx ثم حاول مرة أخرى.':c==='nodecomp'?'هذا المتصفح لا يقرأ ملفات Excel. استخدم Chrome أو Edge، أو احفظ الملف بصيغة CSV.':c==='nohead'?'لم يتم العثور على أسماء الأعمدة في الملف. تأكد أن الصف الأول يحتوي على: المبلغ، البيان، التاريخ…':'تعذّرت قراءة هذا الملف. تأكد أنه ملف Excel ‎.xlsx أو CSV.'}}
     render();const c=$('#impCard');if(c)c.scrollIntoView({block:'start'})};
   document.querySelectorAll('[data-imap]').forEach(sel=>sel.onchange=()=>{const v=sel.value;S.imp.map[sel.dataset.imap]=v===''?undefined:+v;buildImport();render()});
   on('#impFill','onchange',e=>{S.imp.fill=e.target.checked;buildImport();render()});
