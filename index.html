@@ -247,6 +247,8 @@ button.in-btn{background:var(--ok);border-color:var(--ok);color:var(--on-accent)
 
 @keyframes autoFlash{0%{box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}100%{box-shadow:none}}
 select.auto-flash{animation:autoFlash 1.2s ease-out}
+
+.due-card{border-color:#e5c07b}.due-card .sec-h{color:#8a5a00}
 </style>
 
 <div class="wrap">
@@ -274,7 +276,7 @@ select.auto-flash{animation:autoFlash 1.2s ease-out}
 
 <script>
 /* ===================== installed app edition: Supabase backend ===================== */
-const APPCFG={url:'https://ifsupnuwtkyfyughcudi.supabase.co',key:'sb_publishable_a9bNBNCAi5C8Zds4OqH6zw_SsXyRkJz'};
+const APPCFG={url:'https://ifsupnuwtkyfyughcudi.supabase.co',key:'sb_publishable_a9bNBNCAi5C8Zds4OqH6zw_SsXyRkJz',vapid:'BKNaK9D7Sk2clJgKixBQMU91QNyezF2ISjV87OxsDIJ4JUalM5x_kgWxohsOBURijvqcVJmxgFU984ewAvxZ0FE'};
 const LS_ME='adc_app_me_v1';
 let SB=null,installEvt=null;
 const APPU={me:null,owner:false,approved:false,mode:'login',msg:'',info:'',email:'',offline:false,members:null,membersBusy:false,pwMsg:'',copyMsg:''};
@@ -517,6 +519,7 @@ function appSecurityCard(){
       ${APPU.pwMsg?`<p class="msg ${APPU.pwMsg.ok?'ok':'err'}" style="grid-column:1/-1">${esc(APPU.pwMsg.t)}</p>`:''}
     </form>
     ${appBioCard()}
+    ${appPushCard()}
     <div class="row">${installEvt&&!isStandalone()?'<button type="button" class="primary" data-app="install">تثبيت التطبيق على الجهاز</button>':''}<button type="button" class="danger" data-app="signout">تسجيل الخروج</button></div>
     ${isStandalone()?'':isIOS()?'<p class="note">للتثبيت على الآيفون: من Safari اضغط زر المشاركة، ثم «إضافة إلى الشاشة الرئيسية».</p>':installEvt?'':'<p class="note">للتثبيت: من قائمة المتصفح (⋮) اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».</p>'}
     ${users}</div>`;
@@ -537,6 +540,9 @@ document.addEventListener('click',async ev=>{
   else if(a==='bio-go')appBioVerify();
   else if(a==='bio-pw'){APPU.bioPw=true;APPU.msg='';appShow()}
   else if(a==='bio-on')appBioEnable();
+  else if(a==='push-on')appPushEnable();
+  else if(a==='push-off')appPushDisable();
+  else if(a==='push-test')appPushTest();
   else if(a==='bio-off'){appLs(LS_BIO,null);APPU.bioMsg={ok:1,t:'تم إلغاء الفتح بالبصمة على هذا الجهاز.'};render()}
   else if(a==='install')appInstall();
   else if(a==='signout')appSignOut();
@@ -775,11 +781,53 @@ window.addEventListener('online',()=>setTimeout(appSyncReceipts,1500));
 setInterval(()=>{if(S.pending.length===0||navigator.onLine)appSyncReceipts()},45000);
 setTimeout(appSyncReceipts,6000);
 
+/* ---------- phone notifications (Web Push): cheque reminders sent by the daily server job ---------- */
+const LS_PUSH='adc_push_v1';
+const pushOk=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:'||(location.hostname==='localhost'&&'PushManager' in window);
+function devId(){let d=null;try{d=localStorage.getItem('adc_dev_id');if(!d){d='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem('adc_dev_id',d)}}catch(e){d='d0'}return d}
+const pushPath=()=>(APPU.owner?'':'u/'+APPU.me.id+'/')+'push/'+devId();
+function pushCfg(){const c=appLs(LS_PUSH);return c&&APPU.me&&c.uid===APPU.me.id?c:null}
+function b64uToU8(s){return unb64u(s)}
+async function appPushEnable(){
+  APPU.pushMsg=null;
+  if(!pushOk()){APPU.pushMsg={t:isIOS()&&!isStandalone()?'على الآيفون: ثبّت التطبيق على الشاشة الرئيسية أولًا، ثم افتحه من الأيقونة وفعّل الإشعارات.':'هذا المتصفح لا يدعم الإشعارات.'};return render()}
+  if(!navigator.onLine){APPU.pushMsg={t:'تفعيل الإشعارات يحتاج اتصالًا بالإنترنت.'};return render()}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){APPU.pushMsg={t:'لم يُسمح بالإشعارات. اسمح بها من إعدادات المتصفح أو الهاتف ثم حاول مرة أخرى.'};return render()}
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(APPCFG.vapid)});
+    await APPDB.doc(pushPath()).set({sub:sub.toJSON(),at:Date.now(),name:APPU.me.name||'',ua:navigator.userAgent.slice(0,120)});
+    appLs(LS_PUSH,{uid:APPU.me.id,dev:devId(),at:Date.now()});
+    APPU.pushMsg={ok:1,t:'تم تفعيل الإشعارات على هذا الجهاز. ستصلك رسالة قبل موعد استحقاق كل شيك بيوم.'};
+  }catch(e){APPU.pushMsg={t:'تعذّر تفعيل الإشعارات ('+(e&&(e.name||e.code)||'خطأ')+'). حاول مرة أخرى.'}}
+  render();
+}
+async function appPushDisable(){
+  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe()}catch(e){}
+  try{await APPDB.doc(pushPath()).delete()}catch(e){}
+  appLs(LS_PUSH,null);APPU.pushMsg={ok:1,t:'تم إيقاف الإشعارات على هذا الجهاز.'};render();
+}
+async function appPushTest(){
+  try{const reg=await navigator.serviceWorker.ready;await reg.showNotification('ADC حسابات المواقع',{body:'هكذا سيظهر تذكير الشيكات على هذا الجهاز.',icon:'icon-192.png',badge:'icon-192.png',dir:'rtl',lang:'ar',tag:'adc-test'});APPU.pushMsg={ok:1,t:'أُرسل إشعار تجريبي.'}}
+  catch(e){APPU.pushMsg={t:'تعذّر عرض الإشعار التجريبي.'}}
+  render();
+}
+function appPushCard(){
+  const c=pushCfg(),m=APPU.pushMsg,msg=m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:'';
+  const head='<div class="sec-h" style="margin-top:14px">تنبيهات الشيكات</div>';
+  if(c)return head+`<p>الإشعارات مفعّلة على هذا الجهاز ✔ — تصلك رسالة قبل استحقاق كل شيك بيوم (الساعة ٩ صباحًا).</p>
+    <div class="row"><button type="button" class="ghost" data-app="push-test">إشعار تجريبي</button><button type="button" class="ghost" data-app="push-off">إيقاف الإشعارات</button></div>${msg}`;
+  return head+`<p class="note">فعّل الإشعارات لتصلك رسالة على هذا الجهاز قبل موعد استحقاق كل شيك آجل بيوم، حتى لو كان التطبيق مغلقًا.${isIOS()&&!isStandalone()?' على الآيفون يجب تثبيت التطبيق على الشاشة الرئيسية أولًا.':''}</p>
+    <div class="row"><button type="button" class="primary" data-app="push-on">تفعيل الإشعارات</button></div>${msg}`;
+}
+
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
 const LS_CACHE='adc_cache_v1',LS_PEND='adc_pending_v1',LS_BACKUP='adc_last_backup',LS_BY='adc_by';
 const LS_BASE='adc_off_base_v1',LS_LOCAL='adc_off_local_v1',LS_EXPORT='adc_off_last_export';
-const METHOD={cash:'نقدي',bank:'بنك',transfer:'تحويل'};
+const METHOD={cash:'نقدي',bank:'بنك',transfer:'تحويل',deferred:'آجل (شيك)'};
 const S={db:null,canWrite:true,downloads:null,
   srv:{sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[]},pending:[],sites:[],exp:[],dep:[],cnt:[],log:[],cons:[],items:[],stmt:null,sf:{site:'',from:'',to:''},confirmReg:'',pfx:OFF?'':null,parts:{},subbed:new Set(),xlsxMsg:'',autoT:0,isManager:false,roleKnown:OFF,uid:null,user:null,assets:null,names:{},asked:new Set(),editing:null,fillEdit:false,pickedFile:null,imp:null,jf:{site:'',type:'',from:'',to:'',q:''},jKeep:{type:'exp',site:'',date:'',method:'cash'},jLimit:200,viewer:null,busy:false,countMsg:'',
   mode:OFF?'offline':'loading',cacheAt:null,baseAt:null,loaded:OFF,got:{s:false,e:false,d:false,c:false,l:false,k:false,i:false},
@@ -800,6 +848,10 @@ const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({c
 const amt=x=>+x.amount||0;
 const sum=l=>l.reduce((a,x)=>a+amt(x),0);
 const meth=x=>METHOD[x.method]&&x.method!=='cash'?x.method:'cash';
+/* deferred (post-dated cheque): counts in the totals now, leaves the bank on its due date */
+const notDue=(x,d)=>x.method==='deferred'&&(x.due||'')>(d||today());
+const addDays=(d,n)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
+const mlabel=x=>METHOD[meth(x)]+(x.method==='deferred'&&x.due?' · '+(notDue(x)?'يستحق ':'استُحق ')+x.due+(x.chq?' · شيك '+x.chq:''):'');
 const negCls=v=>v<0?' neg':'';
 
 /* ---------- data ---------- */
@@ -843,8 +895,8 @@ async function flush(){
 }
 function bal(siteId){
   const e=siteId?S.exp.filter(x=>x.siteId===siteId):S.exp, d=siteId?S.dep.filter(x=>x.siteId===siteId):S.dep;
-  const ec=sum(e.filter(x=>meth(x)==='cash')),eb=sum(e)-ec,dc=sum(d.filter(x=>meth(x)==='cash')),db=sum(d)-dc;
-  return {dep:dc+db,exp:ec+eb,cash:dc-ec,bank:db-eb,total:dc+db-ec-eb,ne:e.length,nd:d.length};
+  const ec=sum(e.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x))),eb=sum(e)-ec-ed,dc=sum(d.filter(x=>meth(x)==='cash')),dd=sum(d.filter(x=>notDue(x))),db=sum(d)-dc-dd;
+  return {dep:dc+db+dd,exp:ec+eb+ed,cash:dc-ec,bank:db-eb,defer:dd-ed,total:dc+db+dd-ec-eb-ed,ne:e.length,nd:d.length};
 }
 
 function statusRender(){
@@ -892,7 +944,7 @@ function balTiles(b,mine){
     <div class="stat"><div class="l">${mine?'إيداعاتك':'إجمالي الإيداعات'}</div><div class="v in">${fmt(b.dep)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">${mine?'مصروفاتك':'إجمالي المصروفات'}</div><div class="v">${fmt(b.exp)}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">${mine?'رصيدك (الإيداعات − المصروفات)':'الرصيد الدفتري'}</div><div class="v bal${negCls(b.total)}">${fmt(b.total)}<small>${CUR}</small></div>
-      <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span></div></div>
+      <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span>${b.defer?`<span>شيكات لم تُستحق <b class="${negCls(b.defer)}">${fmt(b.defer)}</b></span>`:''}</div></div>
   </div>`;
 }
 const myBy=()=>(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
@@ -924,8 +976,8 @@ function userBalCard(){
 /* ---------- reconciliation (الجرد) ---------- */
 function balAt(siteId,date){
   const e=S.exp.filter(x=>x.siteId===siteId&&(x.date||'')<=date),d=S.dep.filter(x=>x.siteId===siteId&&(x.date||'')<=date);
-  const ec=sum(e.filter(x=>meth(x)==='cash')),dc=sum(d.filter(x=>meth(x)==='cash'));
-  return {cash:dc-ec,bank:(sum(d)-dc)-(sum(e)-ec)};
+  const ec=sum(e.filter(x=>meth(x)==='cash')),dc=sum(d.filter(x=>meth(x)==='cash')),ed=sum(e.filter(x=>notDue(x,date))),dd=sum(d.filter(x=>notDue(x,date)));
+  return {cash:dc-ec,bank:(sum(d)-dc-dd)-(sum(e)-ec-ed)};
 }
 function countsOf(siteId){return S.cnt.filter(c=>c.siteId===siteId).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||0)-(a.created||0))}
 function reconOf(c){
@@ -992,7 +1044,7 @@ function renderOverview(){
   const actCash=counted.reduce((a,x)=>a+x.r.cash,0),actBank=counted.reduce((a,x)=>a+x.r.bank,0),dsum=counted.reduce((a,x)=>a+x.r.d,0);
   const siteLinks=l=>l.map(x=>`<button class="linkish" data-site="${esc(x.s.id)}">${esc(x.s.name)}</button> (${fmt(Math.abs(x.r.d))})`).join('، ');
   const act=(r,k)=>r.st==='none'?'<span class="muted">—</span>':fmt(r[k]);
-  $('#pane').innerHTML=head+balTiles(all,isUserView())+userBalCard()+
+  $('#pane').innerHTML=head+balTiles(all,isUserView())+dueCard()+userBalCard()+
   (short.length?`<div class="alert"><b>عجز في ${short.length===1?'موقع واحد':short.length+' مواقع'}:</b> ${siteLinks(short)}</div>`:'')+
   (over.length?`<div class="alert over"><b>زيادة في ${over.length===1?'موقع واحد':over.length+' مواقع'}:</b> ${siteLinks(over)}</div>`:'')+
   `<div class="site-cards">${rows.map(({s,b,r})=>`<div class="scard ${r.st==='short'?'neg-card':r.st==='over'?'over-card':''}"><div class="sc-h"><button class="linkish" data-site="${esc(s.id)}">${esc(s.name)}</button>${stPill(r)}</div>
@@ -1008,8 +1060,12 @@ function renderOverview(){
   bindOverview();
 }
 
+function dueFields(p){return `<div class="f c1 half" id="${p}_due_w" hidden><label for="${p}_due">تاريخ الاستحقاق</label><input id="${p}_due" type="date"></div><div class="f c1 half" id="${p}_chq_w" hidden><label for="${p}_chq">رقم الشيك (اختياري)</label><input id="${p}_chq" maxlength="40" dir="ltr"></div>`}
+function dueToggle(p){const m=document.getElementById(p+'_method');if(!m)return;const on=m.value==='deferred';for(const k of ['_due_w','_chq_w']){const el=document.getElementById(p+k);if(el)el.hidden=!on}}
+function bindDue(p){const m=document.getElementById(p+'_method');if(m)m.addEventListener('change',()=>{dueToggle(p);if(m.value==='deferred'){const d=document.getElementById(p+'_due');if(d&&!d.value)d.focus()}});dueToggle(p)}
+function dueRead(p,rec,miss){if(rec.method==='deferred'){rec.due=(document.getElementById(p+'_due')||{}).value||'';rec.chq=((document.getElementById(p+'_chq')||{}).value||'').trim();if(!rec.due)miss.push('تاريخ الاستحقاق')}else{delete rec.due;delete rec.chq}}
 function methodSelect(label){
-  return `<div class="f c1 half"><label for="e_method">${label}</label><select id="e_method"><option value="cash">نقدي</option><option value="bank">بنك</option><option value="transfer">تحويل</option></select></div>`;
+  return `<div class="f c1 half"><label for="e_method">${label}</label><select id="e_method"><option value="cash">نقدي</option><option value="bank">بنك</option><option value="transfer">تحويل</option><option value="deferred">آجل (شيك)</option></select></div>${dueFields('e')}`;
 }
 function renderSite(){
   const site=S.sites.find(s=>s.id===S.sel);
@@ -1049,10 +1105,10 @@ function renderSite(){
       ${moreBox(`<div class="f c2"><label for="e_remarks">ملاحظات</label><input id="e_remarks" maxlength="300" placeholder="رقم الشيك، رقم التحويل…"></div>${photoField}`,moreOpen)}
       <div class="form-foot"><button class="primary in-btn" type="submit" id="saveBtn">${ed?'حفظ التعديل':'حفظ الإيداع'}</button>${ed?'<button type="button" id="cancelEdit">إلغاء التعديل</button>':''}<span class="msg" id="formMsg"></span></div>`;
   const expTable=()=>`<table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>البند</th><th>المقاول</th><th>ملاحظات</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
-    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num">${fmt(amt(e))}<span class="mtag">${METHOD[meth(e)]}</span></td><td>${esc(e.notes)||'—'}</td><td class="date">${esc(e.date)}</td><td>${e.item?`<button class="chip chip-btn" data-stmtgo="items" data-name="${esc(e.item)}">${esc(e.item)}</button>`:'—'}</td><td>${e.contractor?`<button class="linkish" data-stmtgo="contractors" data-name="${esc(e.contractor)}">${esc(e.contractor)}</button>`:'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('expenses',e)}</tr>`).join('')}
+    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num">${fmt(amt(e))}<span class="mtag">${mlabel(e)}</span></td><td>${esc(e.notes)||'—'}</td><td class="date">${esc(e.date)}</td><td>${e.item?`<button class="chip chip-btn" data-stmtgo="items" data-name="${esc(e.item)}">${esc(e.item)}</button>`:'—'}</td><td>${e.contractor?`<button class="linkish" data-stmtgo="contractors" data-name="${esc(e.contractor)}">${esc(e.contractor)}</button>`:'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('expenses',e)}</tr>`).join('')}
     </tbody><tfoot><tr><td class="num">${fmt(ftot)}</td><td colspan="${S.canWrite?6:5}">${filtOn?`إجمالي النتائج (${list.length})`:'إجمالي المصروفات'}</td></tr></tfoot></table>`;
   const depTable=()=>`<table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>أُودع في</th><th>ملاحظات</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
-    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num in">${fmt(amt(e))}</td><td>${esc(e.notes)||'إيداع من المالك'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><span class="chip">${METHOD[meth(e)]}</span></td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('deposits',e)}</tr>`).join('')}
+    ${list.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num in">${fmt(amt(e))}</td><td>${esc(e.notes)||'إيداع من المالك'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><span class="chip">${mlabel(e)}</span></td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('deposits',e)}</tr>`).join('')}
     </tbody><tfoot><tr><td class="num in">${fmt(ftot)}</td><td colspan="${S.canWrite?5:4}">${filtOn?`إجمالي النتائج (${list.length})`:'إجمالي الإيداعات'}</td></tr></tfoot></table>`;
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${esc(site.name)}</h2><div class="actions">
@@ -1101,8 +1157,8 @@ function bindSite(site){
     const rec={siteId:site.id,amount,date:$('#e_date').value,method:$('#e_method').value,notes:$('#e_notes').value.trim(),remarks:$('#e_remarks').value.trim(),by:old?(old.by||''):myBy()};
     if(kind==='exp'){rec.contractor=regValue('e_contractor','contractors');rec.item=regValue('e_item','items')}
     if(!(amount>0)){msg.className='msg err';msg.textContent='أدخل مبلغًا أكبر من صفر.';return}
-    const miss=[];if(!rec.date)miss.push('التاريخ');if(kind==='exp'&&!rec.contractor)miss.push('المقاول');if(kind==='exp'&&!rec.item)miss.push('البند');if(!rec.notes)miss.push('البيان');
-    if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','البند':'#e_item','البيان':'#e_notes'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
+    const miss=[];if(!rec.date)miss.push('التاريخ');if(kind==='exp'&&!rec.contractor)miss.push('المقاول');if(kind==='exp'&&!rec.item)miss.push('البند');if(!rec.notes)miss.push('البيان');dueRead('e',rec,miss);
+    if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','البند':'#e_item','البيان':'#e_notes','تاريخ الاستحقاق':'#e_due'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
     if(kind==='exp')commitNewRegs([['e_contractor','contractors'],['e_item','items']]);
     const file=S.pickedFile;
     if(old){rec.receipt=old.receipt||'';rec.receiptType=old.receiptType||''}
@@ -1132,9 +1188,9 @@ function bindSite(site){
   };
   if(S.fillEdit&&S.editing){
     const r=(S[COLS[S.editing.col]]||[]).find(x=>x.id===S.editing.id);S.fillEdit=false;
-    if(r){const setv=(id,v)=>{const el=$(id);if(el)el.value=v??''};setv('#e_amount',r.amount);setv('#e_date',r.date);setv('#e_method',meth(r));setv('#e_notes',r.notes);setv('#e_remarks',r.remarks);setRegFromRecord('e_contractor','contractors',r.contractor);setRegFromRecord('e_item','items',r.item)}
+    if(r){const setv=(id,v)=>{const el=$(id);if(el)el.value=v??''};setv('#e_amount',r.amount);setv('#e_date',r.date);setv('#e_method',meth(r));setv('#e_due',r.due);setv('#e_chq',r.chq);dueToggle('e');setv('#e_notes',r.notes);setv('#e_remarks',r.remarks);setRegFromRecord('e_contractor','contractors',r.contractor);setRegFromRecord('e_item','items',r.item)}
   }
-  bindRegSelect('e_contractor','contractors');bindRegSelect('e_item','items');bindConItem('e_contractor','e_item');
+  bindRegSelect('e_contractor','contractors');bindRegSelect('e_item','items');bindConItem('e_contractor','e_item');bindDue('e');
   const ce=$('#cancelEdit');if(ce)ce.onclick=()=>{S.editing=null;S.pickedFile=null;S.justSaved=true;render()};
   const pf=$('#e_photo');if(pf)pf.onchange=()=>{S.pickedFile=pf.files&&pf.files[0]||null;render()};
   const mb=$('#moreBox');if(mb)mb.ontoggle=()=>{S.moreOpen=mb.open};
@@ -1189,7 +1245,7 @@ function renderJournal(){
       <div class="f c2 half"><label for="j_site">الموقع</label><select id="j_site"><option value="">اختر الموقع</option>${siteOpts}</select></div>
       <div class="f c1 half"><label for="j_amount">المبلغ (${CUR})</label><input id="j_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
       <div class="f c1 half"><label for="j_date">التاريخ</label><input id="j_date" type="date" value="${esc(K.date||today())}"></div>
-      <div class="f c1 half"><label for="j_method">طريقة الدفع</label><select id="j_method">${Object.entries(METHOD).map(([k,v])=>`<option value="${k}" ${(K.method||'cash')===k?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="f c1 half"><label for="j_method">طريقة الدفع</label><select id="j_method">${Object.entries(METHOD).map(([k,v])=>`<option value="${k}" ${(K.method||'cash')===k?'selected':''}>${v}</option>`).join('')}</select></div>${dueFields('j')}
       <div class="f c2"><label for="j_notes">البيان</label><input id="j_notes" maxlength="300" placeholder="${isExp?'وصف المصروف':'مثال: دفعة من المالك على حساب الموقع'}"></div>
       <div class="f c2 j-exp" ${isExp?'':'hidden'}><label for="j_item">البند</label>${regSelect('j_item','items')}</div>
       <div class="f c2 j-exp" ${isExp?'':'hidden'}><label for="j_contractor">المقاول</label>${regSelect('j_contractor','contractors')}</div>
@@ -1217,7 +1273,7 @@ function renderJournal(){
     </div>
     ${shown.length?`<div class="tbl-wrap"><table class="j-t"><thead><tr><th class="num">رقم القيد</th><th>التاريخ</th><th>الموقع</th><th class="num">وارد</th><th class="num">منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>ملاحظات</th><th class="num">الرصيد بعد الحركة</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
     ${shown.map(r=>`<tr><td class="num plain">${r.no}</td><td class="date">${esc(r.date)}</td><td><button class="linkish" data-site="${esc(r.siteId)}">${esc(siteNameOf(r.siteId))||'—'}</button></td>
-      <td class="num in">${r.k==='dep'?fmt(amt(r))+`<span class="mtag">${METHOD[meth(r)]}</span>`:''}</td><td class="num">${r.k==='exp'?fmt(amt(r))+`<span class="mtag">${METHOD[meth(r)]}</span>`:''}</td>
+      <td class="num in">${r.k==='dep'?fmt(amt(r))+`<span class="mtag">${mlabel(r)}</span>`:''}</td><td class="num">${r.k==='exp'?fmt(amt(r))+`<span class="mtag">${mlabel(r)}</span>`:''}</td>
       <td>${esc(r.notes)||(r.k==='dep'?'إيداع من المالك':'—')}${r.pending?`<span class="pend">${PEND}</span>`:''}</td><td>${r.item?`<span class="chip">${esc(r.item)}</span>`:'—'}</td><td>${esc(r.contractor)||'—'}</td>
       <td>${esc(r.remarks)||'—'}${r.by?`<span class="note">سجّله: ${esc(r.by)}</span>`:''}${r.receipt?`<button class="rcpt" data-receipt="${esc(r.receipt)}" data-rtype="${esc(r.receiptType||'')}">عرض الإيصال</button>`:''}</td>
       <td class="num strong${negCls(r.run)}">${fmt(r.run)}</td>${acts(r)}</tr>`).join('')}
@@ -1235,7 +1291,7 @@ function bindJournal(){
   on('#jMore','onclick',()=>{S.jLimit+=200;render()});
   on('#j_type','onchange',e=>{S.jKeep.type=e.target.value;document.querySelectorAll('.j-exp').forEach(x=>x.hidden=e.target.value!=='exp');const n=$('#j_notes');if(n)n.placeholder=e.target.value==='exp'?'وصف المصروف':'مثال: دفعة من المالك على حساب الموقع'});
   on('#j_site','onchange',e=>{S.jKeep.site=e.target.value});
-  bindRegSelect('j_item','items');bindRegSelect('j_contractor','contractors');bindConItem('j_contractor','j_item');
+  bindRegSelect('j_item','items');bindRegSelect('j_contractor','contractors');bindConItem('j_contractor','j_item');bindDue('j');
   {const mb=$('#moreBox');if(mb)mb.ontoggle=()=>{S.moreOpen=mb.open}}
   on('#j_photo','onchange',e=>{S.pickedFile=e.target.files&&e.target.files[0]||null;render()});
   if(S.flash&&S.flash.until>Date.now()&&$('#jMsg')){$('#jMsg').className='msg ok';$('#jMsg').textContent=S.flash.text}
@@ -1246,8 +1302,8 @@ function bindJournal(){
     const amount=parseFloat($('#j_amount').value);
     const rec={siteId:site,amount,date:$('#j_date').value,method:$('#j_method').value,notes:$('#j_notes').value.trim(),remarks:$('#j_remarks').value.trim(),by:myBy()};
     if(type==='exp'){rec.contractor=regValue('j_contractor','contractors');rec.item=regValue('j_item','items')}
-    const miss=[];if(!site)miss.push('الموقع');if(!(amount>0))miss.push('المبلغ');if(!rec.date)miss.push('التاريخ');if(!rec.notes)miss.push('البيان');if(type==='exp'&&!rec.item)miss.push('البند');if(type==='exp'&&!rec.contractor)miss.push('المقاول');
-    if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor'}[miss[0]]);if(el)el.focus();return}
+    const miss=[];if(!site)miss.push('الموقع');if(!(amount>0))miss.push('المبلغ');if(!rec.date)miss.push('التاريخ');if(!rec.notes)miss.push('البيان');if(type==='exp'&&!rec.item)miss.push('البند');if(type==='exp'&&!rec.contractor)miss.push('المقاول');dueRead('j',rec,miss);
+    if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor','تاريخ الاستحقاق':'#j_due'}[miss[0]]);if(el)el.focus();return}
     if(type==='exp')commitNewRegs([['j_contractor','contractors'],['j_item','items']]);
     if(S.pickedFile){
       if(!OFF&&S.mode!=='live'){msg.className='msg err';msg.textContent='رفع الصورة يحتاج إلى الإنترنت. احذف الصورة وسجّل، ثم أضفها لاحقًا من «تعديل».';return}
@@ -1375,13 +1431,13 @@ const LS_XLSX='adc_last_xlsx',LS_AUTOX='adc_auto_xlsx';
 const KIND={expenses:'مصروف',deposits:'إيداع',counts:'جرد',sites:'موقع',files:'من ملف',contractors:'مقاول',items:'بند'};
 const siteNameOf=id=>(S.sites.find(s=>s.id===id)||{}).name||'';
 function logDetails(col,r){
-  if(col==='expenses')return [r.contractor,r.item,r.notes,METHOD[meth(r)]].filter(Boolean).join(' · ');
-  if(col==='deposits')return ['من المالك',METHOD[meth(r)],r.notes,r.remarks].filter(Boolean).join(' · ');
+  if(col==='expenses')return [r.contractor,r.item,r.notes,mlabel(r)].filter(Boolean).join(' · ');
+  if(col==='deposits')return ['من المالك',mlabel(r),r.notes,r.remarks].filter(Boolean).join(' · ');
   if(col==='counts')return 'نقدي '+fmtPlain(+r.cash||0)+' · بنك '+fmtPlain(+r.bank||0);
   if(col==='sites'||col==='contractors'||col==='items')return r.name||'';
   return r.details||'';
 }
-const FLD=[['name','الاسم'],['claim','إجمالي المستخلص',v=>v?fmtPlain(+v):'—'],['spec','التخصص'],['phone','الهاتف'],['code','الكود'],['amount','المبلغ',v=>fmtPlain(+v||0)],['date','التاريخ'],['contractor','المقاول'],['item','البند'],['method','نقدي/بنك',v=>METHOD[v==='bank'?'bank':'cash']],['notes','البيان'],['remarks','ملاحظات'],['receipt','الإيصال',v=>v?'موجود':'لا يوجد']];
+const FLD=[['name','الاسم'],['claim','إجمالي المستخلص',v=>v?fmtPlain(+v):'—'],['spec','التخصص'],['phone','الهاتف'],['code','الكود'],['amount','المبلغ',v=>fmtPlain(+v||0)],['date','التاريخ'],['contractor','المقاول'],['item','البند'],['method','طريقة الدفع',v=>METHOD[v]||METHOD.cash],['due','تاريخ الاستحقاق'],['chq','رقم الشيك'],['notes','البيان'],['remarks','ملاحظات'],['receipt','الإيصال',v=>v?'موجود':'لا يوجد']];
 function diffText(a,b){
   const out=[];for(const [k,l,f] of FLD){const x=a[k]??'',y=b[k]??'';const fx=f?f(x):x,fy=f?f(y):y;if(String(fx)!==String(fy))out.push(l+': '+(fx===''?'—':fx)+' ← '+(fy===''?'—':fy))}
   return out.length?out.join(' · '):'بدون تغيير في القيم';
@@ -1418,11 +1474,11 @@ async function exportExcel(siteId,auto){
   if(sites.length>1)T(sum1,['الإجمالي',...tot]);
   const ex={name:'المصروفات',rows:[],styles:{},widths:[13,24,12,16,22,22,9,20,14,17],freeze:1};
   H(ex,['المبلغ','البيان','التاريخ','البند','المقاول','ملاحظات','نقدي/بنك','الموقع','المسجل','وقت التسجيل','آخر تعديل','إيصال']);ex.widths.push(17,8);
-  const el=pick(S.exp).sort(byDate);for(const r of el)ex.rows.push([amt(r),r.notes||'',r.date,r.item||'',r.contractor||'',r.remarks||'',METHOD[meth(r)],siteNameOf(r.siteId),r.by||'',dt(r.created),dt(r.updated),r.receipt?'موجود':'']);
+  const el=pick(S.exp).sort(byDate);for(const r of el)ex.rows.push([amt(r),r.notes||'',r.date,r.item||'',r.contractor||'',r.remarks||'',mlabel(r),siteNameOf(r.siteId),r.by||'',dt(r.created),dt(r.updated),r.receipt?'موجود':'']);
   T(ex,[sum(el),'الإجمالي']);
   const dp={name:'الإيداعات',rows:[],styles:{},widths:[13,28,12,10,24,20,14,17],freeze:1};
   H(dp,['المبلغ','البيان','التاريخ','أُودع في','ملاحظات','الموقع','المسجل','وقت التسجيل','آخر تعديل','إيصال']);dp.widths.push(17,8);
-  const dl=pick(S.dep).sort(byDate);for(const r of dl)dp.rows.push([amt(r),r.notes||'إيداع من المالك',r.date,METHOD[meth(r)],r.remarks||'',siteNameOf(r.siteId),r.by||'',dt(r.created),dt(r.updated),r.receipt?'موجود':'']);
+  const dl=pick(S.dep).sort(byDate);for(const r of dl)dp.rows.push([amt(r),r.notes||'إيداع من المالك',r.date,mlabel(r),r.remarks||'',siteNameOf(r.siteId),r.by||'',dt(r.created),dt(r.updated),r.receipt?'موجود':'']);
   T(dp,[sum(dl),'الإجمالي']);
   const ct={name:'الجرد',rows:[],styles:{},widths:[20,12,13,13,13,13,13,13,16,22,17],freeze:1};
   H(ct,['الموقع','تاريخ الجرد','دفتري نقدي','دفتري بنك','نقدي موجود','في البنك','الفرق نقدي','الفرق بنك','الحالة','ملاحظات','وقت التسجيل']);
@@ -1435,7 +1491,7 @@ async function exportExcel(siteId,auto){
   H(jr,['رقم القيد','التاريخ','الموقع','النوع','وارد','منصرف','البيان','البند','المقاول','ملاحظات','نقدي/بنك','الرصيد','المسجل','وقت التسجيل']);
   {const all=journalRows().filter(r=>!siteId||r.siteId===siteId).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created||0)-(b.created||0));let run=0,ti=0,to=0;
    for(const r of all){const v=amt(r);if(r.k==='dep'){run+=v;ti+=v}else{run-=v;to+=v}
-     jr.rows.push([r.no,r.date,siteNameOf(r.siteId),r.k==='dep'?'إيداع':'مصروف',r.k==='dep'?v:'',r.k==='exp'?v:'',r.notes||(r.k==='dep'?'إيداع من المالك':''),r.item||'',r.contractor||'',r.remarks||'',METHOD[meth(r)],run,r.by||'',dt(r.created)])}
+     jr.rows.push([r.no,r.date,siteNameOf(r.siteId),r.k==='dep'?'إيداع':'مصروف',r.k==='dep'?v:'',r.k==='exp'?v:'',r.notes||(r.k==='dep'?'إيداع من المالك':''),r.item||'',r.contractor||'',r.remarks||'',mlabel(r),run,r.by||'',dt(r.created)])}
    T(jr,['','','','الإجمالي',ti,to,'','','','','',run])}
   const blob=XLSX_W.build([sum1,jr,ex,dp,ct,lg]);
   const d=new Date(now),fn='ADC-حسابات-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كل-المواقع')+'-'+today()+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
@@ -2093,7 +2149,7 @@ function renderStatement(col,name){
       ${filtOn?'<button class="ghost" id="sfClear">مسح الفلتر</button>':''}
     </div>
     ${tr.length?`<div class="tbl-wrap"><table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>الموقع</th><th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th class="num">الإجمالي التراكمي</th></tr></thead><tbody>
-    ${tr.map(e=>`<tr><td class="num">${fmt(amt(e))}<span class="mtag">${METHOD[meth(e)]}</span></td><td>${esc(e.notes)||'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><button class="linkish" data-site="${esc(e.siteId)}">${esc(siteNameOf(e.siteId))}</button></td><td>${esc(e[R.other])||'—'}</td><td>${esc(e.remarks)||'—'}</td><td class="num strong">${fmt(e.run)}</td></tr>`).join('')}
+    ${tr.map(e=>`<tr><td class="num">${fmt(amt(e))}<span class="mtag">${mlabel(e)}</span></td><td>${esc(e.notes)||'—'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><button class="linkish" data-site="${esc(e.siteId)}">${esc(siteNameOf(e.siteId))}</button></td><td>${esc(e[R.other])||'—'}</td><td>${esc(e.remarks)||'—'}</td><td class="num strong">${fmt(e.run)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td class="num">${fmt(sum(rows))}</td><td colspan="6">الإجمالي</td></tr></tfoot></table></div>`:`<div class="blank" style="padding:24px"><h3>لا توجد حركات${filtOn?' لهذا الفلتر':''}</h3></div>`}
   </div>
   ${rows.length?`<div class="breakdowns"><div class="card"><div class="sec-h">حسب الموقع</div>${barsHTML(bySite)}</div><div class="card"><div class="sec-h">حسب ${col==='contractors'?'البند':'المقاول'}</div>${barsHTML(byOther)}</div></div>`:''}`;
@@ -2110,7 +2166,7 @@ async function exportStatement(col,name){
   sh.rows.push(['الفترة: '+(sf.from||'البداية')+' إلى '+(sf.to||today())+(sf.site?' · الموقع: '+siteNameOf(sf.site):'')+' · تم الحفظ '+stamp(Date.now())]);
   {const cl=col==='contractors'?claimOf(name):null;if(cl!=null){const paid=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);sh.rows.push(['إجمالي المستخلص',cl,'المدفوع (كل المواقع)',paid,cl-paid<0?'مدفوع بالزيادة':'المتبقي',Math.abs(cl-paid)])}else sh.rows.push([])}
   sh.rows.push(['التاريخ','المبلغ','البيان','الموقع',col==='contractors'?'البند':'المقاول','ملاحظات','نقدي/بنك','الإجمالي التراكمي','وقت التسجيل']);sh.styles[3]=1;
-  let run=0;for(const e of rows){run+=amt(e);sh.rows.push([e.date,amt(e),e.notes||'',siteNameOf(e.siteId),e[R.other]||'',e.remarks||'',METHOD[meth(e)],run,dt(e.created)])}
+  let run=0;for(const e of rows){run+=amt(e);sh.rows.push([e.date,amt(e),e.notes||'',siteNameOf(e.siteId),e[R.other]||'',e.remarks||'',mlabel(e),run,dt(e.created)])}
   sh.rows.push(['الإجمالي',run]);sh.styles[sh.rows.length-1]=3;
   const fn=('ADC-'+R.stmt+'-'+name+'-'+today()+'.xlsx').replace(/[\\/:*?"<>|]/g,'-').replace(/ /g,'-');
   try{await saveFile(fn,XLSX_W.build([sh]));S.xlsxMsg='تم الحفظ: '+fn;render()}catch(e){}
@@ -2305,7 +2361,7 @@ function reportDoc(kind){
     const rows=[...S.dep.filter(x=>x.siteId===site.id&&inR(x)).map(x=>({...x,k:'dep'})),...S.exp.filter(x=>x.siteId===site.id&&inR(x)).map(x=>({...x,k:'exp'}))].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created||0)-(b.created||0));
     let run=open,ti=0,to=0;
     const tr=rows.map(r=>{const v=amt(r);if(r.k==='dep'){run+=v;ti+=v}else{run-=v;to+=v}
-      return `<tr>${td(esc(r.date))}${td(r.k==='dep'?money(v):'','n in')}${td(r.k==='exp'?money(v):'','n')}${td(esc(r.notes||(r.k==='dep'?'إيداع من المالك':'')),'tl')}${td(esc(r.item||''))}${td(esc(r.contractor||''),'tl')}${td(esc(r.remarks||''),'tl')}${td(METHOD[meth(r)])}${td(money(run),'n b')}</tr>`}).join('');
+      return `<tr>${td(esc(r.date))}${td(r.k==='dep'?money(v):'','n in')}${td(r.k==='exp'?money(v):'','n')}${td(esc(r.notes||(r.k==='dep'?'إيداع من المالك':'')),'tl')}${td(esc(r.item||''))}${td(esc(r.contractor||''),'tl')}${td(esc(r.remarks||''),'tl')}${td(mlabel(r))}${td(money(run),'n b')}</tr>`}).join('');
     const b=bal(site.id),r=recon(site.id);
     body=`<div class="tiles"><div><span>إجمالي الإيداعات</span><b>${money(b.dep)}</b></div><div><span>إجمالي المصروفات</span><b>${money(b.exp)}</b></div><div><span>الرصيد الدفتري</span><b>${money(b.total)}</b><small>نقدي ${money(b.cash)} · بنك ${money(b.bank)}</small></div><div><span>آخر جرد</span><b>${r.st==='none'?'—':ST[r.st][1]+(r.st==='short'||r.st==='over'?' '+money(Math.abs(r.d)):'')}</b><small>${r.st==='none'?'لم يتم الجرد':esc(r.c.date)}</small></div></div>
     <table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>ملاحظات</th><th>نقدي/بنك</th><th>الرصيد</th></tr></thead><tbody>
@@ -2320,7 +2376,7 @@ function reportDoc(kind){
     const cl=col==='contractors'?claimOf(name):null,paidAll=S.exp.filter(e=>(e[R.field]||'').trim()===name).reduce((a,e)=>a+amt(e),0);
     body=`<div class="tiles">${cl!=null?`<div><span>إجمالي المستخلص</span><b>${money(cl)}</b></div><div><span>المدفوع (كل المواقع)</span><b>${money(paidAll)}</b></div><div><span>${cl-paidAll<0?'مدفوع بالزيادة':'المتبقي للمقاول'}</span><b>${money(Math.abs(cl-paidAll))}</b></div>`:''}<div><span>إجمالي المصروف${sf.site||sf.from||sf.to?' (حسب الفترة)':''}</span><b>${money(sum(rows))}</b></div><div><span>عدد الحركات</span><b>${rows.length}</b></div></div>
     <table><thead><tr><th>التاريخ</th><th>المبلغ</th><th>البيان</th><th>الموقع</th><th>${col==='contractors'?'البند':'المقاول'}</th><th>ملاحظات</th><th>طريقة الدفع</th><th>الإجمالي التراكمي</th></tr></thead><tbody>
-    ${rows.map(e=>{run+=amt(e);return `<tr>${td(esc(e.date))}${td(money(amt(e)),'n')}${td(esc(e.notes||''),'tl')}${td(esc(siteNameOf(e.siteId)),'tl')}${td(esc(e[R.other]||''),'tl')}${td(esc(e.remarks||''),'tl')}${td(METHOD[meth(e)])}${td(money(run),'n b')}</tr>`}).join('')||'<tr><td colspan="8">لا توجد حركات</td></tr>'}
+    ${rows.map(e=>{run+=amt(e);return `<tr>${td(esc(e.date))}${td(money(amt(e)),'n')}${td(esc(e.notes||''),'tl')}${td(esc(siteNameOf(e.siteId)),'tl')}${td(esc(e[R.other]||''),'tl')}${td(esc(e.remarks||''),'tl')}${td(mlabel(e))}${td(money(run),'n b')}</tr>`}).join('')||'<tr><td colspan="8">لا توجد حركات</td></tr>'}
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(run),'n')}<td colspan="6"></td></tr></tfoot></table>`;
   }else{
     const jf=S.jf;title='دفتر اليومية';land=true;
@@ -2385,10 +2441,34 @@ async function printReport(kind){
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
-const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+/* ---------- post-dated cheques: what is coming due ---------- */
+function dueSoon(days){
+  const t=today(),lim=addDays(t,days);
+  return [...S.exp.map(x=>({...x,k:'exp'})),...S.dep.map(x=>({...x,k:'dep'}))]
+    .filter(x=>x.method==='deferred'&&x.due&&x.due>=t&&x.due<=lim)
+    .sort((a,b)=>a.due.localeCompare(b.due)||amt(b)-amt(a));
+}
+function dueCard(){
+  const l=dueSoon(7);if(!l.length)return '';
+  const t=today(),tm=addDays(t,1);
+  const when=d=>d===t?'<b class="neg">اليوم</b>':d===tm?'<b class="neg">غدًا</b>':esc(d);
+  return `<div class="card due-card"><div class="sec-h">شيكات تستحق خلال ٧ أيام (${l.length}) · الإجمالي ${fmt(l.filter(x=>x.k==='exp').reduce((a,x)=>a+amt(x),0))} ${CUR}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>الاستحقاق</th><th>الموقع</th><th>النوع</th><th class="num">المبلغ</th><th>المقاول / البيان</th><th>رقم الشيك</th></tr></thead><tbody>
+  ${l.map(x=>`<tr class="${x.due<=tm?'row-neg':''}"><td class="date">${when(x.due)}</td><td><button class="linkish" data-site="${esc(x.siteId)}">${esc(siteNameOf(x.siteId))}</button></td><td>${x.k==='exp'?'صادر (مصروف)':'وارد (إيداع)'}</td><td class="num">${fmt(amt(x))}</td><td>${esc(x.contractor||x.notes||'')}</td><td class="date">${esc(x.chq||'—')}</td></tr>`).join('')}
+  </tbody></table></div></div>`;
+}
+function dueAlert(){
+  if(S.dueAlerted||!S.loaded)return;S.dueAlerted=true;
+  const t=today(),tm=addDays(t,1),l=dueSoon(1);if(!l.length)return;
+  const nT=l.filter(x=>x.due===t),nM=l.filter(x=>x.due===tm),tot=a=>fmt(a.reduce((s,x)=>s+amt(x),0));
+  const parts=[];if(nT.length)parts.push(nT.length+' شيك يستحق اليوم بإجمالي '+tot(nT)+' '+CUR);if(nM.length)parts.push(nM.length+' شيك يستحق غدًا بإجمالي '+tot(nM)+' '+CUR);
+  showBanner('تنبيه: '+parts.join('، و')+'. التفاصيل في «ملخص كل المواقع».');
+}
 function render(){
   statusRender();renderSites();
   if(!S.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري تحميل الحسابات…</h3></div>';return}
+  if(!S.dueAlerted&&(OFF||S.mode==='live'||S.mode==='off'))setTimeout(dueAlert,300);
   const keep={};const focusId=document.activeElement&&document.activeElement.id;
   if(!S.justSaved)for(const id of KEEP){const el=document.getElementById(id);if(el)keep[id]=el.value}
   S.justSaved=false;
