@@ -972,8 +972,11 @@ function logCard(){
   </tbody></table></div><p class="foot-note" style="margin:8px 0 0">السجل الكامل بتاريخ ووقت كل تعديل موجود في ملف Excel، في ورقة «سجل التعديلات».</p>`:'<p class="empty-note">عند تسجيل أو حذف أي شيء سيظهر هنا بتاريخه ووقته.</p>'}</div>`;
 }
 /* ---------- files ---------- */
+function flash(msg,bad){try{let t=document.getElementById('adcToast');if(!t){t=document.createElement('div');t.id='adcToast';t.setAttribute('role','status');t.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);color:#fff;padding:11px 18px;border-radius:12px;z-index:99999;font:inherit;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:92vw;text-align:center;direction:rtl';document.body.appendChild(t)}t.style.background=bad?'#b91c1c':'#0f766e';t.textContent=msg;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>{t.style.display='none'},6000)}catch(e){}}
 async function saveFile(filename,blob){
-  if(APP&&await appSaveToDir(filename,blob))return;
+  if(APP){try{if(await appSaveToDir(filename,blob)){flash('تم حفظ الملف «'+filename+'» في مجلد «'+appDirName()+'» على هذا الجهاز');return}}catch(e){}
+    try{await S.downloads.save({filename,data:blob});flash('تم تنزيل الملف «'+filename+'» — ستجده في مجلد التنزيلات (Downloads)')}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تنزيل الملف، حاول مرة أخرى',1);throw e}
+    return}
   if(OFF&&await saveToFolder(filename,blob))return;
   if(OFF){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return}
   await S.downloads.save({filename,data:blob});
@@ -1781,7 +1784,7 @@ function bindImport(site){
     const dep=S.imp&&S.imp.kind==='dep';
     const sh=dep?{name:'إيداعات',rows:[['المبلغ','البيان','التاريخ','أُودع في','ملاحظات'],[100000,'دفعة من المالك',today(),'بنك','شيك رقم 1020'],[50000,'دفعة نقدية',today(),'نقدي','']],styles:{0:1},widths:[14,30,13,12,24],freeze:1}
       :{name:'مصروفات',rows:[['المبلغ','البيان','التاريخ','البند','المقاول','طريقة الدفع','ملاحظات','تاريخ الاستحقاق','رقم الشيك'],[12500,'توريد طوب',today(),'مباني','مؤسسة الفتح للمباني','نقدي','مستخلص رقم 1','',''],[40000,'دفعة مستخلص',today(),'خرسانة مسلحة','م. أحمد سعيد','آجل',' ',addDays(today(),30),'778899']],styles:{0:1},widths:[13,26,13,18,24,12,20,15,12],freeze:1};
-    try{await saveFile(dep?'ADC-نموذج-إيداعات.xlsx':'ADC-نموذج-مصروفات.xlsx',XLSX_W.build([sh]))}catch(e){}});
+    try{await saveFile(dep?'ADC-نموذج-إيداعات.xlsx':'ADC-نموذج-مصروفات.xlsx',XLSX_W.build([sh]))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تجهيز النموذج: '+((e&&e.message)||e),1)}});
   document.querySelectorAll('[data-impkind]').forEach(b=>b.onclick=()=>{S.imp.kind=b.dataset.impkind;if(S.imp.rows)buildImport();render()});
   const f=$('#impFile');if(f)f.onchange=async()=>{const file=f.files&&f.files[0];if(!file)return;
     try{let rows;
