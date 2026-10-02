@@ -349,7 +349,8 @@ const meth=x=>METHOD[x.method]&&x.method!=='cash'?x.method:'cash';
 /* deferred (post-dated cheque): counts in the totals now, leaves the bank on its due date */
 const notDue=(x,d)=>x.method==='deferred'&&(x.due||'')>(d||today());
 const addDays=(d,n)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
-const mlabel=x=>METHOD[meth(x)]+(x.method==='deferred'&&x.due?' · '+(notDue(x)?'يستحق ':'استُحق ')+x.due+(x.chq?' · شيك '+x.chq:''):'');
+const BANKY=m=>m==='bank'||m==='transfer'||m==='deferred';
+const mlabel=x=>METHOD[meth(x)]+(BANKY(x.method)&&x.bank?' · '+x.bank:'')+(x.method==='deferred'&&x.due?' · '+(notDue(x)?'يستحق ':'استُحق ')+x.due+(x.chq?' · شيك '+x.chq:''):'');
 const negCls=v=>v<0?' neg':'';
 
 /* ---------- data ---------- */
@@ -436,8 +437,8 @@ function renderSites(){
   const all=bal(),cur=S.sel;
   const tool=(id,name,t)=>`<button class="site-btn jbtn" role="menuitem" data-site="${id}" aria-current="${cur===id}"><span class="n">${name}</span><span class="t">${t}</span></button>`;
   const tm=$('#toolMenu');
-  if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'')+tool('__settings','الإعدادات','');
-  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__custody:'العُهد',__settings:'الإعدادات'};
+  if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+tool('__banks','الحسابات البنكية',bankList().length||'')+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'')+tool('__settings','الإعدادات','');
+  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__custody:'العُهد',__settings:'الإعدادات'};
   const mb=$('#menuBtn');if(mb){const pend=APP&&!appIsEngineer()&&typeof custMine==='function'?custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length:0;
     mb.innerHTML=`<span aria-hidden="true">☰</span> ${TOOLS[cur]?esc(TOOLS[cur]):'القائمة'}${pend?`<span class="badge" title="مصروفات عهدة للمراجعة">${pend}</span>`:''}`;mb.classList.toggle('on',!!TOOLS[cur])}
   const am=$('#addMenu');
@@ -458,6 +459,33 @@ function renderSites(){
   $('#newSiteForm').hidden=!canAddSite();
   const ab=$('#allSitesBtn');if(ab)ab.onclick=()=>{S.allSites=!S.allSites;S.siteQ='';renderSites()};
   const sf=$('#siteFilter');if(sf){sf.oninput=()=>{S.siteQ=sf.value;const p=sf.selectionStart;renderSites();const n=$('#siteFilter');if(n){n.focus();try{n.setSelectionRange(p,p)}catch(e){}}}}
+}
+function bankSave(list){const d=bankDoc();const rec={...(d?clean(d):{}),name:BANK_DOC,hidden:true,banks:list,updated:Date.now()};delete rec.id;delete rec._p;queue('items',BANK_DOC,rec)}
+function renderBanks(){
+  const list=bankList(),all=(bankDoc()||{}).banks||[],td=today();
+  const known=new Map(list.map(b=>[b.name,{...b,inn:0,out:0,later:0,n:0}]));const other=new Map();const none={name:'غير محدد',inn:0,out:0,later:0,n:0};
+  const add=(x,sign)=>{if(!BANKY(x.method))return;const k=(x.bank||'').trim();const r=k?(known.get(k)||other.get(k)||(other.set(k,{name:k,inn:0,out:0,later:0,n:0}),other.get(k))):none;r.n++;if(notDue(x,td)){r.later+=sign*amt(x);return}if(sign>0)r.inn+=amt(x);else r.out+=amt(x)};
+  for(const e of S.dep)add(e,1);for(const e of S.exp)add(e,-1);
+  const row=(r,isKnown)=>{const op=+r.opening||0,bal=op+r.inn-r.out;return `<tr><td><b>${esc(r.name)}</b>${isKnown?'':'<span class="pend">'+(r===none?'لم يُحدَّد البنك':'أخرى')+'</span>'}</td><td class="num plain">${isKnown&&op?fmt(op):'—'}</td><td class="num in">${fmt(r.inn)}</td><td class="num">${fmt(r.out)}</td><td class="num strong${bal<0?' neg':''}">${fmt(bal)}</td><td class="num plain">${r.later?fmt(r.later):'—'}</td><td class="plain">${r.n}</td>${canBanks()?`<td class="acts">${isKnown?`<button class="ghost" data-bankhide="${esc(r.name)}">إخفاء</button>`:''}</td>`:''}</tr>`};
+  const rows=[...known.values()].map(r=>row(r,true)).concat([...other.values()].sort((a,b)=>b.n-a.n).map(r=>row(r,false))).concat(none.n?[row(none,false)]:[]);
+  const hiddenOnes=all.filter(b=>b&&b.hidden);
+  $('#pane').innerHTML=`<div class="pane-h"><h2>الحسابات البنكية</h2></div>
+  <p class="foot-note" style="margin:-8px 0 0">عند اختيار «بنك» أو «تحويل» أو «آجل (شيك)» في أي مصروف أو إيداع، تظهر خانة لاختيار البنك. وإذا خرجت الفلوس من مكان غير مسجَّل (مثل إنستاباي) يُختار «أخرى» ويُكتب اسمه.${isUserView()?' الأرقام هنا لحركات مواقعك فقط.':''}</p>
+  ${canBanks()?`<div class="card"><form class="entry" id="bankForm" autocomplete="off" novalidate>
+    <div class="f c2"><label for="b_name">اسم البنك / الحساب</label><input id="b_name" maxlength="60" placeholder="مثال: البنك الأهلي - 4521"></div>
+    <div class="f c2"><label for="b_open">الرصيد الافتتاحي (اختياري)</label><input id="b_open" type="number" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+    <div class="form-foot"><button class="primary" type="submit">إضافة الحساب</button><span class="msg" id="bankMsg"></span></div></form></div>`:''}
+  <div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="sec-h">أرصدة الحسابات</div>
+  ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>الحساب</th><th class="num">الافتتاحي</th><th class="num">وارد</th><th class="num">منصرف</th><th class="num">الرصيد</th><th class="num">شيكات لم تستحق</th><th>الحركات</th>${canBanks()?'<th></th>':''}</tr></thead><tbody>${rows.join('')}</tbody></table></div>
+  <p class="foot-note" style="margin:0">الرصيد = الافتتاحي + الوارد − المنصرف. الشيكات الآجلة التي لم يحِن موعدها تظهر وحدها ولا تُخصم من الرصيد إلا في تاريخ استحقاقها.</p>`
+  :`<p class="empty-note">${canBanks()?'لم تُسجَّل حسابات بنكية بعد. أضف أول حساب من الأعلى.':'لم يسجّل المدير حسابات بنكية بعد.'}</p>`}
+  ${hiddenOnes.length&&canBanks()?`<details><summary>حسابات مخفية (${hiddenOnes.length})</summary>${hiddenOnes.map(b=>`<div class="row"><span>${esc(b.name)}</span><button class="ghost" data-bankshow="${esc(b.name)}">إظهار</button></div>`).join('')}</details>`:''}
+  </div>`;
+  const f=$('#bankForm');if(f)f.onsubmit=ev=>{ev.preventDefault();const n=$('#b_name').value.trim(),m=$('#bankMsg');if(!n){m.className='msg err';m.textContent='اكتب اسم الحساب.';return}
+    const cur=[...all];const ex=cur.find(b=>b&&b.name===n);if(ex&&!ex.hidden){m.className='msg err';m.textContent='هذا الحساب موجود بالفعل.';return}
+    const op=parseFloat($('#b_open').value);const nb={name:n,opening:op>0||op<0?op:0,created:Date.now()};
+    bankSave(ex?cur.map(b=>b===ex?{...b,...nb,hidden:false}:b):[...cur,nb]);logChange('add','items',{name:'حساب بنكي: '+n});S.justSaved=true;flash('تمت إضافة الحساب «'+n+'».');render()};
+  document.querySelectorAll('[data-bankhide],[data-bankshow]').forEach(b=>b.onclick=()=>{const n=b.dataset.bankhide||b.dataset.bankshow,hide=!!b.dataset.bankhide;bankSave(all.map(x=>x&&x.name===n?{...x,hidden:hide}:x));render()});
 }
 function closePops(){document.querySelectorAll('.pop').forEach(m=>{m.hidden=true});document.querySelectorAll('[data-pop]').forEach(b=>b.setAttribute('aria-expanded','false'))}
 document.addEventListener('click',ev=>{
@@ -619,10 +647,19 @@ function renderOverview(){
   bindOverview();
 }
 
-function dueFields(p){return `<div class="f c1 half" id="${p}_due_w" hidden><label for="${p}_due">تاريخ الاستحقاق</label><input id="${p}_due" type="date"></div><div class="f c1 half" id="${p}_chq_w" hidden><label for="${p}_chq">رقم الشيك (اختياري)</label><input id="${p}_chq" maxlength="40" dir="ltr"></div>`}
-function dueToggle(p){const m=document.getElementById(p+'_method');if(!m)return;const on=m.value==='deferred';for(const k of ['_due_w','_chq_w']){const el=document.getElementById(p+k);if(el)el.hidden=!on}}
-function bindDue(p){const m=document.getElementById(p+'_method');if(m)m.addEventListener('change',()=>{dueToggle(p);if(m.value==='deferred'){const d=document.getElementById(p+'_due');if(d&&!d.value)d.focus()}});dueToggle(p)}
-function dueRead(p,rec,miss){if(rec.method==='deferred'){rec.due=(document.getElementById(p+'_due')||{}).value||'';rec.chq=((document.getElementById(p+'_chq')||{}).value||'').trim();if(!rec.due)miss.push('تاريخ الاستحقاق')}else{delete rec.due;delete rec.chq}}
+/* bank accounts: the owner keeps the list (stored in one shared record items/__banks); «أخرى» takes any text such as إنستاباي */
+const BANK_DOC='__banks';
+function bankDoc(){return (S.items||[]).find(x=>x.id===BANK_DOC&&!x._p)||(S.items||[]).find(x=>x.id===BANK_DOC)||null}
+function bankList(){const d=bankDoc();return d&&Array.isArray(d.banks)?d.banks.filter(b=>b&&b.name&&!b.hidden):[]}
+const canBanks=()=>S.canWrite&&(S.isManager||OFF);
+function bankField(p){const l=bankList();return `<div class="f c2" id="${p}_bank_w" hidden><label for="${p}_bank">البنك / الحساب</label>${l.length?`<select id="${p}_bank"><option value="">— اختر —</option>${l.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}<option value="__other">أخرى…</option></select>`:''}<input id="${p}_bank_o" maxlength="60" placeholder="اكتب الاسم، مثال: إنستاباي" ${l.length?'hidden':''}></div>`}
+function bankToggle(p){const s=document.getElementById(p+'_bank'),o=document.getElementById(p+'_bank_o');if(s&&o)o.hidden=s.value!=='__other'}
+function bankRead(p,rec){if(!BANKY(rec.method)){delete rec.bank;return}const s=document.getElementById(p+'_bank'),o=document.getElementById(p+'_bank_o');const v=s&&s.value!=='__other'?s.value:((o&&o.value)||'');if(v.trim())rec.bank=v.trim();else delete rec.bank}
+function bankSet(p,v){const s=document.getElementById(p+'_bank'),o=document.getElementById(p+'_bank_o');v=v||'';if(s){if(!v)s.value=bankList().length===1?bankList()[0].name:'';else if([...s.options].some(x=>x.value===v))s.value=v;else{s.value='__other';if(o)o.value=v}}else if(o)o.value=v;bankToggle(p)}
+function dueFields(p){return bankField(p)+`<div class="f c1 half" id="${p}_due_w" hidden><label for="${p}_due">تاريخ الاستحقاق</label><input id="${p}_due" type="date"></div><div class="f c1 half" id="${p}_chq_w" hidden><label for="${p}_chq">رقم الشيك (اختياري)</label><input id="${p}_chq" maxlength="40" dir="ltr"></div>`}
+function dueToggle(p){const m=document.getElementById(p+'_method');if(!m)return;const on=m.value==='deferred';{const bw=document.getElementById(p+'_bank_w');if(bw)bw.hidden=!BANKY(m.value)}bankToggle(p);for(const k of ['_due_w','_chq_w']){const el=document.getElementById(p+k);if(el)el.hidden=!on}}
+function bindDue(p){{const bs=document.getElementById(p+'_bank');if(bs){bs.addEventListener('change',()=>{bankToggle(p);if(bs.value==='__other'){const o=document.getElementById(p+'_bank_o');if(o)o.focus()}});if(!bs.value&&bankList().length===1)bs.value=bankList()[0].name}}const m=document.getElementById(p+'_method');if(m)m.addEventListener('change',()=>{dueToggle(p);if(m.value==='deferred'){const d=document.getElementById(p+'_due');if(d&&!d.value)d.focus()}});dueToggle(p)}
+function dueRead(p,rec,miss){bankRead(p,rec);if(rec.method==='deferred'){rec.due=(document.getElementById(p+'_due')||{}).value||'';rec.chq=((document.getElementById(p+'_chq')||{}).value||'').trim();if(!rec.due)miss.push('تاريخ الاستحقاق')}else{delete rec.due;delete rec.chq}}
 function methodSelect(label){
   return `<div class="f c1 half"><label for="e_method">${label}</label><select id="e_method"><option value="cash">نقدي</option><option value="bank">بنك</option><option value="transfer">تحويل</option><option value="deferred">آجل (شيك)</option></select></div>${dueFields('e')}`;
 }
@@ -751,7 +788,7 @@ function bindSite(site){
   };
   if(S.fillEdit&&S.editing){
     const r=(S[COLS[S.editing.col]]||[]).find(x=>x.id===S.editing.id);S.fillEdit=false;
-    if(r){const setv=(id,v)=>{const el=$(id);if(el)el.value=v??''};setv('#e_amount',r.amount);setv('#e_date',r.date);setv('#e_method',meth(r));setv('#e_due',r.due);setv('#e_chq',r.chq);dueToggle('e');setv('#e_notes',r.notes);setv('#e_remarks',r.remarks);setRegFromRecord('e_contractor','contractors',r.contractor);setRegFromRecord('e_item','items',r.item)}
+    if(r){const setv=(id,v)=>{const el=$(id);if(el)el.value=v??''};setv('#e_amount',r.amount);setv('#e_date',r.date);setv('#e_method',meth(r));setv('#e_due',r.due);setv('#e_chq',r.chq);dueToggle('e');bankSet('e',r.bank);setv('#e_notes',r.notes);setv('#e_remarks',r.remarks);setRegFromRecord('e_contractor','contractors',r.contractor);setRegFromRecord('e_item','items',r.item)}
   }
   bindRegSelect('e_contractor','contractors');bindRegSelect('e_item','items');bindConItem('e_contractor','e_item');bindDue('e');
   const ce=$('#cancelEdit');if(ce)ce.onclick=()=>{S.editing=null;S.pickedFile=null;S.justSaved=true;render()};
@@ -1819,7 +1856,8 @@ const IMP_FIELDS=[
   ['remarks','ملاحظات',['ملاحظات','الملاحظات','ملاحظة','remarks','notes']],
   ['method','طريقة الدفع',['نقدي/بنك','طريقة الدفع','الدفع','نقدي / بنك','صُرف من','أُودع في']],
   ['due','تاريخ الاستحقاق',['تاريخ الاستحقاق','الاستحقاق','due']],
-  ['chq','رقم الشيك',['رقم الشيك','الشيك','cheque']]];
+  ['chq','رقم الشيك',['رقم الشيك','الشيك','cheque']],
+  ['bank','البنك / الحساب',['البنك','الحساب البنكي','الحساب','اسم البنك','bank']]];
 const normH=s=>toLatinDigits(String(s??'')).replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/\s+/g,' ').trim().toLowerCase();
 function guessMap(rows){
   let best={row:-1,score:0,map:{}};
@@ -1854,6 +1892,7 @@ function buildImport(){
     if(amount<0)amount=-amount;
     const rec={siteId:site,amount,date:parseDate(g('date')),method:parseMethod(g('method')),notes:String(g('notes')||'').trim(),remarks:String(g('remarks')||'').trim()};
     if(rec.method==='deferred'){rec.due=parseDate(g('due'));const cq=String(g('chq')||'').trim();if(cq)rec.chq=cq}
+    if(BANKY(rec.method)){const bk=String(g('bank')||'').trim();if(bk){const m=bankList().find(b=>normH(b.name)===normH(bk));rec.bank=m?m.name:bk}}
     if(kind==='exp'){rec.item=String(g('item')||'').trim();rec.contractor=String(g('contractor')||'').trim()}
     const errs=[];
     if(!(amount>0))errs.push('المبلغ');
@@ -1897,8 +1936,8 @@ function bindImport(site){
   on('#impAgain','onclick',()=>{S.imp={siteId:site.id,fill:S.imp.fill,kind:S.imp.kind};render()});
   on('#impTpl','onclick',async()=>{
     const dep=S.imp&&S.imp.kind==='dep';
-    const sh=dep?{name:'إيداعات',rows:[['المبلغ','البيان','التاريخ','أُودع في','ملاحظات'],[100000,'دفعة من المالك',today(),'بنك','شيك رقم 1020'],[50000,'دفعة نقدية',today(),'نقدي','']],styles:{0:1},widths:[14,30,13,12,24],freeze:1}
-      :{name:'مصروفات',rows:[['المبلغ','البيان','التاريخ','البند','المقاول','طريقة الدفع','ملاحظات','تاريخ الاستحقاق','رقم الشيك'],[12500,'توريد طوب',today(),'مباني','مؤسسة الفتح للمباني','نقدي','مستخلص رقم 1','',''],[40000,'دفعة مستخلص',today(),'خرسانة مسلحة','م. أحمد سعيد','آجل',' ',addDays(today(),30),'778899']],styles:{0:1},widths:[13,26,13,18,24,12,20,15,12],freeze:1};
+    const sh=dep?{name:'إيداعات',rows:[['المبلغ','البيان','التاريخ','أُودع في','البنك','ملاحظات'],[100000,'دفعة من المالك',today(),'بنك',(bankList()[0]||{name:'البنك الأهلي'}).name,'شيك رقم 1020'],[50000,'دفعة نقدية',today(),'نقدي','','']],styles:{0:1},widths:[14,30,13,12,18,24],freeze:1}
+      :{name:'مصروفات',rows:[['المبلغ','البيان','التاريخ','البند','المقاول','طريقة الدفع','البنك','ملاحظات','تاريخ الاستحقاق','رقم الشيك'],[12500,'توريد طوب',today(),'مباني','مؤسسة الفتح للمباني','نقدي','','مستخلص رقم 1','',''],[40000,'دفعة مستخلص',today(),'خرسانة مسلحة','م. أحمد سعيد','آجل',(bankList()[0]||{name:'البنك الأهلي'}).name,' ',addDays(today(),30),'778899'],[3000,'تحويل للمورد',today(),'مباني','مؤسسة الفتح للمباني','تحويل','إنستاباي','','','']],styles:{0:1},widths:[13,26,13,18,24,12,16,20,15,12],freeze:1};
     try{await saveFile(dep?'ADC-نموذج-إيداعات.xlsx':'ADC-نموذج-مصروفات.xlsx',XLSX_W.build([sh]))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تجهيز النموذج: '+((e&&e.message)||e),1)}});
   document.querySelectorAll('[data-impkind]').forEach(b=>b.onclick=()=>{S.imp.kind=b.dataset.impkind;if(S.imp.rows)buildImport();render()});
   const f=$('#impFile');if(f)f.onchange=async()=>{const file=f.files&&f.files[0];if(!file)return;
@@ -2028,7 +2067,7 @@ async function printReport(kind){
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
-const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
 /* ---------- post-dated cheques: what is coming due ---------- */
 function dueSoon(days){
   const t=today(),lim=addDays(t,days);
@@ -2061,12 +2100,13 @@ function render(){
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
-  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__settings'?renderSettings():renderSite();
+  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__settings'?renderSettings():renderSite();
   const bar=(APP&&appIsEngineer())?'':excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
   for(const id in keep){const el=document.getElementById(id);if(el)el.value=keep[id]}
+  dueToggle('e');dueToggle('j');
   if(focusId){const el=document.getElementById(focusId);if(el&&(el.tagName==='INPUT'||el.tagName==='SELECT')&&el.type!=='file')el.focus()}
 }
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.viewer){S.viewer=null;render()}});
