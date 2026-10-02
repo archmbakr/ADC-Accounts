@@ -1,0 +1,36 @@
+name: cheque-reminders
+on:
+  schedule:
+    - cron: '3 6 * * *'
+    - cron: '3 7 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send test reminder now (cheques due within 7 days)'
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency: cheque-reminders
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install web-push
+        working-directory: report
+        run: npm install --no-save --no-audit --no-fund web-push@3 > /dev/null
+      - name: Send reminders
+        working-directory: report
+        env:
+          MODE: remind
+          SUPABASE_URL: https://ifsupnuwtkyfyughcudi.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          VAPID_PUBLIC_KEY: BPUb7BqcmmftBrGx2_CFgm8S_vGFwFdrrfedfKEdhfqoiQezDKkOv-lx6j4roBJQvV1LFh7cI6xrVWGyjLHW91w
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+        run: node send.mjs
