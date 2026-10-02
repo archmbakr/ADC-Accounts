@@ -1268,7 +1268,14 @@ function shownSites(){
   for(const s of [...all].sort((a,b)=>(act.get(b.id)||0)-(act.get(a.id)||0)))add(s.id);
   return ids.map(id=>by.get(id));
 }
+function appBadge(){
+  if(!('setAppBadge' in navigator))return;
+  let n=0;try{n+=dueSoon(1).length;if(APP&&!appIsEngineer()&&typeof custMine==='function')n+=custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length}catch(e){}
+  if(n===S.badgeN)return;S.badgeN=n;try{(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{})}catch(e){}
+}
 function renderSites(){
+  if(S.go==='exp'&&S.sites.length){const rec=(lsGet(LS_RECENT)||[]).find(i=>S.sites.some(s=>s.id===i));S.go='';S.sel=rec||S.sites[S.sites.length-1].id;S.kind='exp';S.editing=null;setTimeout(()=>{const a=$('#e_amount');if(a)a.focus()},60)}
+  appBadge();
   const all=bal(),cur=S.sel;
   const tool=(id,name,t)=>`<button class="site-btn jbtn" role="menuitem" data-site="${id}" aria-current="${cur===id}"><span class="n">${name}</span><span class="t">${t}</span></button>`;
   const tm=$('#toolMenu');
@@ -2869,7 +2876,7 @@ function reportDoc(kind){
   }
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-@page{size:A4 ${land?'landscape':'portrait'};margin:12mm 10mm}
+@page{size:A4 ${land?'landscape':'portrait'};margin:0}
 *{box-sizing:border-box}
 body{margin:0;font-family:Tahoma,"Segoe UI",Arial,sans-serif;color:#111;font-size:11px;background:#fff}
 .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px;gap:12px}
@@ -2894,13 +2901,20 @@ tfoot td{background:#eee;font-weight:bold}
 .foot{margin-top:10px;font-size:9px;color:#666}
 @media screen{body{padding:16px;max-width:${land?'1100px':'800px'};margin:auto}.bar{position:sticky;top:0;background:#fffbe6;border:1px solid #e5d48a;padding:8px 10px;margin-bottom:12px;border-radius:6px;font-size:12px;display:flex;gap:10px;align-items:center;justify-content:space-between}.bar button{font:inherit;padding:6px 14px;cursor:pointer}}
 @media print{.bar{display:none}}
+/* no page margin = the browser has no room to add its own date, title and link lines; the spacer rows below give every page its margin */
+table.pg{width:100%;border-collapse:collapse}table.pg>thead>tr>td,table.pg>tfoot>tr>td,table.pg>tbody>tr>td{border:0;padding:0;text-align:inherit;vertical-align:top}
+@media print{table.pg>thead>tr>td{height:12mm}table.pg>tfoot>tr>td{height:12mm}table.pg>tbody>tr>td{padding:0 10mm}}
+@media screen{table.pg>thead,table.pg>tfoot{display:none}}
+table.pg>tfoot{display:table-footer-group}
 </style></head><body>
 <div class="bar"><span>اختر الطابعة من نافذة الطباعة، أو اختر «Save as PDF» لحفظه بصيغة PDF.</span><button onclick="print()">طباعة / PDF</button></div>
+<table class="pg"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot><tbody><tr><td>
 <div class="hd"><div><h1>${esc(title)}</h1></div>${logo?`<img src="${logo}" alt="AFAQ Development Construction">`:''}</div>
 <p class="sub">${esc(sub)}${sub?' · ':''}طُبع: ${esc(now)}${who?' · بواسطة: '+esc(who):''} · المبالغ بالجنيه المصري</p>
 ${body}
 <div class="sign"><div>المحاسب</div><div>مدير الموقع</div><div>الاعتماد</div></div>
 <p class="foot">ADC Construction · حسابات المواقع</p>
+</td></tr></tbody></table>
 <script>window.addEventListener('load',function(){setTimeout(function(){try{print()}catch(e){}},400)})<\/script>
 </body></html>`;
 }
@@ -3012,6 +3026,8 @@ $('#dlgRegForm').addEventListener('submit',ev=>{
 
 (async function start(){
   try{if(location.hash==='#journal')S.sel='__journal'}catch(e){}
+  /* shortcuts on the app icon (long-press on the phone, right-click on the computer) open ?go=… */
+  try{const g=new URLSearchParams(location.search).get('go');if(g){const m={journal:'__journal',custody:'__custody',banks:'__banks'};if(m[g])S.sel=m[g];else if(g==='exp')S.go='exp';history.replaceState(null,'',location.pathname+location.hash)}}catch(e){}
   if(OFF){
     S.downloads=true;S.loaded=false;
     SEC.mode='';SEC.locked=true;if(!(auth()||{}).users)SEC.lastUser=MAIN_USER;
