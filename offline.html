@@ -466,7 +466,14 @@ function renderBanks(){
   const known=new Map(list.map(b=>[b.name,{...b,inn:0,out:0,later:0,n:0}]));const other=new Map();const none={name:'غير محدد',inn:0,out:0,later:0,n:0};
   const add=(x,sign)=>{if(!BANKY(x.method))return;const k=(x.bank||'').trim();const r=k?(known.get(k)||other.get(k)||(other.set(k,{name:k,inn:0,out:0,later:0,n:0}),other.get(k))):none;r.n++;if(notDue(x,td)){r.later+=sign*amt(x);return}if(sign>0)r.inn+=amt(x);else r.out+=amt(x)};
   for(const e of S.dep)add(e,1);for(const e of S.exp)add(e,-1);
-  const row=(r,isKnown)=>{const op=+r.opening||0,bal=op+r.inn-r.out;return `<tr><td><b>${esc(r.name)}</b>${isKnown?'':'<span class="pend">'+(r===none?'لم يُحدَّد البنك':'أخرى')+'</span>'}</td><td class="num plain">${isKnown&&op?fmt(op):'—'}</td><td class="num in">${fmt(r.inn)}</td><td class="num">${fmt(r.out)}</td><td class="num strong${bal<0?' neg':''}">${fmt(bal)}</td><td class="num plain">${r.later?fmt(r.later):'—'}</td><td class="plain">${r.n}</td>${canBanks()?`<td class="acts">${isKnown?`<button class="ghost" data-bankhide="${esc(r.name)}">إخفاء</button>`:''}</td>`:''}</tr>`};
+  const row=(r,isKnown)=>{const op=+r.opening||0,bal=op+r.inn-r.out;return `<tr><td><b>${esc(r.name)}</b>${isKnown?'':'<span class="pend">'+(r===none?'لم يُحدَّد البنك':'أخرى')+'</span>'}</td><td class="num plain">${isKnown&&op?fmt(op):'—'}</td><td class="num in">${fmt(r.inn)}</td><td class="num">${fmt(r.out)}</td><td class="num strong${bal<0?' neg':''}">${fmt(bal)}</td><td class="num plain">${r.later?fmt(r.later):'—'}</td><td class="plain">${r.n}</td>${canBanks()?`<td class="acts">${isKnown?bankActs(r):''}</td>`:''}</tr>${isKnown&&S.bankEdit===r.name?bankEditRow(r):''}`};
+  const bankActs=r=>S.bankDel===r.name?(r.n?`<span class="confirm"><span class="msg err">عليه ${r.n} حركة، لا يمكن حذفه.</span><button data-bankhide="${esc(r.name)}">إخفاؤه من القائمة</button><button data-bankno="1">إلغاء</button></span>`:`<span class="confirm"><button class="danger" data-bankdelyes="${esc(r.name)}">تأكيد الحذف</button><button data-bankno="1">إلغاء</button></span>`)
+    :`<button class="ghost" data-bankedit="${esc(r.name)}">تعديل</button><button class="ghost" data-bankdel="${esc(r.name)}">حذف</button>`;
+  const bankEditRow=r=>`<tr class="row-edit"><td colspan="${canBanks()?8:7}"><form class="entry" id="bankEditForm" autocomplete="off" novalidate>
+    <div class="f c2"><label for="be_name">اسم الحساب</label><input id="be_name" maxlength="60" value="${esc(r.name)}"></div>
+    <div class="f c2"><label for="be_open">الرصيد الافتتاحي</label><input id="be_open" type="number" inputmode="decimal" step="0.01" value="${+r.opening||''}" placeholder="0.00"></div>
+    <div class="form-foot"><button class="primary" type="submit">حفظ التعديل</button><button type="button" data-bankno="1">إلغاء</button><span class="msg" id="beMsg"></span></div>
+    ${r.n?`<p class="foot-note" style="margin:0">عند تغيير الاسم يتغيّر أيضًا في الحركات المسجّلة عليه (${r.n} حركة).</p>`:''}</form></td></tr>`;
   const rows=[...known.values()].map(r=>row(r,true)).concat([...other.values()].sort((a,b)=>b.n-a.n).map(r=>row(r,false))).concat(none.n?[row(none,false)]:[]);
   const hiddenOnes=all.filter(b=>b&&b.hidden);
   $('#pane').innerHTML=`<div class="pane-h"><h2>الحسابات البنكية</h2></div>
@@ -485,7 +492,18 @@ function renderBanks(){
     const cur=[...all];const ex=cur.find(b=>b&&b.name===n);if(ex&&!ex.hidden){m.className='msg err';m.textContent='هذا الحساب موجود بالفعل.';return}
     const op=parseFloat($('#b_open').value);const nb={name:n,opening:op>0||op<0?op:0,created:Date.now()};
     bankSave(ex?cur.map(b=>b===ex?{...b,...nb,hidden:false}:b):[...cur,nb]);logChange('add','items',{name:'حساب بنكي: '+n});S.justSaved=true;flash('تمت إضافة الحساب «'+n+'».');render()};
-  document.querySelectorAll('[data-bankhide],[data-bankshow]').forEach(b=>b.onclick=()=>{const n=b.dataset.bankhide||b.dataset.bankshow,hide=!!b.dataset.bankhide;bankSave(all.map(x=>x&&x.name===n?{...x,hidden:hide}:x));render()});
+  document.querySelectorAll('[data-bankhide],[data-bankshow]').forEach(b=>b.onclick=()=>{const n=b.dataset.bankhide||b.dataset.bankshow,hide=!!b.dataset.bankhide;bankSave(all.map(x=>x&&x.name===n?{...x,hidden:hide}:x));S.bankDel='';render()});
+  document.querySelectorAll('[data-bankedit]').forEach(b=>b.onclick=()=>{S.bankEdit=b.dataset.bankedit;S.bankDel='';S.justSaved=true;render();const i=$('#be_name');if(i)i.focus()});
+  document.querySelectorAll('[data-bankdel]').forEach(b=>b.onclick=()=>{S.bankDel=b.dataset.bankdel;S.bankEdit='';render()});
+  document.querySelectorAll('[data-bankno]').forEach(b=>b.onclick=()=>{S.bankDel='';S.bankEdit='';S.justSaved=true;render()});
+  document.querySelectorAll('[data-bankdelyes]').forEach(b=>b.onclick=()=>{const n=b.dataset.bankdelyes;bankSave(all.filter(x=>!(x&&x.name===n)));logChange('delete','items',{name:'حساب بنكي: '+n});S.bankDel='';flash('تم حذف الحساب «'+n+'».');render()});
+  const ef=$('#bankEditForm');if(ef)ef.onsubmit=ev=>{ev.preventDefault();const old=S.bankEdit,n=$('#be_name').value.trim(),m=$('#beMsg');
+    if(!n){m.className='msg err';m.textContent='اكتب اسم الحساب.';return}
+    if(n!==old&&all.some(x=>x&&x.name===n)){m.className='msg err';m.textContent='يوجد حساب آخر بهذا الاسم.';return}
+    const op=parseFloat($('#be_open').value);
+    bankSave(all.map(x=>x&&x.name===old?{...x,name:n,opening:op>0||op<0?op:0}:x));
+    if(n!==old){for(const [col,key] of [['expenses','exp'],['deposits','dep']])for(const r of S[key])if((r.bank||'').trim()===old)queue(col,r.id,{...clean(r),bank:n,updated:Date.now()})}
+    logChange('edit','items',{name:'حساب بنكي: '+(n!==old?old+' ← '+n:n)});S.bankEdit='';S.justSaved=true;flash('تم حفظ التعديل.');render()};
 }
 function closePops(){document.querySelectorAll('.pop').forEach(m=>{m.hidden=true});document.querySelectorAll('[data-pop]').forEach(b=>b.setAttribute('aria-expanded','false'))}
 document.addEventListener('click',ev=>{
