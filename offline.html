@@ -286,6 +286,11 @@ body.eng-mode .hdr-acts{display:none!important}
 @keyframes spin{to{transform:rotate(-360deg)}}
 @media (max-width:560px){.hdr-acts .set-btn{flex:0 0 auto}.set-btn .set-l{display:none}}
 .qs-multi{margin-top:10px}
+.ct-lines{min-width:860px}.ct-lines td,.ct-lines th{padding:5px 6px;vertical-align:middle}.ct-lines input{padding:5px 6px;min-width:70px}.ct-lines input.sm{width:72px;min-width:60px}
+.ct-lines tr.ct-sec td{background:var(--sunk);font-weight:600}.ct-ded{gap:6px;margin:4px 0;flex-wrap:nowrap}.ct-ded input:first-child{flex:1}
+.ct-calc table{max-width:520px}
+form.entry .fw{grid-column:1/-1}
+.bq-sel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0}.bq-sel .f{display:flex;flex-direction:column;gap:4px}@media (max-width:640px){.bq-sel{grid-template-columns:minmax(0,1fr)}}
 .isum>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.isum>summary::-webkit-details-marker{display:none}.isum>summary::after{content:'▾';margin-inline-start:auto;color:var(--muted)}.isum:not([open])>summary::after{content:'◂'}.isum[open]>summary{margin-bottom:10px}
 .pct{display:inline-block;width:46px;height:6px;background:var(--sunk);border-radius:3px;margin-inline-end:6px;vertical-align:middle;overflow:hidden}.pct i{display:block;height:100%;background:var(--money)}
 .more-row{justify-content:space-between;align-items:center;margin-top:8px;gap:8px;flex-wrap:wrap}
@@ -2106,7 +2111,7 @@ function reportDoc(kind){
   const logo=(document.querySelector('.logo img')||{}).src||'';
   const who=(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
   const now=stamp(Date.now());
-  let title='',sub='',body='',land=false;
+  let title='',sub='',body='',land=false,signs=['المحاسب','مدير الموقع','الاعتماد'];
   const money=v=>fmt(v).replace(/[⁦⁩]/g,'');
   const td=(v,c)=>`<td${c?` class="${c}"`:''}>${v}</td>`;
   if(kind==='summary'){
@@ -2135,7 +2140,7 @@ function reportDoc(kind){
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(ti),'n')}${td(money(to),'n')}<td colspan="5"></td>${td(money(run),'n')}</tr></tfoot></table>`;
     land=true;
   }else if(kind==='cert'&&APP&&CT.printing){
-    const x=ctDocBody(CT.printing);title=x.title;sub=x.sub;body=x.body;
+    const x=ctDocBody(CT.printing);title=x.title;sub=x.sub;body=x.body;if(x.signs)signs=x.signs;if(x.land)land=true;
   }else if(kind==='stmt'){
     const col=S.stmt.col,name=S.stmt.name,R=REG[col],sf=S.sf,rows=stmtRows(col,name),multi=isMulti(name);
     title=R.stmt+(multi?' مجمّع':'')+': '+nmLabel(name);land=true;
@@ -2182,6 +2187,8 @@ tfoot td{background:#eee;font-weight:bold}
 .sign{display:flex;gap:24px;margin-top:28px;page-break-inside:avoid}
 .sign div{flex:1;border-top:1px solid #333;padding-top:4px;text-align:center;font-size:11px}
 .foot{margin-top:10px;font-size:9px;color:#666}
+.cert-t td,.cert-t th{font-size:12px;padding:7px 8px}.cert-t tfoot td{font-size:13px}.cert-t tr.b td{font-weight:bold}
+.words{margin:10px 0 0;padding:8px 10px;border:1px solid #bbb;border-radius:4px;background:#fafafa;font-size:12px}
 @media screen{body{padding:16px;max-width:${land?'1100px':'800px'};margin:auto}.bar{position:sticky;top:0;background:#fffbe6;border:1px solid #e5d48a;padding:8px 10px;margin-bottom:12px;border-radius:6px;font-size:12px;display:flex;gap:10px;align-items:center;justify-content:space-between}.bar button{font:inherit;padding:6px 14px;cursor:pointer}}
 @media print{.bar{display:none}}
 /* no page margin = the browser has no room to add its own date, title and link lines; the spacer rows below give every page its margin */
@@ -2195,7 +2202,7 @@ table.pg>tfoot{display:table-footer-group}
 <div class="hd"><div><h1>${esc(title)}</h1></div>${logo?`<img src="${logo}" alt="AFAQ Development Construction">`:''}</div>
 <p class="sub">${esc(sub)}${sub?' · ':''}طُبع: ${esc(now)}${who?' · بواسطة: '+esc(who):''} · المبالغ بالجنيه المصري</p>
 ${body}
-<div class="sign"><div>المحاسب</div><div>مدير الموقع</div><div>الاعتماد</div></div>
+<div class="sign">${signs.map(x=>`<div>${x}</div>`).join('')}</div>
 <p class="foot">ADC Construction · حسابات المواقع</p>
 </td></tr></tbody></table>
 <script>window.addEventListener('load',function(){setTimeout(function(){try{print()}catch(e){}},400)})<\/script>
