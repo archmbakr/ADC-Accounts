@@ -6,6 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { buildXlsx, buildHtml } from './statement.mjs';
+import { storeReport, storeHtml } from './store.mjs';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const KEY = process.env.SUPABASE_SERVICE_KEY || '';
@@ -55,9 +56,10 @@ async function sbPut(pathKey, data) {
 async function loadAll() {
   if (MOCK) return JSON.parse(fs.readFileSync(MOCK, 'utf8'));
   const [docs, members, owners] = await Promise.all([sbGet('docs?select=path,data&order=path'), sbGet('members?select=*'), sbGet('app_owner?select=email')]);
-  let custody = [];
-  try { custody = await sbGetSoft('custody?select=*'); } catch { }
-  return { docs, members, owners, custody };
+  const soft = async q => { try { const r = await sbGetSoft(q); return Array.isArray(r) ? r : []; } catch { return []; } };
+  const T = ['custody', 'certs', 'cert_boq', 'site_access', 'cert_ret', 'store_moves', 'store_items', 'store_sites', 'store_access'];
+  const got = await Promise.all(T.map(t => soft(t + '?select=*&limit=100000')));
+  return { docs, members, owners, ...Object.fromEntries(T.map((t, i) => [t, got[i]])) };
 }
 
 /* ---------- تجهيز البيانات ---------- */
@@ -129,11 +131,12 @@ async function send(to, subject, html, files) {
   }
   await transport.sendMail({ from: { name: 'ADC حسابات المواقع', address: process.env.SMTP_USER }, to, subject, html, attachments: files });
 }
-function mailBody(title, sub, week, lastMod) {
+function mailBody(title, sub, week, lastMod, st) {
   const t = totals(week);
   return `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;color:#111;line-height:1.7">
   <h2 style="margin:0 0 6px">${esc(title)}</h2><p style="margin:0 0 10px;color:#444">${esc(sub)}</p>
   <p>تعديلات هذا الأسبوع: <b>${t.n}</b> · مصروفات أُضيفت: <b>${fmt(t.exp)} ${CUR}</b> · إيداعات أُضيفت: <b>${fmt(t.dep)} ${CUR}</b></p>
+  ${st ? `<p>المخزن: <b>${st.nIn}</b> توريد و<b>${st.nCount}</b> جرد هذا الأسبوع — مرفق «تقرير المخزن» (PDF).</p>` : ''}
   <p>مرفق الكشف الكامل (Excel و PDF) حتى آخر تعديل بتاريخ <b dir="ltr">${esc(lastMod)}</b>، ومعه ملف نسخة احتياطية (JSON) يمكن استرجاع البيانات منه من «الإعدادات» ← «استرجاع من ملف».</p>
   <p style="color:#777;font-size:12px">رسالة آلية من تطبيق ADC حسابات المواقع.</p></div>`;
 }
@@ -215,7 +218,7 @@ async function remind(now, c) {
     if (wd !== WEEKDAY || c.h < HOUR) { log('ليس وقت التقرير الأسبوعي (' + c.hm + ' بتوقيت القاهرة).'); return; }
     end = cairoInstant(c.y, c.m, c.d, HOUR); start = end - WEEK;
   }
-  const { docs, members, owners, custody = [] } = await loadAll();
+  const { docs, members, owners, custody = [], certs = [], cert_boq = [], site_access = [], cert_ret = [], store_moves = [], store_items = [], store_sites = [], store_access = [] } = await loadAll();
   const state = docs.find(d => d.path === 'sys/report');
   if (!FORCE && state && state.data && state.data.day === day) { log('تقرير اليوم أُرسل بالفعل.'); return; }
 
@@ -239,8 +242,18 @@ async function remind(now, c) {
     const shared = k => uid ? [...(root[k] || []), ...L(k)] : L(k);
     return Buffer.from(JSON.stringify({ app: 'ADC-site-accounts', version: 2, exportedAt: at, source: 'weekly-report', account: uid || 'owner', sites: L('sites'), expenses: L('expenses'), deposits: L('deposits'), counts: L('counts'), log: L('log'), contractors: shared('contractors'), items: shared('items') }));
   };
-  const dumpOf = at => Buffer.from(JSON.stringify({ app: 'ADC-db-dump', version: 1, exportedAt: at, docs: docs.filter(d => !/(^|\/)push\//.test(d.path)), members, custody }));
-  const deliver = async (to, folder, who, data, extra = []) => {
+  const dumpOf = at => Buffer.from(JSON.stringify({ app: 'ADC-db-dump', version: 1, exportedAt: at, docs: docs.filter(d => !/(^|\/)push\//.test(d.path)), members, custody, certs, cert_boq, site_access, cert_ret, store_moves, store_items, store_sites, store_access }));
+  /* مخزن الموقع: لصاحب الموقع مواقعه، وللمدير كل المواقع */
+  const addDay = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const wkFrom = addDay(cairo(new Date(start)).day, 1);
+  const siteNm = new Map(); for (const [uid, g] of G) for (const s of g.sites) siteNm.set(s.id, (s.name || '') + (uid ? '' : ''));
+  const storeFor = (uid, all) => {
+    const sites = store_sites.filter(x => all || x.site_owner === uid);
+    if (!sites.length) return null;
+    return storeReport({ sites, moves: store_moves, items: store_items, from: wkFrom, to: today, since: start, until: end,
+      siteName: s => (siteNm.get(s.site_id) || s.site_name || '') + (all && s.site_owner ? ' (' + uname(s.site_owner) + ')' : '') });
+  };
+  const deliver = async (to, folder, who, data, extra = [], st = null) => {
     const week = data.log.filter(inWeek).sort((a, b) => a.at - b.at);
     const lm = lastModOf(data), lastMod = lm ? stampOf(lm) : stampNow.replace(' ', '_').replace(':', '-');
     const title = 'كشف حساب كامل' + (who ? ' — ' + who : '');
@@ -252,21 +265,23 @@ async function remind(now, c) {
     await upload(`${folder}/${lastMod}.pdf`, pdf, 'application/pdf');
     const more = extra.map(x => ({ filename: x.name(lastMod), content: x.buf }));
     for (const x of extra) await upload(`${folder}/${lastMod}${x.suffix}`, x.buf, 'application/json');
-    if (!week.length) return;                       // لا تعديلات هذا الأسبوع: لا يُرسل بريد
-    await send(to, `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }, ...more]);
+    if (!week.length && !(st && st.changed)) return; // لا تعديلات هذا الأسبوع: لا يُرسل بريد
+    if (st) more.push({ filename: 'ADC-تقرير-المخزن-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'تقرير المخزن الأسبوعي' + (who ? ' — ' + who : ''), sub: 'من ' + wkFrom + ' إلى ' + today, sections: st.sections, logo: logoUri() })) });
+    await send(to, `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod, st), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }, ...more]);
     sent++;
   };
-  const anyWeek = [...G.values()].some(g => g.log.some(inWeek));
+  const storeWeek = store_moves.some(m => { const t = Date.parse(m.updated_at || m.created_at || 0); return t > start && t <= end; });
+  const anyWeek = [...G.values()].some(g => g.log.some(inWeek)) || storeWeek;
   if (!anyWeek) log('لا توجد تعديلات هذا الأسبوع، لن يُرسل شيء.');
   else {
     for (const [uid] of G) {
       if (!uid) continue;
       const m = mem.get(uid);
-      if (m && m.approved && m.email && m.role !== 'engineer') await deliver(m.email, uid, '', merge([uid], false), [{ suffix: '.json', buf: bakOf(uid, end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' }]);
+      if (m && m.approved && m.email && (!m.role || m.role === 'user')) await deliver(m.email, uid, '', merge([uid], false), [{ suffix: '.json', buf: bakOf(uid, end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' }], storeFor(uid, false));
     }
     for (const o of owners) if (o.email) await deliver(o.email, 'owner', 'كل المواقع', merge([...G.keys()], true), [
       { suffix: '.json', buf: bakOf('', end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' },
-      { suffix: '-db.json', buf: dumpOf(end), name: lm => 'ADC-قاعدة-البيانات-كاملة-' + lm + '.json' }]);
+      { suffix: '-db.json', buf: dumpOf(end), name: lm => 'ADC-قاعدة-البيانات-كاملة-' + lm + '.json' }], storeFor('', true));
   }
   if (!FORCE && !MOCK) await sbPut('sys/report', { day, at: Date.now(), sent });
   log('تم. عدد الرسائل المرسلة: ' + sent);
