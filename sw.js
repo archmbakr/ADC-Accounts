@@ -1,5 +1,5 @@
-/* ADC accounts — offline shell cache. version 20261005223337 */
-const CACHE = 'adc-app-20261005223337';
+/* ADC accounts — offline shell cache. version 20261007074817 */
+const CACHE = 'adc-app-20261007074817';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { mode: u.startsWith('http') ? 'cors' : 'same-origin' })).catch(() => {})))).then(() => self.skipWaiting()));

@@ -573,6 +573,24 @@ async function appLoadMembers(){
   if(waiting&&S.sel!=='__settings')showBanner('يوجد '+waiting+' مستخدم بانتظار موافقتك. افتح «الإعدادات» للموافقة عليهم.');
   try{render()}catch(e){}
 }
+/* the owner registers engineers on sites: that decides their store and (for the technical office) certificates */
+const REG_ROLES=['engineer','tech','eng_tech','store'];
+function appRegSites(){return S.sites.map(s=>{const o=ctOwnerOf(s),m=o&&(APPU.members||[]).find(x=>x.id===o);return {id:s.id,name:s.name+(m?' ('+(m.name||m.email)+')':''),owner:o,plain:s.name}}).sort((a,b)=>a.name.localeCompare(b.name,'ar'))}
+function appRegRow(m){
+  const mine=(CT.access||[]).filter(a=>a.engineer===m.id),open=APPU.regOpen===m.id;
+  return `<tr class="reg-row"><td colspan="5"><div class="row" style="align-items:center;gap:8px"><span class="note" style="margin:0">المواقع: ${mine.length?mine.map(a=>esc(a.site_name||siteNameOf(a.site_id))).join('، '):'<b class="neg">لم يُسجَّل على أي موقع</b>'}</span><button type="button" class="ghost" data-app="reg" data-id="${esc(m.id)}">${open?'إغلاق':'تحديد المواقع'}</button></div>
+  ${open?`<div class="qs-checks">${appRegSites().map(s=>`<label class="chk"><input type="checkbox" data-reg="${esc(s.id)}" data-person="${esc(m.id)}" ${mine.some(a=>a.site_id===s.id)?'checked':''}> ${esc(s.name)}</label>`).join('')||'<p class="note">لا توجد مواقع.</p>'}</div>`:''}</td></tr>`;
+}
+/* who is registered on my sites (read-only: the owner decides from Settings ← Users) */
+function appRegSummary(mySites,kind){
+  const ids=new Set(mySites.map(s=>s.id)),rows=(CT.access||[]).filter(a=>ids.has(a.site_id));
+  const ppl=[...(CU.engs||[]),...(CT.techs||[]),...(SO.people||[]),...(APPU.members||[])],nm=id=>{const x=ppl.find(q=>q.id===id);return x?(x.name||x.email):'مهندس'};
+  const by=new Map();for(const a of rows){if(!by.has(a.engineer))by.set(a.engineer,[]);by.get(a.engineer).push(a.site_name||siteNameOf(a.site_id))}
+  return `<div class="card"><div class="sec-h">المهندسون المسجّلون على ${APPU.owner?'المواقع':'مواقعك'}</div>
+    ${by.size?`<div class="tbl-wrap"><table><thead><tr><th>المهندس</th><th>المواقع</th></tr></thead><tbody>${[...by].map(([id,l])=>`<tr><td>${esc(nm(id))}</td><td>${l.map(esc).join('، ')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">لا يوجد مهندسون مسجّلون بعد.</p>'}
+    <p class="note">${kind==='certs'?'مهندس المكتب الفني يعمل مستخلصات المواقع المسجّل عليها بس.':'المهندس أو أمين المخزن يسجّل في مخزن المواقع المسجّل عليها بس.'} ${APPU.owner?'التسجيل من «الإعدادات» ← «المستخدمون» ← «تحديد المواقع».':'تسجيل المهندسين على المواقع بيحدده المدير.'}</p>
+    ${APPU.owner?'<button type="button" class="ghost" data-site="__settings">فتح المستخدمين</button>':''}</div>`;
+}
 function appSecurityCard(){
   const me=APPU.me||{};
   const link=location.origin+location.pathname;
@@ -585,7 +603,8 @@ function appSecurityCard(){
     <div class="row"><input readonly dir="ltr" value="${esc(link)}" aria-label="رابط التطبيق" style="flex:1;min-width:200px"><button type="button" data-app="copy">نسخ الرابط</button>${APPU.copyMsg?`<span class="msg ok">${esc(APPU.copyMsg)}</span>`:''}</div>
     ${list.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد الإلكتروني</th><th>النوع</th><th>الحالة</th><th></th></tr></thead><tbody>
     ${list.map(m=>`<tr><td>${esc(m.name||'')}</td><td dir="ltr">${esc(m.email||'')}</td><td><select data-role-id="${esc(m.id)}" aria-label="نوع المستخدم">${Object.entries(ROLE_L).map(([k,v])=>`<option value="${k}" ${(m.role||'user')===k?'selected':''}>${v}</option>`).join('')}</select></td><td>${m.approved?'<span class="msg ok">مفعّل</span>':'<b class="neg">بانتظار موافقتك</b>'}</td>
-      <td>${m.approved?`<button type="button" class="ghost" data-app="block" data-id="${esc(m.id)}">إيقاف</button>`:`<button type="button" class="primary" data-app="approve" data-id="${esc(m.id)}">وافق</button>`}</td></tr>`).join('')}</tbody></table></div>`
+      <td>${m.approved?`<button type="button" class="ghost" data-app="block" data-id="${esc(m.id)}">إيقاف</button>`:`<button type="button" class="primary" data-app="approve" data-id="${esc(m.id)}">وافق</button>`}</td></tr>${m.approved&&REG_ROLES.includes(m.role)?appRegRow(m):''}`).join('')}</tbody></table></div>
+    <p class="note">مهندس الموقع ومهندس المكتب الفني وأمين المخزن بيشتغلوا على المواقع اللي تسجّلهم عليها هنا بس: المخزن للكل، والمستخلصات لمهندس المكتب الفني.</p>`
     :`<p class="note">${APPU.members===null?'جاري التحميل…':'لا يوجد مستخدمون غيرك بعد.'}</p>`}
     <div class="row"><button type="button" class="ghost" data-app="members">تحديث القائمة</button></div>
     <p class="note">«إيقاف» يمنع المستخدم من الدخول، وتبقى بياناته محفوظة لديك.</p>`;
@@ -633,6 +652,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='signout')appSignOut();
   else if(a==='recheck'){b.disabled=true;try{const ses=(await SB.auth.getSession()).data.session;if(ses)await appTryEnter(ses);else{APPU.mode='login';appShow()}}catch(e){APPU.msg=authErr(e);appShow()}}
   else if(a==='members'){APPU.members=null;appLoadMembers();render()}
+  else if(a==='reg'){APPU.regOpen=APPU.regOpen===b.dataset.id?'':b.dataset.id;if(!CT.loaded)await ctLoad();render()}
   else if(a==='copy'){const link=location.origin+location.pathname;try{await navigator.clipboard.writeText(link);APPU.copyMsg='تم النسخ.'}catch(e){APPU.copyMsg='انسخه يدويًا من الخانة.'}render();setTimeout(()=>{APPU.copyMsg='';render()},2500)}
   else if(a==='approve'||a==='block'){
     b.disabled=true;
@@ -994,7 +1014,7 @@ async function custLoad(){
 }
 async function custEngs(){
   if(!SB||appIsEngineer())return;
-  try{const {data}=await SB.from('members').select('*').eq('approved',true);const l=(data||[]).filter(m=>m.approved);CU.engs=l.filter(m=>isSiteEngR(m.role));CT.techs=l.filter(m=>isTechR(m.role));SO.people=l.filter(m=>isSiteEngR(m.role)||(APPU.owner&&m.role==='store'))}catch(e){CU.engs=CU.engs||[]}
+  try{const {data}=await SB.from('members').select('*').eq('approved',true);const l=(data||[]).filter(m=>m.approved);CU.engs=l.filter(m=>isSiteEngR(m.role));CT.techs=l.filter(m=>isTechR(m.role));SO.people=l.filter(m=>isSiteEngR(m.role)||isTechR(m.role)||(APPU.owner&&m.role==='store'))}catch(e){CU.engs=CU.engs||[]}
 }
 let custT=null;
 function custRefresh(){clearTimeout(custT);custT=setTimeout(async()=>{await custLoad();await custFlush();try{render()}catch(e){}},300)}
@@ -1133,7 +1153,7 @@ function appRenderEngineer(){
   const r=myRole(),tabs=[];
   if(isSiteEngR(r))tabs.push(['cust','عهدتي']);
   if(isTechR(r))tabs.push(['certs','المستخلصات']);
-  if(r==='store'||(isSiteEngR(r)&&soHasAccess()))tabs.push(['store','المخزن']);
+  if(r==='store'||soHasAccess())tabs.push(['store','المخزن']);
   const tab=tabs.some(t=>t[0]===CT.tab)?CT.tab:(tabs[0]||['store'])[0];
   if(tab==='certs')ctRenderEngineer();else if(tab==='store')soRenderPage();else appRenderCustEng();
   if(tabs.length>1)$('#pane').insertAdjacentHTML('afterbegin',`<div class="seg eng-tabs" role="tablist">${tabs.map(([v,t])=>`<button role="tab" data-ct="tab" data-v="${v}" aria-selected="${tab===v}">${t}</button>`).join('')}</div>`);
@@ -1188,6 +1208,13 @@ function custStart(){
 window.addEventListener('online',()=>setTimeout(custFlush,2000));
 setInterval(()=>{if(custQ().length)custFlush()},30000);
 
+document.addEventListener('change',async ev=>{
+  const t=ev.target;if(!t||!t.dataset||!t.dataset.reg||!SB||!APPU.owner)return;
+  const s=appRegSites().find(x=>x.id===t.dataset.reg),p=t.dataset.person;if(!s)return;t.disabled=true;
+  const r=t.checked?await SB.from('site_access').upsert({engineer:p,site_id:s.id,site_owner:s.owner||null,site_name:s.plain},{onConflict:'engineer,site_id'}):await SB.from('site_access').delete().eq('engineer',p).eq('site_id',s.id);
+  if(r.error)showBanner(ctNetErr(r.error)?'التسجيل على المواقع يحتاج اتصال بالإنترنت.':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100));
+  await ctLoad();await soLoad();render();
+});
 document.addEventListener('change',async ev=>{
   const t=ev.target;if(!t||!t.dataset||!t.dataset.roleId||!SB)return;
   const {error}=await SB.from('members').update({role:t.value}).eq('id',t.dataset.roleId);
@@ -1518,22 +1545,13 @@ function ctRenderPage(){
     <div class="row"><select id="ct_rcon"><option value="">اختر المقاول</option>${cons.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><input id="ct_rpct" type="number" min="0" max="100" step="0.5" placeholder="النسبة %" style="width:110px"><button data-ct="retsave">حفظ</button></div>
     ${overrides.length?`<div class="tbl-wrap"><table><thead><tr><th>المقاول</th><th class="num">النسبة</th><th></th></tr></thead><tbody>${overrides.map(r=>`<tr><td>${esc(r.contractor)}</td><td class="num plain">${+r.pct}%</td><td class="acts"><button class="ghost" data-ct="retdel" data-con="${esc(r.contractor)}">رجوع للافتراضي</button></td></tr>`).join('')}</tbody></table></div>`:''}
   </details>
-  <details class="card"${CT.openGrant?' open':''} id="ctGrantBox"><summary class="sec-h" style="cursor:pointer">صلاحيات المكتب الفني على المواقع</summary>
-    ${techs.length?`<div class="row"><label for="ct_geng">المهندس</label><select id="ct_geng" style="width:auto"><option value="">اختر مهندس المكتب الفني</option>${techs.map(t=>`<option value="${esc(t.id)}" ${ge===t.id?'selected':''}>${esc(t.name||t.email)}</option>`).join('')}</select></div>
-    ${ge?`<div class="qs-checks">${mySites.map(s=>{const on=CT.access.some(a=>a.engineer===ge&&a.site_id===s.id);return `<label class="chk"><input type="checkbox" data-ctgrant="${esc(s.id)}" ${on?'checked':''}> ${esc(s.name)}</label>`}).join('')}</div><p class="note">المهندس يرى ويسجّل مستخلصات المواقع المحددة فقط، ولا يرى أي مصروفات أو أرصدة.</p>`:''}`
-    :`<p class="note">لا يوجد مهندسو مكتب فني بعد. ${APPU.owner?'اجعل نوع المستخدم «مهندس مكتب فني» من «الإعدادات» ← «المستخدمون».':'اطلب من المدير إضافة مهندس مكتب فني.'}</p>`}
-  </details>`;
+  ${appRegSummary(mySites,'certs')}`;
   if(!CT.form)CT.msg=null;
   ctBindForm();ctBindBoq(mySites);
   const fs=$('#ct_fsite');if(fs)fs.onchange=()=>{CT.site=fs.value;render()};
   const g=$('#ct_geng');if(g)g.onchange=()=>{CT.grantEng=g.value;render()};
   const rb=$('#ctRetBox');if(rb)rb.ontoggle=()=>{CT.openRet=rb.open};
-  const gb=$('#ctGrantBox');if(gb)gb.ontoggle=()=>{CT.openGrant=gb.open};
-  document.querySelectorAll('[data-ctgrant]').forEach(cb=>cb.onchange=async()=>{
-    const s=mySites.find(x=>x.id===cb.dataset.ctgrant);if(!s||!ge)return;cb.disabled=true;
-    const r=cb.checked?await SB.from('site_access').upsert({engineer:ge,site_id:s.id,site_owner:ctOwnerOf(s),site_name:s.name},{onConflict:'engineer,site_id'}):await SB.from('site_access').delete().eq('engineer',ge).eq('site_id',s.id);
-    if(r.error)showBanner('تعذّر حفظ الصلاحية: '+String(r.error.message||'').slice(0,100));
-    await ctLoad();render()});
+
 }
 function ctBadgeCount(){if(!APP||appIsEngineer())return 0;const ids=new Set(ctMySites().map(s=>s.id));return CT.rows.filter(c=>ids.has(c.site_id)&&(c.status==='submitted'||c.edit_req)).length}
 /* contractor statement: what the approved certificates say he is owed, per site and item */
@@ -1664,7 +1682,7 @@ function soQueue(t,op,id,row){const q=soQ().filter(x=>!(x.t===t&&x.id===id));q.p
 async function soPut(t,row){soQueue(t,'put',row.id,row);await soFlush();return !soQ().some(x=>x.t===t&&x.id===row.id)}
 let soT=null;
 function soRefresh(){clearTimeout(soT);soT=setTimeout(async()=>{await soLoad();try{if(!document.activeElement||!/^so_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
-function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
+function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access','site_access'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
 function soStart(){if(!SB)return;soLoad().then(()=>{try{render()}catch(e){}});soChannel()}
 function soNeedSql(){return SO.missing?'<div class="card"><p class="msg err">جداول المخزن غير موجودة في قاعدة البيانات. شغّل ملف «ADC-إعداد-المخزن.sql» في Supabase.</p></div>':''}
 
@@ -1674,9 +1692,12 @@ const soIsAppr=()=>!appIsEngineer();
 function soMySites(){
   const d=SO.d||soEmpty(),en=new Set(d.sites.map(s=>s.site_id));
   if(soIsAppr())return ctMySites().map(s=>({id:s.id,name:s.name,owner:ctOwnerOf(s),enabled:en.has(s.id)}));
-  return d.access.filter(a=>a.person===soMe()).map(a=>({id:a.site_id,name:a.site_name,owner:a.site_owner,enabled:en.has(a.site_id)}));
+  /* engineers: the server already returns only the stores they may use (granted, custody on the site, or certificate access) */
+  const m=new Map();for(const s of d.sites)m.set(s.site_id,{id:s.site_id,name:s.site_name,owner:s.site_owner,enabled:true});
+  for(const a of d.access.filter(a=>a.person===soMe()))if(!m.has(a.site_id))m.set(a.site_id,{id:a.site_id,name:a.site_name,owner:a.site_owner,enabled:false});
+  return [...m.values()];
 }
-function soHasAccess(){return !!(SO.d&&SO.d.access.some(a=>a.person===soMe()))}
+function soHasAccess(){return !!(SO.d&&(SO.d.sites.length||SO.d.access.some(a=>a.person===soMe())))}
 const soCanAppr=siteId=>soIsAppr()&&ctMySites().some(s=>s.id===siteId);
 const soTs=m=>m.created_at?Date.parse(m.created_at):((m.data||{}).at||0);
 function soLocked(m){const t=soTs(m);return (SO.d.moves||[]).some(c=>c.site_id===m.site_id&&c.kind==='count'&&!c.deleted&&c.id!==m.id&&(c.date>m.date||(c.date===m.date&&soTs(c)>t)))}
@@ -1817,16 +1838,6 @@ function soEnableHTML(sites){
     <p class="note">المخزن اختياري. فعّله على المواقع اللي فيها مخزن بس.</p>
     <div class="qs-checks">${sites.map(s=>`<label class="chk"><input type="checkbox" data-soen="${esc(s.id)}" ${s.enabled?'checked':''}> ${esc(s.name)}</label>`).join('')||'<p class="note">لا توجد مواقع.</p>'}</div></details>`;
 }
-function soGrantHTML(sites){
-  const ppl=SO.people||[],p=SO.grantP,en=sites.filter(s=>s.enabled),acc=SO.d.access;
-  return `<details class="card"${SO.openGr?' open':''} id="soGrBox"><summary class="sec-h" style="cursor:pointer">مين يسجّل في المخزن</summary>
-    <p class="note">صاحب الموقع يسجّل دايمًا. مهندس الموقع${APPU.owner?' وأمين المخزن':''} يسجّلوا في المواقع اللي تحددها هنا بس.${APPU.owner?'':' أمين المخزن يحدده المدير.'}</p>
-    ${ppl.length?`<div class="row"><label for="so_gp">الشخص</label><select id="so_gp" style="width:auto"><option value="">اختر</option>${ppl.map(x=>`<option value="${esc(x.id)}" ${p===x.id?'selected':''}>${esc(x.name||x.email)} — ${x.role==='store'?'أمين مخزن':'مهندس موقع'}</option>`).join('')}</select></div>
-    ${p?(en.length?`<div class="qs-checks">${en.map(s=>`<label class="chk"><input type="checkbox" data-sogrant="${esc(s.id)}" ${acc.some(a=>a.person===p&&a.site_id===s.id)?'checked':''}> ${esc(s.name)}</label>`).join('')}</div>`:'<p class="note">فعّل المخزن على موقع الأول.</p>'):''}`
-    :`<p class="note">لا يوجد مهندسو مواقع${APPU.owner?' أو أمناء مخازن':''} بعد. ${APPU.owner?'غيّر نوع المستخدم من «الإعدادات» ← «المستخدمون».':''}</p>`}
-    ${acc.length?`<div class="tbl-wrap"><table><thead><tr><th>الشخص</th><th>المواقع</th></tr></thead><tbody>${[...new Set(acc.map(a=>a.person))].map(id=>{const x=ppl.find(q=>q.id===id);return `<tr><td>${esc(x?(x.name||x.email):'مستخدم')}</td><td>${acc.filter(a=>a.person===id).map(a=>esc(a.site_name||siteNameOf(a.site_id))).join('، ')}</td></tr>`}).join('')}</tbody></table></div>`:''}
-  </details>`;
-}
 /* ---------- forms: توريد / جرد ---------- */
 function soBook(siteId,itemId,date,skipId){const r=soCalc(soSiteMoves(siteId).filter(m=>m.id!==skipId),null,date).get(itemId);return r?r.bal:0}
 function soFormHTML(site){
@@ -1915,16 +1926,15 @@ function soRenderPage(){
   ${site?`<div class="seg" role="tablist" aria-label="المخزن"><button role="tab" data-so="tab" data-v="bal" aria-selected="${tab==='bal'}">الأرصدة</button><button role="tab" data-so="tab" data-v="moves" aria-selected="${tab==='moves'}">الحركات</button><button role="tab" data-so="tab" data-v="rep" aria-selected="${tab==='rep'}">التقارير</button></div>
   ${tab==='moves'?soMovesHTML(site):tab==='rep'?soRepHTML(site):soBalHTML(site)}`:''}
   ${appr||en.length?soCatHTML():''}
-  ${appr?soEnableHTML(sites)+soGrantHTML(sites):''}`;
+  ${appr?soEnableHTML(sites)+appRegSummary(ctMySites(),'store'):''}`;
   if(site)soBindForm(site);
   const ss=$('#so_site');if(ss)ss.onchange=()=>{SO.site=ss.value;SO.form=null;render()};
   for(const [id,k] of [['so_rmain','main'],['so_rsub','sub'],['so_rfrom','from'],['so_rto','to']]){const e=document.getElementById(id);if(e)e.onchange=()=>{SO.rep[k]=e.value;if(k==='main')SO.rep.sub='';render()}}
   const rs=$('#so_rsup');if(rs)rs.onchange=()=>{SO.rep.sup=rs.value;render()};
   const gp=$('#so_gp');if(gp)gp.onchange=()=>{SO.grantP=gp.value;render()};
-  for(const [id,k] of [['soCatBox','openCat'],['soEnBox','openEn'],['soGrBox','openGr']]){const b=document.getElementById(id);if(b)b.ontoggle=()=>{if(SO[k]===b.open)return;SO[k]=b.open;if(id==='soGrBox'&&b.open){SO.pplAt=Date.now();custEngs().then(()=>render())}}}
+  for(const [id,k] of [['soCatBox','openCat'],['soEnBox','openEn']]){const b=document.getElementById(id);if(b)b.ontoggle=()=>{if(SO[k]===b.open)return;SO[k]=b.open}}
   for(const id of ['so_cn','so_cu','so_sn','so_su','so_en','so_eu']){const e=document.getElementById(id);if(e)e.addEventListener('input',()=>{const A=SO.cat.add,E=SO.cat.edit;if(id==='so_sn'&&A)A.name=e.value;if(id==='so_su'&&A)A.unit=e.value;if(id==='so_en'&&E)E.name=e.value;if(id==='so_eu'&&E)E.unit=e.value})}
   document.querySelectorAll('[data-soen]').forEach(cb=>cb.onchange=()=>soEnable(cb.dataset.soen,cb.checked,cb));
-  document.querySelectorAll('[data-sogrant]').forEach(cb=>cb.onchange=()=>soGrant(cb.dataset.sogrant,cb.checked,cb));
   document.querySelectorAll('[data-sophoto]').forEach(inp=>inp.onchange=()=>{const f=inp.files&&inp.files[0];inp.value='';if(f)soPhoto(inp.dataset.sophoto,f)});
   soLoadThumbs();
 }
@@ -1936,12 +1946,6 @@ async function soEnable(id,on,cb){
   const r=on?await SB.from('store_sites').upsert({site_id:id,site_owner:s.owner||null,site_name:s.name},{onConflict:'site_id'}):await SB.from('store_sites').delete().eq('site_id',id);
   if(r.error)showBanner(ctNetErr(r.error)?'تفعيل المخزن يحتاج اتصال بالإنترنت.':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100));
   if(on&&!r.error){SO.site=id;SO.want=''}
-  await soLoad();render();
-}
-async function soGrant(siteId,on,cb){
-  const p=SO.grantP,s=soMySites().find(x=>x.id===siteId);if(!p||!s||!SB)return;if(cb)cb.disabled=true;
-  const r=on?await SB.from('store_access').upsert({person:p,site_id:siteId,site_owner:s.owner||null,site_name:s.name},{onConflict:'person,site_id'}):await SB.from('store_access').delete().eq('person',p).eq('site_id',siteId);
-  if(r.error)showBanner(ctNetErr(r.error)?'الصلاحيات تحتاج اتصال بالإنترنت.':'تعذّر حفظ الصلاحية: '+String(r.error.message||'').slice(0,100));
   await soLoad();render();
 }
 async function soPhoto(id,file){
