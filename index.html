@@ -289,6 +289,7 @@ body.eng-mode .hdr-acts{display:none!important}
 @media (max-width:560px){.hdr-acts .set-btn{flex:0 0 auto}.set-btn .set-l{display:none}}
 .qs-multi{margin-top:10px}
 .ct-lines{min-width:860px}.ct-lines td,.ct-lines th{padding:5px 6px;vertical-align:middle}.ct-lines input{padding:5px 6px;min-width:70px}.ct-lines input.sm{width:72px;min-width:60px}
+.so-t tr.ct-sec td{background:var(--sunk);font-weight:600}.so-t tr.bad td{background:color-mix(in srgb,var(--danger) 12%,transparent)}.so-ph{padding:0;border:0;background:none;width:34px;height:34px;margin-inline-end:8px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden;cursor:zoom-in;font-size:18px}.so-ph img{width:34px;height:34px;object-fit:cover}.so-cat{display:flex;flex-direction:column;gap:2px;margin-top:10px}.so-cat-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid var(--line)}.so-cat-row.sub{padding-inline-start:28px}.so-cat-row .nm{flex:1;min-width:140px;font-weight:600}.so-cat-row.sub .nm{font-weight:400}.so-cat-row input{width:auto;flex:1;min-width:120px}.so-cat-row .acts{display:flex;flex-wrap:wrap;gap:4px}
 .ct-lines tr.ct-sec td{background:var(--sunk);font-weight:600}.ct-ded{gap:6px;margin:4px 0;flex-wrap:nowrap}.ct-ded input:first-child{flex:1}
 .ct-calc table{max-width:520px}
 form.entry .fw{grid-column:1/-1}
@@ -501,12 +502,14 @@ async function appBoot(){
   return wait;
 }
 async function appSignOut(){
+  if((appLs('adc_ct_q_v1')||[]).length){try{await ctFlush()}catch(e){}}
+  if((appLs('adc_store_q_v1')||[]).length){try{await soFlush()}catch(e){}}
   if(S.pending.some(p=>p.col!=='log')){try{await flush()}catch(e){}
     if(S.pending.some(p=>p.col!=='log')&&!confirm('توجد تعديلات لم تُرفع بعد لعدم وجود اتصال بالإنترنت. إذا خرجت الآن فستضيع. هل تريد الخروج على أي حال؟'))return}
   SEC.locked=true;
   try{await SB.auth.signOut()}catch(e){}
   appLs(LS_ME,null);
-  try{localStorage.removeItem(LS_CACHE);localStorage.removeItem(LS_PEND)}catch(e){}
+  try{localStorage.removeItem(LS_CACHE);localStorage.removeItem(LS_PEND);localStorage.removeItem('adc_ct_cache_v1');localStorage.removeItem('adc_ct_q_v1');localStorage.removeItem('adc_store_cache_v1');localStorage.removeItem('adc_store_q_v1')}catch(e){}
   location.reload();
 }
 const appPwOk=(a,b)=>!a||a.length<8?'يجب أن تكون كلمة المرور ٨ حروف أو أرقام على الأقل.':a!==b?'كلمتا المرور غير متطابقتين.':'';
@@ -973,10 +976,10 @@ window.addEventListener('online',()=>setTimeout(()=>repSync(false),3000));
 /* ===================== العُهد (engineers' petty-cash custody) ===================== */
 const LS_CUST='adc_cust_cache_v1',LS_CUSTQ='adc_cust_q_v1';
 const CU={rows:[],engs:null,loaded:false,ch:null,busy:false,msg:null,claimMsg:null,rejecting:'',returning:'',pick:null};
-const ROLE_L={user:'صاحب مواقع',engineer:'مهندس موقع (عهدة)',tech:'مهندس مكتب فني (مستخلصات)',eng_tech:'مهندس موقع + مكتب فني'};
+const ROLE_L={user:'صاحب مواقع',engineer:'مهندس موقع (عهدة)',tech:'مهندس مكتب فني (مستخلصات)',eng_tech:'مهندس موقع + مكتب فني',store:'أمين مخزن'};
 const myRole=()=>APPU.role||(APPU.me&&APPU.me.role)||'user';
 const isSiteEngR=r=>r==='engineer'||r==='eng_tech',isTechR=r=>r==='tech'||r==='eng_tech';
-function appIsEngineer(){return ['engineer','tech','eng_tech'].includes(myRole())}
+function appIsEngineer(){return ['engineer','tech','eng_tech','store'].includes(myRole())}
 const custQ=()=>appLs(LS_CUSTQ)||[];
 function custMerged(){
   const m=new Map(CU.rows.map(r=>[r.id,r]));
@@ -991,7 +994,7 @@ async function custLoad(){
 }
 async function custEngs(){
   if(!SB||appIsEngineer())return;
-  try{const {data}=await SB.from('members').select('*').eq('approved',true);const l=(data||[]).filter(m=>m.approved);CU.engs=l.filter(m=>isSiteEngR(m.role));CT.techs=l.filter(m=>isTechR(m.role))}catch(e){CU.engs=CU.engs||[]}
+  try{const {data}=await SB.from('members').select('*').eq('approved',true);const l=(data||[]).filter(m=>m.approved);CU.engs=l.filter(m=>isSiteEngR(m.role));CT.techs=l.filter(m=>isTechR(m.role));SO.people=l.filter(m=>isSiteEngR(m.role)||(APPU.owner&&m.role==='store'))}catch(e){CU.engs=CU.engs||[]}
 }
 let custT=null;
 function custRefresh(){clearTimeout(custT);custT=setTimeout(async()=>{await custLoad();await custFlush();try{render()}catch(e){}},300)}
@@ -1068,6 +1071,7 @@ function appRenderCustody(){
     <div class="f c1"><label for="cu_amount">المبلغ (${CUR})</label><input id="cu_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
     <div class="f c1"><label for="cu_date">التاريخ</label><input id="cu_date" type="date" value="${today()}"></div>
     <div class="f c1 half"><label for="cu_src">صُرفت من</label><select id="cu_src"><option value="cash">نقدي</option><option value="bank">بنك</option></select></div>
+    <div class="f c2" id="cu_bank_w" hidden><label for="cu_bank">البنك / الحساب</label>${bankList().length?`<select id="cu_bank"><option value="">— اختر —</option>${bankList().map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}<option value="__other">أخرى…</option></select>`:''}<input id="cu_bank_o" maxlength="60" placeholder="اكتب الاسم، مثال: إنستاباي" ${bankList().length?'hidden':''}></div>
     <div class="f c3"><label for="cu_notes">البيان</label><input id="cu_notes" maxlength="200" placeholder="مثال: عهدة مصروفات الموقع"></div>
     <div class="form-foot"><button class="primary" type="submit">صرف العهدة</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div></form>`
   :`<p class="note">لا يوجد مهندسون بعد. اطلب من المهندس إنشاء حساب من رابط التطبيق، ثم ${APPU.owner?'اجعل نوعه «مهندس موقع» من «الإعدادات» ← «المستخدمون» ووافق عليه.':'اطلب من المدير اعتماده كمهندس موقع.'}</p>`}</div>
@@ -1084,12 +1088,14 @@ function appRenderCustody(){
   ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
     ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,60).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.engName||'')}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${r.status==='rejected'&&d.reason?`<span class="note"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}</td></tr>`}).join('')}
     </tbody></table></div>`:'<p class="note">لا توجد حركات.</p>'}</div>`;
+  {const src=$('#cu_src'),w=$('#cu_bank_w'),bs=$('#cu_bank'),bo=$('#cu_bank_o');const tg=()=>{if(w)w.hidden=!src||src.value!=='bank';if(bs&&bo)bo.hidden=bs.value!=='__other'};if(src)src.addEventListener('change',tg);if(bs){bs.addEventListener('change',tg);if(!bs.value&&bankList().length===1)bs.value=bankList()[0].name}tg()}
   const f=$('#cuIssue');if(f)f.onsubmit=ev=>{ev.preventDefault();
     const eng=$('#cu_eng').value,site=$('#cu_site').value,amount=parseFloat($('#cu_amount').value),date=$('#cu_date').value,notes=$('#cu_notes').value.trim();
     if(!eng||!site||!(amount>0)||!date){CU.msg={t:'اختر المهندس والموقع واكتب المبلغ والتاريخ.'};return render()}
     const st=S.sites.find(s=>s.id===site),e=(CU.engs||[]).find(x=>x.id===eng)||{};
     const manager=st&&st._p?st._p.split('/')[1]:null;
-    custPut({id:'c'+newId(),kind:'issue',engineer:eng,manager,site_id:site,status:'ok',data:{amount,date,source:$('#cu_src').value,notes:notes||'عهدة',siteName:st?st.name:'',engName:e.name||e.email||'',by:myBy(),at:Date.now()}});
+    const src=$('#cu_src').value,bs=$('#cu_bank'),bo=$('#cu_bank_o'),bank=src==='bank'?((bs&&bs.value!=='__other'?bs.value:(bo&&bo.value)||'')||'').trim():'';
+    custPut({id:'c'+newId(),kind:'issue',engineer:eng,manager,site_id:site,status:'ok',data:{amount,date,source:src,...(bank?{bank}:{}),notes:notes||'عهدة',siteName:st?st.name:'',engName:e.name||e.email||'',by:myBy(),at:Date.now()}});
     logChange('add','files',{details:'صرف عهدة '+fmtPlain(amount)+' للمهندس '+(e.name||'')+' — '+(st?st.name:'')});
     CU.msg={ok:1,t:'تم صرف العهدة.'};S.justSaved=true;render()};
 }
@@ -1124,10 +1130,13 @@ document.addEventListener('click',ev=>{
 /* ---------- شاشة «عهدتي» للمهندس ---------- */
 function appRenderEngineer(){
   document.body.classList.add('eng-mode');
-  const r=myRole(),both=isSiteEngR(r)&&isTechR(r);
-  const tab=isTechR(r)&&(!isSiteEngR(r)||CT.tab==='certs')?'certs':'cust';
-  if(tab==='certs')ctRenderEngineer();else appRenderCustEng();
-  if(both)$('#pane').insertAdjacentHTML('afterbegin',`<div class="seg eng-tabs" role="tablist"><button role="tab" data-ct="tab" data-v="cust" aria-selected="${tab==='cust'}">عهدتي</button><button role="tab" data-ct="tab" data-v="certs" aria-selected="${tab==='certs'}">المستخلصات</button></div>`);
+  const r=myRole(),tabs=[];
+  if(isSiteEngR(r))tabs.push(['cust','عهدتي']);
+  if(isTechR(r))tabs.push(['certs','المستخلصات']);
+  if(r==='store'||(isSiteEngR(r)&&soHasAccess()))tabs.push(['store','المخزن']);
+  const tab=tabs.some(t=>t[0]===CT.tab)?CT.tab:(tabs[0]||['store'])[0];
+  if(tab==='certs')ctRenderEngineer();else if(tab==='store')soRenderPage();else appRenderCustEng();
+  if(tabs.length>1)$('#pane').insertAdjacentHTML('afterbegin',`<div class="seg eng-tabs" role="tablist">${tabs.map(([v,t])=>`<button role="tab" data-ct="tab" data-v="${v}" aria-selected="${tab===v}">${t}</button>`).join('')}</div>`);
 }
 function appRenderCustEng(){
   if(!CU.loaded){custLoad().then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
@@ -1172,7 +1181,7 @@ function appRenderCustEng(){
 }
 function custStart(){
   CUST_HOOK=custHook;
-  for(const id of ['cu_eng','cu_site','cu_amount','cu_date','cu_src','cu_notes','en_site','en_amount','en_date','en_item','en_con','en_notes','en_rem'])KEEP.push(id);
+  for(const id of ['cu_eng','cu_site','cu_amount','cu_date','cu_src','cu_bank','cu_bank_o','cu_notes','en_site','en_amount','en_date','en_item','en_con','en_notes','en_rem'])KEEP.push(id);
   custLoad().then(()=>{custFlush();try{render()}catch(e){}});custChannel();
   if(!appIsEngineer())custEngs().then(()=>{const n=custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length;if(n)showBanner('يوجد '+n+' مصروف عهدة تحت المراجعة. افتح «العُهد» لاعتمادها.');try{render()}catch(e){}});
 }
@@ -1188,15 +1197,43 @@ document.addEventListener('change',async ev=>{
 
 /* ===================== مستخلصات المقاولين (بالكميات) ===================== */
 const CT={rows:[],access:[],ret:[],boq:[],techs:null,loaded:false,missing:false,boqMissing:false,ch:null,tab:'',form:null,msg:null,grantEng:'',site:'',boqSel:{site:'',con:'',item:''},boqEdit:null,boqMsg:null};
+/* offline: the last copy from the server is kept on the device, and certificates saved without internet wait in a queue */
+const LS_CT='adc_ct_cache_v1',LS_CTQ='adc_ct_q_v1';
+const ctQ=()=>appLs(LS_CTQ)||[];
+function ctMerged(){const m=new Map((CT.srv||[]).map(r=>[r.id,r]));for(const op of ctQ()){if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}return [...m.values()]}
+function ctFromCache(){const c=appLs(LS_CT);if(c){CT.srv=c.rows||[];CT.access=c.access||[];CT.ret=c.ret||[];CT.boq=c.boq||[]}}
 async function ctLoad(){
-  if(!SB||!navigator.onLine){CT.loaded=true;return}
-  try{
-    const [a,b,c,d]=await Promise.all([SB.from('certs').select('*').limit(5000),SB.from('site_access').select('*').limit(5000),SB.from('cert_ret').select('*').limit(5000),SB.from('cert_boq').select('*').limit(5000)]);
-    if(a.error&&/certs|relation|does not exist|schema cache/i.test(a.error.message||'')){CT.missing=true}
-    else{CT.missing=false;CT.rows=a.data||[];CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[]}
-  }catch(e){}
-  CT.loaded=true;
+  let ok=false;
+  if(SB&&navigator.onLine){
+    try{
+      const [a,b,c,d]=await Promise.all([SB.from('certs').select('*').limit(5000),SB.from('site_access').select('*').limit(5000),SB.from('cert_ret').select('*').limit(5000),SB.from('cert_boq').select('*').limit(5000)]);
+      if(a.error&&/certs|relation|does not exist|schema cache/i.test(a.error.message||'')){CT.missing=true;ok=true}
+      else if(!a.error){CT.missing=false;CT.srv=a.data||[];CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[];ok=true;
+        appLs(LS_CT,{rows:CT.srv,access:CT.access,ret:CT.ret,boq:CT.boq,at:Date.now()})}
+    }catch(e){}
+  }
+  if(!ok&&!CT.srv)ctFromCache();
+  CT.rows=ctMerged();CT.loaded=true;
 }
+const ctNetErr=e=>!navigator.onLine||/fetch|network|timeout|load failed|offline/i.test(String(e&&(e.message||e)||''));
+let ctBusy=false;
+async function ctFlush(){
+  const fail={};if(ctBusy||!SB||!navigator.onLine||!ctQ().length)return fail;ctBusy=true;let done=0;
+  try{
+    for(const op of ctQ()){
+      let err=null;
+      try{const r=op.op==='del'?await SB.from('certs').delete().eq('id',op.id):await SB.from('certs').upsert((()=>{const x={...op.row};delete x._local;delete x.updated_at;return x})(),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
+      if(err&&ctNetErr(err))break;
+      appLs(LS_CTQ,ctQ().filter(x=>x.qid!==op.qid));done++;
+      if(err){const m=String(err.message||'');fail[op.id]=/locked/.test(m)?'هذا المستخلص مقفول. اطلب من صاحب الموقع فتحه للتعديل.':/access/.test(m)?'ليس لديك صلاحية على هذا الموقع.':'تعذّر الحفظ: '+m.slice(0,120);showBanner('مستخلص لم يُحفظ: '+fail[op.id])}
+    }
+  }finally{ctBusy=false}
+  if(done)await ctLoad();else CT.rows=ctMerged();
+  return fail;
+}
+window.addEventListener('online',()=>setTimeout(()=>ctFlush().then(()=>{try{render()}catch(e){}}),2500));
+setInterval(()=>{if(ctQ().length&&navigator.onLine)ctFlush().then(()=>{try{render()}catch(e){}})},30000);
+function ctQueue(op){const q=ctQ().filter(x=>x.id!==op.id);q.push({qid:newId(),...op});appLs(LS_CTQ,q);CT.rows=ctMerged()}
 let ctT=null;
 function ctRefresh(){clearTimeout(ctT);ctT=setTimeout(async()=>{await ctLoad();try{if(!document.activeElement||!/^(ct|bq)_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
 function ctChannel(){if(CT.ch||!SB)return;CT.ch=SB.channel('adc-certs').on('postgres_changes',{event:'*',schema:'public',table:'certs'},()=>ctRefresh()).on('postgres_changes',{event:'*',schema:'public',table:'site_access'},()=>ctRefresh()).on('postgres_changes',{event:'*',schema:'public',table:'cert_boq'},()=>ctRefresh()).subscribe()}
@@ -1210,7 +1247,8 @@ const r2=v=>Math.round((+v||0)*100)/100;
 function ctBoqRow(site,con,item){return CT.boq.find(b=>b.site_id===site&&b.contractor===con&&(b.item||'')===(item||''))||null}
 function ctBoqLines(c){const d=c.data||{};if(Array.isArray(d.boq)&&d.boq.length)return d.boq;const b=ctBoqRow(c.site_id,c.contractor,ctItem(c));return b&&Array.isArray((b.data||{}).lines)?b.data.lines:[]}
 /* numbering: groups 1,2… and their lines 1.1, 1.2 … */
-function ctCodes(lines){let g=0,n=0;const m={};for(const l of lines){if(l.kind==='sec'){g++;n=0;m[l.id]=String(g)}else{n++;m[l.id]=g?g+'.'+n:String(n)}}return m}
+function ctCodes(lines){let g=0,n=0;const m={};for(const l of lines){const own=String(l.code??'').trim();if(l.kind==='sec'){g++;n=0;m[l.id]=own||String(g)}else{n++;m[l.id]=own||(g?g+'.'+n:String(n))}}return m}
+function ctAutoCodes(lines){return ctCodes(lines.map(l=>({...l,code:''})))}
 function ctPrevOf(c,all){const ch=(all||CT.rows).filter(x=>x.id!==c.id&&ctKey(x)===ctKey(c)&&x.no<c.no).sort((a,b)=>a.no-b.no);return ch.length?ch[ch.length-1]:null}
 const ctCanSeePaid=()=>!appIsEngineer();
 function ctPaidLive(c){const d=c.data||{},it=ctItem(c);return r2(S.exp.filter(e=>e.siteId===c.site_id&&(e.contractor||'').trim()===c.contractor&&(e.item||'').trim()===it&&(!d.date||(e.date||'')<=d.date)).reduce((a,e)=>a+amt(e),0))}
@@ -1244,10 +1282,12 @@ function ctSitesForForm(){
 function ctRetPct(owner,con){const k=owner||'owner';const r=CT.ret.find(x=>x.owner_key===k&&x.contractor===con);return r?+r.pct:5}
 function ctNextNo(site,con,item){return CT.rows.filter(x=>x.site_id===site&&x.contractor===con&&ctItem(x)===(item||'')).reduce((m,x)=>Math.max(m,x.no||0),0)+1}
 async function ctSave(row){
-  const r={...row};delete r.updated_at;
-  const {error}=await SB.from('certs').upsert(r,{onConflict:'id'});
-  if(error){CT.msg={t:/locked/.test(error.message||'')?'هذا المستخلص مقفول. اطلب من صاحب الموقع فتحه للتعديل.':/access/.test(error.message||'')?'ليس لديك صلاحية على هذا الموقع.':'تعذّر الحفظ: '+String(error.message||'').slice(0,120)};render();return false}
-  await ctLoad();return true;
+  const r={...row};delete r.updated_at;delete r._local;
+  ctQueue({op:'put',id:r.id,row:r});
+  const fail=await ctFlush();
+  if(fail[r.id]){CT.msg={t:fail[r.id]};render();return false}
+  if(ctQ().some(x=>x.id===r.id))showBanner('لا يوجد اتصال بالإنترنت: المستخلص محفوظ على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.');
+  return true;
 }
 const ctSel=(id,label,opts,val,ph)=>`<div class="f c2"><label for="${id}">${label}</label><select id="${id}"><option value="">${ph}</option>${opts.map(o=>`<option value="${esc(o.v)}" ${o.v===val?'selected':''}>${esc(o.t)}</option>`).join('')}</select></div>`;
 /* ---------- certificate form ---------- */
@@ -1346,17 +1386,19 @@ function ctBoqLoad(){
 }
 function ctBoqUsed(lid){const s=CT.boqSel;return CT.rows.some(c=>c.site_id===s.site&&c.contractor===s.con&&ctItem(c)===s.item&&((c.data||{}).lines||{})[lid]&&+c.data.lines[lid].tot)}
 function ctBoqHTML(mySites){
-  const s=CT.boqSel,cons=regNames('contractors'),its=regNames('items');ctBoqLoad();const E=CT.boqEdit,codes=E?ctCodes(E.lines):{};
+  const s=CT.boqSel,cons=regNames('contractors'),its=regNames('items');ctBoqLoad();const E=CT.boqEdit,auto=E?ctAutoCodes(E.lines):{};
   const total=E?E.lines.filter(l=>l.kind!=='sec').reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0):0;
   const m=CT.boqMsg;CT.boqMsg=null;
   return `<details class="card"${CT.openBoq?' open':''} id="ctBoqBox"><summary class="sec-h" style="cursor:pointer">بنود التعاقد (الكميات والفئات)</summary>
     <p class="note">سجّل بنود التعاقد لكل مقاول على كل بند في الموقع مرة واحدة. مهندس المكتب الفني يكتب عليها الكميات المنفذة فقط، ولا يستطيع تغييرها.</p>
     <div class="bq-sel">${ctSel('bq_site','الموقع',mySites.map(x=>({v:x.id,t:x.name})),s.site,'اختر الموقع')}${ctSel('bq_con','المقاول',cons.map(x=>({v:x.name,t:x.name})),s.con,'اختر المقاول')}${ctSel('bq_item','البند',its.map(x=>({v:x.name,t:x.name})),s.item,'اختر البند')}</div>
     ${E?`<div class="tbl-wrap"><table class="ct-lines"><thead><tr><th>م</th><th>البند / المجموعة</th><th>الوحدة</th><th class="num">كمية التعاقد</th><th class="num">الفئة</th><th class="num">القيمة</th><th></th></tr></thead><tbody>
-      ${E.lines.map((l,i)=>l.kind==='sec'?`<tr class="ct-sec"><td>${codes[l.id]}</td><td colspan="5"><input id="bq_d_${i}" data-bq="${i}" data-k="desc" value="${esc(l.desc||'')}" placeholder="اسم المجموعة، مثال: أعمال التغذية بالمياه"></td><td class="acts">${ctBoqLinesUnder(E.lines,i)?'':`<button type="button" class="ghost" data-ct="bqdel" data-i="${i}">حذف</button>`}</td></tr>`
-        :`<tr><td>${codes[l.id]}</td><td><input id="bq_d_${i}" data-bq="${i}" data-k="desc" value="${esc(l.desc||'')}" placeholder="وصف البند"></td><td><input id="bq_u_${i}" data-bq="${i}" data-k="unit" value="${esc(l.unit||'')}" placeholder="م.ط / م2 / عدد" style="width:90px"></td><td><input id="bq_q_${i}" data-bq="${i}" data-k="qty" type="number" inputmode="decimal" step="any" value="${l.qty??''}" style="width:100px"></td><td><input id="bq_r_${i}" data-bq="${i}" data-k="rate" type="number" inputmode="decimal" step="any" value="${l.rate??''}" style="width:100px"></td><td class="num plain" id="bq_v_${i}">${fmt((+l.qty||0)*(+l.rate||0))}</td><td class="acts">${ctBoqUsed(l.id)?'<span class="note">مستخدم</span>':`<button type="button" class="ghost" data-ct="bqdel" data-i="${i}">حذف</button>`}</td></tr>`).join('')}
+      ${E.lines.map((l,i)=>l.kind==='sec'?`<tr class="ct-sec"><td><input id="bq_c_${i}" data-bq="${i}" data-k="code" value="${esc(l.code??'')}" placeholder="${esc(auto[l.id])}" style="width:56px"></td><td colspan="5"><input id="bq_d_${i}" data-bq="${i}" data-k="desc" value="${esc(l.desc||'')}" placeholder="اسم المجموعة، مثال: أعمال التغذية بالمياه"></td><td class="acts">${ctBoqLinesUnder(E.lines,i)?'':`<button type="button" class="ghost" data-ct="bqdel" data-i="${i}">حذف</button>`}</td></tr>`
+        :`<tr><td><input id="bq_c_${i}" data-bq="${i}" data-k="code" value="${esc(l.code??'')}" placeholder="${esc(auto[l.id])}" style="width:56px"></td><td><input id="bq_d_${i}" data-bq="${i}" data-k="desc" value="${esc(l.desc||'')}" placeholder="وصف البند"></td><td><input id="bq_u_${i}" data-bq="${i}" data-k="unit" value="${esc(l.unit||'')}" placeholder="م.ط / م2 / عدد" style="width:90px"></td><td><input id="bq_q_${i}" data-bq="${i}" data-k="qty" type="number" inputmode="decimal" step="any" value="${l.qty??''}" style="width:100px"></td><td><input id="bq_r_${i}" data-bq="${i}" data-k="rate" type="number" inputmode="decimal" step="any" value="${l.rate??''}" style="width:100px"></td><td class="num plain" id="bq_v_${i}">${fmt((+l.qty||0)*(+l.rate||0))}</td><td class="acts">${ctBoqUsed(l.id)?'<span class="note">مستخدم</span>':`<button type="button" class="ghost" data-ct="bqdel" data-i="${i}">حذف</button>`}</td></tr>`).join('')}
       </tbody><tfoot><tr><td colspan="5">إجمالي قيمة التعاقد</td><td class="num" id="bq_tot">${fmt(total)}</td><td></td></tr></tfoot></table></div>
-      <div class="row"><button type="button" class="ghost" data-ct="bqline">+ بند</button><button type="button" class="ghost" data-ct="bqsec">+ مجموعة</button><button type="button" class="primary" data-ct="bqsave">حفظ بنود التعاقد</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
+      <div class="row"><button type="button" class="ghost" data-ct="bqline">+ بند</button><button type="button" class="ghost" data-ct="bqsec">+ مجموعة</button><button type="button" class="primary" data-ct="bqsave">حفظ بنود التعاقد</button></div>
+      <div class="row"><span class="filebtn"><button type="button" class="ghost">استيراد من Excel</button><input type="file" id="bqFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="استيراد بنود التعاقد من Excel"></span><button type="button" class="ghost" data-ct="bqtpl">تنزيل نموذج Excel</button></div>
+      ${m?`<div class="msg ${m.ok?'ok':'err'}" style="white-space:pre-line">${esc(m.t)}</div>`:''}
       <p class="note">تغيير الفئة أو الكمية يظهر في المستخلصات الجديدة وغير المعتمدة. المستخلصات المعتمدة تحتفظ بالبنود كما كانت وقت اعتمادها.</p>`:''}
   </details>`;
 }
@@ -1366,10 +1408,51 @@ function ctBindBoq(mySites){
   for(const [id,k] of [['#bq_site','site'],['#bq_con','con'],['#bq_item','item']]){const e=$(id);if(e)e.onchange=()=>{ctBoqRead();CT.boqSel[k]=e.value;CT.boqEdit=null;render()}}
   document.querySelectorAll('[data-bq]').forEach(e=>e.oninput=()=>{ctBoqRead();const E=CT.boqEdit,i=+e.dataset.bq,l=E.lines[i];const v=$('#bq_v_'+i);if(v&&l)v.textContent=fmt((+l.qty||0)*(+l.rate||0));const t=$('#bq_tot');if(t)t.textContent=fmt(E.lines.filter(x=>x.kind!=='sec').reduce((a,x)=>a+(+x.qty||0)*(+x.rate||0),0))});
   const bb=$('#ctBoqBox');if(bb)bb.ontoggle=()=>{CT.openBoq=bb.open};
+  const bf=$('#bqFile');if(bf)bf.onchange=async()=>{const f=bf.files&&bf.files[0];bf.value='';if(f)await ctBoqImport(f)};
+}
+/* ---------- BOQ import from Excel ---------- */
+const CT_BOQ_TPL='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';
+const ctNum=v=>{if(v===null||v===undefined)return '';if(typeof v==='number')return isFinite(v)?v:'';let t=String(v).trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٬,\s]/g,'').replace('٫','.');if(t==='')return '';const n=Number(t);return isFinite(n)?n:NaN};
+function ctBoqParse(rows){
+  const norm=v=>String(v??'').replace(/[*\s]+/g,' ').trim();
+  let hr=-1,col={};
+  for(let r=0;r<Math.min(rows.length,40)&&hr<0;r++){const row=rows[r]||[];const c={};row.forEach((v,i)=>{const t=norm(v);if(!t)return;
+      if(/توصيف|وصف البند/.test(t))c.desc=i;else if(/^الوحدة|^وحدة/.test(t))c.unit=i;else if(/كمية/.test(t))c.qty=i;else if(/الفئة|^فئة|سعر/.test(t))c.rate=i;else if(/^م$|مسلسل|^رقم/.test(t))c.code=i});
+    if(c.desc!==undefined&&c.rate!==undefined){hr=r;col=c}}
+  if(hr<0)return {err:'الملف مش على شكل نموذج بنود التعاقد: مش لاقي عمودي «توصيف البند» و«الفئة». نزّل النموذج من الزرار واملاه.'};
+  const lines=[],errs=[];
+  for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[],g=k=>col[k]===undefined?'':row[col[k]];
+    if(row.some(v=>/إجمالي قيمة التعاقد/.test(String(v??''))))break;
+    const code=norm(g('code')),desc=norm(g('desc')),unit=norm(g('unit')),qty=ctNum(g('qty')),rate=ctNum(g('rate'));
+    if(!code&&!desc&&!unit&&qty===''&&rate==='')continue;
+    const n=r+1,miss=[];
+    if(desc&&!unit&&qty===''&&rate===''){lines.push({kind:'sec',code,desc});continue}
+    if(!code)miss.push('م');if(!desc)miss.push('توصيف البند');if(!unit)miss.push('الوحدة');if(rate==='')miss.push('الفئة');
+    if(Number.isNaN(qty))miss.push('كمية التعاقد (مش رقم)');if(Number.isNaN(rate))miss.push('الفئة (مش رقم)');else if(rate!==''&&!(rate>0))miss.push('الفئة (لازم أكبر من صفر)');
+    if(miss.length){errs.push('سطر '+n+': ناقص '+miss.join('، '));continue}
+    lines.push({kind:'line',code,desc,unit,qty:qty===''?'':qty,rate});
+  }
+  if(errs.length)return {err:'الملف فيه أخطاء، صلّحها وارفعه تاني:\n'+errs.slice(0,12).join('\n')+(errs.length>12?'\n… و'+(errs.length-12)+' أخطاء تانية':'')};
+  if(!lines.some(l=>l.kind==='line'))return {err:'مفيش ولا بند في الملف.'};
+  return {lines};
+}
+async function ctBoqImport(file){
+  ctBoqRead();const E=CT.boqEdit;if(!E)return;
+  let rows;try{rows=await XLSX_R.read(await file.arrayBuffer())}catch(e){CT.boqMsg={t:'تعذّرت قراءة الملف. تأكد إنه ملف Excel (.xlsx).'};return render()}
+  const p=ctBoqParse(rows);if(p.err){CT.boqMsg={t:p.err};return render()}
+  /* keep ids of existing lines so certificates already written on them stay linked */
+  const old=E.lines.filter(l=>l.kind!=='sec'&&(l.desc||'').trim()),taken=new Set(),key=x=>String(x??'').replace(/\s+/g,' ').trim();
+  const find=nl=>old.find(o=>!taken.has(o.id)&&nl.code&&key(o.code)===nl.code&&key(o.desc)===nl.desc)||old.find(o=>!taken.has(o.id)&&key(o.desc)===nl.desc&&key(o.unit)===nl.unit)||old.find(o=>!taken.has(o.id)&&nl.code&&key(o.code)===nl.code);
+  const lines=p.lines.map(nl=>{if(nl.kind==='sec')return {id:'l'+newId(),...nl};const o=find(nl);if(o)taken.add(o.id);return {id:o?o.id:'l'+newId(),...nl}});
+  const kept=old.filter(o=>!taken.has(o.id)&&ctBoqUsed(o.id));
+  E.lines=lines.concat(kept);
+  const n=lines.filter(l=>l.kind==='line').length,g=lines.length-n;
+  CT.boqMsg={ok:!kept.length,t:'تم قراءة '+n+' بند'+(g?' و'+g+' مجموعة':'')+' من الملف. راجعهم واضغط «حفظ بنود التعاقد».'+(kept.length?'\nتنبيه: '+kept.length+' بند قديم مستخدم في مستخلصات ومش موجود في الملف، فاتساب في آخر الجدول.':'')};
+  render();
 }
 async function ctBoqSave(){
   ctBoqRead();const E=CT.boqEdit,s=CT.boqSel;if(!E)return;
-  const lines=E.lines.filter(l=>(l.desc||'').trim()||l.kind!=='sec').map(l=>l.kind==='sec'?{id:l.id,kind:'sec',desc:(l.desc||'').trim()}:{id:l.id,kind:'line',desc:(l.desc||'').trim(),unit:(l.unit||'').trim(),qty:+l.qty||0,rate:+l.rate||0});
+  const lines=E.lines.filter(l=>(l.desc||'').trim()||l.kind!=='sec').map(l=>{const code=String(l.code??'').trim(),o=l.kind==='sec'?{id:l.id,kind:'sec',desc:(l.desc||'').trim()}:{id:l.id,kind:'line',desc:(l.desc||'').trim(),unit:(l.unit||'').trim(),qty:+l.qty||0,rate:+l.rate||0};if(code)o.code=code;return o});
   const bad=lines.filter(l=>l.kind!=='sec'&&(!l.desc||!(l.rate>0)));
   if(bad.length){CT.boqMsg={t:'كل بند يحتاج وصفًا وفئة أكبر من صفر.'};return render()}
   if(!lines.some(l=>l.kind!=='sec')){CT.boqMsg={t:'أضف بندًا واحدًا على الأقل.'};return render()}
@@ -1390,7 +1473,7 @@ function ctListHTML(rows){
     if(ap&&c.status!=='draft')acts.push(`<button class="ghost" data-ct="reopen" data-id="${esc(c.id)}">فتح للتعديل</button>`);
     if(ap&&c.edit_req)acts.push(`<button class="ghost" data-ct="noreq" data-id="${esc(c.id)}">رفض طلب التعديل</button>`);
     if(mine&&!ap&&c.status!=='draft'&&!c.edit_req)acts.push(`<button class="ghost" data-ct="req" data-id="${esc(c.id)}">طلب تعديل</button>`);
-    return `<tr><td><b>${c.no}</b>${d.final?'<span class="pend">ختامي</span>':''}</td><td>${esc(d.siteName||siteNameOf(c.site_id))}</td><td>${esc(c.contractor)}</td><td>${esc(d.item||'')||'—'}</td><td class="date">${esc(d.date||'')}</td><td class="num plain">${fmt(k.works)}</td><td class="num">${k.net==null?'—':fmt(k.net)}</td><td>${ST_L[c.status]||''}${c.edit_req?'<span class="pend">مطلوب تعديله</span>':''}</td><td class="acts">${acts.join('')}</td></tr>`}).join('')}
+    return `<tr><td><b>${c.no}</b>${d.final?'<span class="pend">ختامي</span>':''}</td><td>${esc(d.siteName||siteNameOf(c.site_id))}</td><td>${esc(c.contractor)}</td><td>${esc(d.item||'')||'—'}</td><td class="date">${esc(d.date||'')}</td><td class="num plain">${fmt(k.works)}</td><td class="num">${k.net==null?'—':fmt(k.net)}</td><td>${ST_L[c.status]||''}${c.edit_req?'<span class="pend">مطلوب تعديله</span>':''}${c._local?'<span class="pend">على الجهاز</span>':''}</td><td class="acts">${acts.join('')}</td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 const ctSort=l=>l.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||b.no-a.no);
@@ -1453,6 +1536,21 @@ function ctRenderPage(){
     await ctLoad();render()});
 }
 function ctBadgeCount(){if(!APP||appIsEngineer())return 0;const ids=new Set(ctMySites().map(s=>s.id));return CT.rows.filter(c=>ids.has(c.site_id)&&(c.status==='submitted'||c.edit_req)).length}
+/* contractor statement: what the approved certificates say he is owed, per site and item */
+function ctConSummary(name){
+  const g=new Map();for(const c of CT.rows.filter(c=>c.status==='approved'&&c.contractor===name)){const k=ctKey(c),o=g.get(k);if(!o||c.no>o.no)g.set(k,c)}
+  if(!g.size)return null;
+  const rows=[...g.values()].map(c=>{const k=ctCalc(c),paid=ctPaidLive({...c,data:{...c.data,date:''}});return {c,k,paid,left:r2(k.after-paid)}}).sort((a,b)=>siteNameOf(a.c.site_id).localeCompare(siteNameOf(b.c.site_id),'ar'));
+  return {rows,after:r2(rows.reduce((a,x)=>a+x.k.after,0)),paid:r2(rows.reduce((a,x)=>a+x.paid,0)),left:r2(rows.reduce((a,x)=>a+x.left,0))};
+}
+function ctConCard(name){
+  const q=ctConSummary(name);
+  if(!q)return `<p class="foot-note" style="margin:-6px 0 0">لا توجد مستخلصات معتمدة لهذا المقاول بعد. المستخلصات تُسجَّل من «☰ ← المستخلصات».</p>`;
+  return `<div class="card"><div class="sec-h">حسب المستخلصات المعتمدة</div><div class="tbl-wrap"><table><thead><tr><th>الموقع</th><th>البند</th><th>آخر مستخلص</th><th class="num">الأعمال حتى تاريخه</th><th class="num">بعد الخصومات</th><th class="num">المدفوع على البند</th><th class="num">المتبقي له</th></tr></thead><tbody>
+  ${q.rows.map(x=>`<tr><td>${esc(siteNameOf(x.c.site_id))}</td><td>${esc(ctItem(x.c))||'—'}</td><td>رقم ${x.c.no}${x.k.fin?' (ختامي)':''} · ${esc((x.c.data||{}).date||'')}</td><td class="num plain">${fmt(x.k.works)}</td><td class="num">${fmt(x.k.after)}</td><td class="num">${fmt(x.paid)}</td><td class="num strong${x.left<0?' neg':''}">${fmt(x.left)}</td></tr>`).join('')}
+  </tbody><tfoot><tr><td colspan="4">الإجمالي</td><td class="num">${fmt(q.after)}</td><td class="num">${fmt(q.paid)}</td><td class="num">${fmt(q.left)}</td></tr></tfoot></table></div>
+  <p class="note">المدفوع على البند = المصروفات المسجّلة على هذا المقاول بنفس البند في نفس الموقع.</p></div>`;
+}
 /* certificate document for print / PDF — black & white, colour only in the title and logo */
 /* amount in Arabic words for the certificate («فقط … لا غير») */
 function arWords(v){
@@ -1506,8 +1604,9 @@ document.addEventListener('click',async ev=>{
   if(a==='bqline'||a==='bqsec'){ctBoqRead();CT.boqEdit.lines.push(a==='bqsec'?{id:'l'+newId(),kind:'sec',desc:''}:{id:'l'+newId(),kind:'line',desc:'',unit:'',qty:'',rate:''});render();const n=document.getElementById('bq_d_'+(CT.boqEdit.lines.length-1));if(n)n.focus();return}
   if(a==='bqdel'){ctBoqRead();CT.boqEdit.lines.splice(+b.dataset.i,1);render();return}
   if(a==='bqsave'){ctBoqSave();return}
+  if(a==='bqtpl'){try{const raw=atob(CT_BOQ_TPL),u=Uint8Array.from(raw,ch=>ch.charCodeAt(0));const s=CT.boqSel,nm=['نموذج بنود التعاقد',s.con,s.item].filter(Boolean).join(' - ');await saveFile(safeName(nm)+'.xlsx',new Blob([u],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تنزيل النموذج: '+((e&&e.message)||e),1)}return}
   if(a==='edit'&&c){const d=c.data||{};CT.form={id:c.id,site:c.site_id,con:c.contractor,item:d.item||'',no:c.no,date:d.date,lines:JSON.parse(JSON.stringify(d.lines||{})),deds:JSON.parse(JSON.stringify(d.deds||[])),notes:d.notes||'',final:!!d.final};CT.msg=null;render();const x=$('#ctFormCard');if(x)x.scrollIntoView({block:'start'});return}
-  if(a==='del'&&c){if(!confirm('حذف مسودة المستخلص رقم '+c.no+'؟'))return;const {error}=await SB.from('certs').delete().eq('id',c.id);if(error)showBanner('تعذّر الحذف.');await ctLoad();render();return}
+  if(a==='del'&&c){if(!confirm('حذف مسودة المستخلص رقم '+c.no+'؟'))return;if(!(CT.srv||[]).some(x=>x.id===c.id)){appLs(LS_CTQ,ctQ().filter(x=>x.id!==c.id));CT.rows=ctMerged()}else{ctQueue({op:'del',id:c.id});await ctFlush()}render();return}
   if(a==='approve'&&c){const paid=ctPaidLive(c),lines=ctBoqLines(c);
     if(await ctSave({...c,status:'approved',edit_req:false,data:{...c.data,prev_paid:paid,boq:lines,approvedBy:myBy(),approvedAt:Date.now()}})){CT.msg={ok:1,t:'تم اعتماد المستخلص رقم '+c.no+'. السابق صرفه: '+fmtPlain(paid)+' '+CUR+'.'};render()}return}
   if(a==='reopen'&&c){const d={...c.data};delete d.prev_paid;delete d.boq;delete d.approvedBy;delete d.approvedAt;if(await ctSave({...c,status:'draft',edit_req:false,data:d})){CT.msg={ok:1,t:'تم فتح المستخلص للتعديل.'};render()}return}
@@ -1522,6 +1621,405 @@ function ctStart(){
   if(!SB)return;
   ctLoad().then(()=>{try{render()}catch(e){}});ctChannel();
   for(const id of ['ct_rcon','ct_rpct'])KEEP.push(id);
+}
+
+/* ---------- مخزن الموقع: توريد + جرد دوري، والمنصرف يُحسب من الجرد ---------- */
+const SO={srv:null,d:null,loaded:false,missing:false,ch:null,site:'',want:'',tab:'bal',form:null,msg:null,catMsg:null,people:null,grantP:'',rep:{main:'',sub:'',from:'',to:'',sup:''},printing:null,showDel:false,lim:50,cat:{add:null,edit:null},urls:{},openCat:false,openEn:false,openGr:false};
+const LS_SO='adc_store_cache_v1',LS_SOQ='adc_store_q_v1';
+const soQ=()=>appLs(LS_SOQ)||[];
+const soEmpty=()=>({moves:[],items:[],sites:[],access:[]});
+function soOverlay(list,t){const m=new Map(list.map(r=>[r.id,r]));for(const op of soQ()){if(op.t!==t)continue;if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}return [...m.values()]}
+function soData(){const s=SO.srv||soEmpty();return {moves:soOverlay(s.moves||[],'store_moves'),items:soOverlay(s.items||[],'store_items'),sites:s.sites||[],access:s.access||[]}}
+async function soAll(t){const out=[];for(let off=0;;off+=1000){const r=await SB.from(t).select('*').range(off,off+999);if(r.error)return r;out.push(...(r.data||[]));if(!r.data||r.data.length<1000)break}return {data:out,error:null}}
+async function soLoad(){
+  let ok=false;
+  if(SB&&navigator.onLine){
+    try{
+      const [m,i,s,a]=await Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll));
+      if(m.error&&/store_moves|relation|does not exist|schema cache/i.test(m.error.message||'')){SO.missing=true;SO.srv=SO.srv||soEmpty();ok=true}
+      else if(!m.error){SO.missing=false;SO.srv={moves:m.data||[],items:i.data||[],sites:s.data||[],access:a.data||[]};ok=true;appLs(LS_SO,{...SO.srv,at:Date.now()})}
+    }catch(e){}
+  }
+  if(!ok&&!SO.srv){const c=appLs(LS_SO);SO.srv=c?{moves:c.moves||[],items:c.items||[],sites:c.sites||[],access:c.access||[]}:soEmpty()}
+  SO.d=soData();SO.loaded=true;
+}
+const soClean=r=>{const x={...r};delete x._local;delete x.updated_at;delete x.created_at;return x};
+let soBusy=false;
+async function soFlush(){
+  if(soBusy||!SB||!navigator.onLine||!soQ().length)return;soBusy=true;let done=0;
+  try{
+    for(const op of soQ()){
+      let err=null;
+      try{const r=op.op==='del'?await SB.from(op.t).delete().eq('id',op.id):await SB.from(op.t).upsert(soClean(op.row),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
+      if(err&&ctNetErr(err))break;
+      appLs(LS_SOQ,soQ().filter(x=>x.qid!==op.qid));done++;
+      if(err){const m=String(err.message||'');showBanner('المخزن: لم يُحفظ — '+(/later stock count|locked/.test(m)?'الحركة مقفولة لأن بعدها جرد. اطلب من صاحب الموقع تعديلها.':/no access/.test(m)?'ليس لديك صلاحية على مخزن هذا الموقع.':/only the owner/.test(m)?'حذف الخامات من القائمة للمدير فقط.':m.slice(0,120)))}
+    }
+  }finally{soBusy=false}
+  if(done)await soLoad();else SO.d=soData();
+}
+window.addEventListener('online',()=>setTimeout(()=>soFlush().then(()=>{try{render()}catch(e){}}),3000));
+setInterval(()=>{if(soQ().length&&navigator.onLine)soFlush().then(()=>{try{render()}catch(e){}})},30000);
+function soQueue(t,op,id,row){const q=soQ().filter(x=>!(x.t===t&&x.id===id));q.push({qid:newId(),t,op,id,row});appLs(LS_SOQ,q);SO.d=soData()}
+async function soPut(t,row){soQueue(t,'put',row.id,row);await soFlush();return !soQ().some(x=>x.t===t&&x.id===row.id)}
+let soT=null;
+function soRefresh(){clearTimeout(soT);soT=setTimeout(async()=>{await soLoad();try{if(!document.activeElement||!/^so_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
+function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
+function soStart(){if(!SB)return;soLoad().then(()=>{try{render()}catch(e){}});soChannel()}
+function soNeedSql(){return SO.missing?'<div class="card"><p class="msg err">جداول المخزن غير موجودة في قاعدة البيانات. شغّل ملف «ADC-إعداد-المخزن.sql» في Supabase.</p></div>':''}
+
+/* ---------- who can do what ---------- */
+const soMe=()=>APPU.me&&APPU.me.id;
+const soIsAppr=()=>!appIsEngineer();
+function soMySites(){
+  const d=SO.d||soEmpty(),en=new Set(d.sites.map(s=>s.site_id));
+  if(soIsAppr())return ctMySites().map(s=>({id:s.id,name:s.name,owner:ctOwnerOf(s),enabled:en.has(s.id)}));
+  return d.access.filter(a=>a.person===soMe()).map(a=>({id:a.site_id,name:a.site_name,owner:a.site_owner,enabled:en.has(a.site_id)}));
+}
+function soHasAccess(){return !!(SO.d&&SO.d.access.some(a=>a.person===soMe()))}
+const soCanAppr=siteId=>soIsAppr()&&ctMySites().some(s=>s.id===siteId);
+const soTs=m=>m.created_at?Date.parse(m.created_at):((m.data||{}).at||0);
+function soLocked(m){const t=soTs(m);return (SO.d.moves||[]).some(c=>c.site_id===m.site_id&&c.kind==='count'&&!c.deleted&&c.id!==m.id&&(c.date>m.date||(c.date===m.date&&soTs(c)>t)))}
+function soCanEdit(m){return soCanAppr(m.site_id)||(m.created_by===soMe()&&!soLocked(m))}
+
+/* ---------- the shared list of materials ---------- */
+const soNorm=s=>String(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[ً-ْ]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+const soByName=(a,b)=>String(a.name).localeCompare(String(b.name),'ar');
+const soItems=()=>((SO.d&&SO.d.items)||[]).filter(i=>!i.deleted);
+const soItem=id=>((SO.d&&SO.d.items)||[]).find(i=>i.id===id);
+const soMains=()=>soItems().filter(i=>!i.parent).sort(soByName);
+const soSubs=id=>soItems().filter(i=>i.parent===id).sort(soByName);
+const soPickable=i=>!soSubs(i.id).length&&!!(i.unit||'').trim();
+function soLabel(id){const i=soItem(id);if(!i)return 'خامة غير معروفة';const p=i.parent&&soItem(i.parent);return p?p.name+' — '+i.name:i.name}
+const soUnit=id=>(soItem(id)||{}).unit||'';
+const soCanEditItem=i=>APPU.owner||myRole()==='user'||i.created_by===soMe();
+const soUsed=id=>(SO.d.moves||[]).some(m=>!m.deleted&&(m.kind==='in'?(m.data||{}).item===id:((m.data||{}).lines||{})[id]!=null));
+function soItemOpts(sel,onlyPick){
+  return soMains().map(m=>{const subs=soSubs(m.id);
+    if(!subs.length)return onlyPick&&!soPickable(m)?'':`<option value="${esc(m.id)}" ${sel===m.id?'selected':''}>${esc(m.name)}${m.unit?' ('+esc(m.unit)+')':''}</option>`;
+    return `<optgroup label="${esc(m.name)}">${subs.filter(s=>!onlyPick||soPickable(s)).map(s=>`<option value="${esc(s.id)}" ${sel===s.id?'selected':''}>${esc(s.name)}${s.unit?' ('+esc(s.unit)+')':''}</option>`).join('')}</optgroup>`}).join('');
+}
+
+/* ---------- balances: المنصرف = الرصيد قبل الجرد + التوريد − الجرد ---------- */
+function soSorted(moves){return moves.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.kind===b.kind?0:a.kind==='in'?-1:1)||soTs(a)-soTs(b))}
+function soCalc(moves,from,to){
+  const R=new Map(),g=id=>{let r=R.get(id);if(!r){r={id,open:0,inQ:0,out:0,bal:0,known:false,started:false,last:null,counts:[],ins:[]};R.set(id,r)}return r};
+  const start=(r,inP)=>{if(inP&&!r.started){r.open=r.bal;r.started=true}};
+  for(const m of soSorted(moves.filter(m=>!m.deleted))){
+    if(to&&m.date>to)break;
+    const inP=!from||m.date>=from,d=m.data||{};
+    if(m.kind==='in'){if(!d.item)continue;const r=g(d.item),q=+d.qty||0;start(r,inP);r.bal+=q;if(inP){r.inQ+=q;r.ins.push(m)}}
+    else for(const [id,v] of Object.entries(d.lines||{})){
+      if(v===''||v==null||isNaN(+v))continue;const r=g(id),c=+v,diff=r.bal-c;start(r,inP);
+      let out=diff,adj=0;if(!r.known&&diff<0){adj=-diff;out=0}
+      if(inP){r.out+=out;r.open+=adj;r.counts.push({date:m.date,book:r2(r.bal),actual:c,out:r2(out),adj:r2(adj),first:!r.known})}
+      r.bal=c;r.known=true;r.last={date:m.date,qty:c};
+    }
+  }
+  for(const r of R.values()){if(!r.started)r.open=r.bal;for(const k of ['open','inQ','out','bal'])r[k]=r2(r[k])}
+  return R;
+}
+const soSiteMoves=(siteId,withDel)=>((SO.d&&SO.d.moves)||[]).filter(m=>m.site_id===siteId&&(withDel||!m.deleted));
+/* rows grouped under their main item, in catalogue order */
+function soGroups(calc,ids){
+  const want=ids?new Set(ids):null,groups=[],seen=new Set();
+  for(const m of soMains()){
+    const subs=soSubs(m.id),rows=[];
+    if(calc.has(m.id)&&(!want||want.has(m.id))){rows.push({it:m,r:calc.get(m.id),own:true});seen.add(m.id)}
+    for(const s of subs)if(calc.has(s.id)&&(!want||want.has(s.id))){rows.push({it:s,r:calc.get(s.id)});seen.add(s.id)}
+    if(rows.length)groups.push({main:m,subs:!!subs.length,rows});
+  }
+  const lost=[...calc.keys()].filter(id=>!seen.has(id)&&(!want||want.has(id)));
+  if(lost.length)groups.push({main:{id:'',name:'خامات محذوفة من القائمة'},subs:true,rows:lost.map(id=>({it:soItem(id)||{id,name:'خامة غير معروفة',unit:''},r:calc.get(id)}))});
+  return groups;
+}
+function soScopeIds(rep){
+  if(rep.sub)return [rep.sub];
+  if(rep.main)return [rep.main,...soSubs(rep.main).map(s=>s.id)];
+  return null;
+}
+function soScopeLabel(rep){return rep.sub?soLabel(rep.sub):rep.main?((soItem(rep.main)||{}).name||'')+(soSubs(rep.main).length?' (كل البنود الفرعية)':''):'كل البنود'}
+function soSuppliers(){const s=new Set();for(const m of (SO.d.moves||[]))if(m.kind==='in'&&(m.data||{}).supplier)s.add(m.data.supplier.trim());return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ar'))}
+
+/* ---------- page ---------- */
+const soQty=(v,u)=>`${fmt(v)}${u?' <small>'+esc(u)+'</small>':''}`;
+function soBalHTML(site){
+  const calc=soCalc(soSiteMoves(site.id)),gs=soGroups(calc);
+  if(!gs.length)return `<div class="card blank"><h3>لا توجد حركات في هذا المخزن بعد</h3><p>ابدأ بـ«+ جرد» لتسجيل الرصيد الموجود حاليًا (رصيد افتتاحي)، وبعدها سجّل كل توريد يدخل الموقع.</p></div>`;
+  return `<div class="card"><div class="sec-h">أرصدة المخزن</div><div class="tbl-wrap"><table class="so-t"><thead><tr><th>الخامة</th><th>الوحدة</th><th class="num">إجمالي التوريد</th><th class="num">إجمالي المنصرف</th><th class="num">الرصيد الحالي</th><th>آخر جرد</th></tr></thead><tbody>
+  ${gs.map(g=>(g.subs?`<tr class="ct-sec"><td colspan="6">${soThumb(g.main)}<b>${esc(g.main.name)}</b></td></tr>`:'')+g.rows.map(x=>`<tr${x.r.bal<0?' class="bad"':''}><td>${g.subs&&!x.own?'':soThumb(x.it)}${esc(x.it.name)}</td><td>${esc(x.it.unit||'')}</td><td class="num plain">${fmt(x.r.inQ)}</td><td class="num plain">${fmt(x.r.out)}</td><td class="num strong${x.r.bal<0?' neg':''}">${fmt(x.r.bal)}</td><td>${x.r.last?esc(x.r.last.date)+' <small>('+fmt(x.r.last.qty)+')</small>':'<span class="note">لم يُجرد</span>'}</td></tr>`).join('')).join('')}
+  </tbody></table></div><p class="note">المنصرف يُحسب عند كل جرد: الرصيد قبله + ما ورد − الموجود فعلًا. الرصيد الحالي = آخر جرد + ما ورد بعده.</p></div>`;
+}
+function soMoveText(m){
+  const d=m.data||{};
+  if(m.kind==='in')return `<b>${esc(soLabel(d.item))}</b> · ${soQty(d.qty,soUnit(d.item))}${d.supplier?' · المورد: '+esc(d.supplier):''}${d.notes?'<span class="note">'+esc(d.notes)+'</span>':''}`;
+  const L=Object.entries(d.lines||{}).filter(([,v])=>v!==''&&v!=null);
+  return `<b>جرد ${L.length} خامة</b><span class="note">${L.slice(0,4).map(([id,v])=>esc(soLabel(id))+': '+fmt(v)+' '+esc(soUnit(id))).join('، ')}${L.length>4?' و'+(L.length-4)+' أخرى':''}</span>${d.notes?'<span class="note">'+esc(d.notes)+'</span>':''}`;
+}
+function soMovesHTML(site){
+  const appr=soCanAppr(site.id),all=soSiteMoves(site.id,true).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||soTs(b)-soTs(a));
+  const live=all.filter(m=>!m.deleted),del=all.filter(m=>m.deleted),list=live.slice(0,SO.lim);
+  return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">حركات المخزن (${live.length})</div>${appr&&del.length?`<button class="ghost" data-so="showdel">${SO.showDel?'إخفاء المحذوفات':'المحذوفات ('+del.length+')'}</button>`:''}</div>
+  ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>سجّله</th><th></th></tr></thead><tbody>
+  ${list.map(m=>{const ed=soCanEdit(m);return `<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'<span class="pill-ok">توريد</span>':'<span class="pill-over">جرد</span>'}${m._local?'<span class="pend">على الجهاز</span>':''}</td><td>${soMoveText(m)}</td><td>${esc((m.data||{}).by||'')}</td><td class="acts">${ed?`<button class="ghost" data-so="edit" data-id="${esc(m.id)}">تعديل</button><button class="ghost" data-so="del" data-id="${esc(m.id)}">حذف</button>`:'<span class="note">مقفول بعد جرد لاحق</span>'}</td></tr>`}).join('')}
+  </tbody></table></div>${live.length>list.length?`<button class="ghost" data-so="more">عرض المزيد</button>`:''}`:'<p class="note">لا توجد حركات بعد.</p>'}
+  ${SO.showDel&&appr&&del.length?`<div class="sec-h" style="margin-top:12px">المحذوفات</div><div class="tbl-wrap"><table><tbody>${del.map(m=>`<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'توريد':'جرد'}</td><td>${soMoveText(m)}</td><td class="acts"><button class="ghost" data-so="restore" data-id="${esc(m.id)}">استرجاع</button><button class="ghost" data-so="purge" data-id="${esc(m.id)}">حذف نهائي</button></td></tr>`).join('')}</tbody></table></div>`:''}
+  <p class="note">من سجّل الحركة يقدر يعدّلها لحد ما يتعمل الجرد اللي بعدها. بعد كده التعديل للمدير أو صاحب الموقع فقط.</p></div>`;
+}
+function soReport(site,rep){
+  const ids=soScopeIds(rep),calc=soCalc(soSiteMoves(site.id),rep.from||null,rep.to||null);
+  const gs=soGroups(calc,ids);
+  const want=ids?new Set(ids):null,sup=soNorm(rep.sup);
+  const ins=[],counts=[];
+  for(const g of gs)for(const x of g.rows){for(const m of x.r.ins)if(!sup||soNorm((m.data||{}).supplier).includes(sup))ins.push({m,it:x.it});for(const c of x.r.counts)counts.push({...c,it:x.it})}
+  ins.sort((a,b)=>(a.m.date||'').localeCompare(b.m.date||'')||soTs(a.m)-soTs(b.m));counts.sort((a,b)=>a.date.localeCompare(b.date));
+  return {gs,ins,counts,want};
+}
+function soRepHTML(site){
+  const rep=SO.rep,mains=soMains(),subs=rep.main?soSubs(rep.main):[],x=soReport(site,rep),sups=soSuppliers();
+  return `<div class="card"><div class="sec-h">تقارير المخزن</div>
+  <div class="filters">
+    <div class="f"><label for="so_rmain">البند الرئيسي</label><select id="so_rmain"><option value="">كل البنود</option>${mains.map(m=>`<option value="${esc(m.id)}" ${rep.main===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></div>
+    ${subs.length?`<div class="f"><label for="so_rsub">البند الفرعي</label><select id="so_rsub"><option value="">كل البنود الفرعية</option>${subs.map(s=>`<option value="${esc(s.id)}" ${rep.sub===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`:''}
+    <div class="f"><label for="so_rfrom">من تاريخ</label><input id="so_rfrom" type="date" value="${esc(rep.from)}"></div>
+    <div class="f"><label for="so_rto">إلى تاريخ</label><input id="so_rto" type="date" value="${esc(rep.to)}"></div>
+    <div class="f"><label for="so_rsup">المورد (للتوريدات)</label><input id="so_rsup" list="so_sups" value="${esc(rep.sup)}" placeholder="الكل"><datalist id="so_sups">${sups.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
+  </div>
+  <div class="row"><button class="primary" data-so="print">طباعة / PDF</button><button data-so="xlsx">Excel</button></div>
+  ${x.gs.length?`<div class="tbl-wrap"><table><thead><tr><th>الخامة</th><th>الوحدة</th><th class="num">رصيد أول المدة</th><th class="num">التوريد</th><th class="num">المنصرف</th><th class="num">رصيد آخر المدة</th></tr></thead><tbody>
+  ${x.gs.map(g=>(g.subs?`<tr class="ct-sec"><td colspan="6"><b>${esc(g.main.name)}</b></td></tr>`:'')+g.rows.map(y=>`<tr><td>${esc(y.it.name)}</td><td>${esc(y.it.unit||'')}</td><td class="num plain">${fmt(y.r.open)}</td><td class="num plain">${fmt(y.r.inQ)}</td><td class="num plain">${fmt(y.r.out)}</td><td class="num strong">${fmt(y.r.bal)}</td></tr>`).join('')).join('')}
+  </tbody></table></div><p class="note">${x.ins.length} توريد و${x.counts.length} سطر جرد في الفترة. التفاصيل في ملف PDF أو Excel.</p>`:'<p class="note">لا توجد حركات بهذه الاختيارات.</p>'}
+  </div>`;
+}
+function soThumb(it){if(!it||!it.photo)return '';const u=SO.urls[it.photo];return `<button type="button" class="so-ph" data-receipt="${esc(it.photo)}" data-rtype="image/jpeg" title="صورة ${esc(it.name)}">${u&&u.url?`<img src="${esc(u.url)}" alt="">`:'<span aria-hidden="true">🖼</span>'}</button>`}
+function soLoadThumbs(){
+  const need=new Set();document.querySelectorAll('.so-ph').forEach(b=>{const p=b.dataset.receipt;const u=SO.urls[p];if(!u||(!u.url&&!u.busy&&Date.now()-u.at>60000)||(u.url&&Date.now()-u.at>3000000))need.add(p)});
+  for(const p of need){SO.urls[p]={busy:true,at:Date.now()};appBlobUrl(p).then(url=>{SO.urls[p]={url,at:Date.now()};document.querySelectorAll(`.so-ph[data-receipt="${CSS.escape(p)}"]`).forEach(b=>{if(url)b.innerHTML='<img src="'+esc(url)+'" alt="">'})})}
+}
+function soCatHTML(){
+  const A=SO.cat.add,E=SO.cat.edit,m=SO.catMsg;SO.catMsg=null;
+  const line=(it,isSub)=>E&&E.id===it.id?`<div class="so-cat-row${isSub?' sub':''}"><input id="so_en" value="${esc(E.name)}" aria-label="اسم الخامة"><input id="so_eu" value="${esc(E.unit)}" placeholder="الوحدة" aria-label="الوحدة" style="width:110px"><button class="primary" data-so="catsave">حفظ</button><button class="ghost" data-so="catcancel">إلغاء</button></div>`
+    :`<div class="so-cat-row${isSub?' sub':''}">${soThumb(it)}<span class="nm">${esc(it.name)}${it.unit?` <small>(${esc(it.unit)})</small>`:(!isSub&&!soSubs(it.id).length?' <small class="neg">بدون وحدة</small>':'')}${it._local?'<span class="pend">على الجهاز</span>':''}</span><span class="acts">
+      ${!isSub?`<button class="ghost" data-so="addsub" data-id="${esc(it.id)}">+ بند فرعي</button>`:''}
+      ${soCanEditItem(it)?`<button class="ghost" data-so="catedit" data-id="${esc(it.id)}">تعديل</button><span class="filebtn"><button type="button" class="ghost">${it.photo?'تغيير الصورة':'صورة'}</button><input type="file" accept="image/*" data-sophoto="${esc(it.id)}" aria-label="صورة ${esc(it.name)}"></span>`:''}
+      ${APPU.owner&&!soUsed(it.id)&&!soSubs(it.id).length?`<button class="ghost" data-so="catdel" data-id="${esc(it.id)}">حذف</button>`:''}</span></div>`;
+  const addSub=id=>A&&A.parent===id?`<div class="so-cat-row sub"><input id="so_sn" value="${esc(A.name||'')}" placeholder="اسم البند الفرعي، مثال: حديد 12 مم" aria-label="اسم البند الفرعي"><input id="so_su" value="${esc(A.unit||'')}" placeholder="الوحدة" aria-label="الوحدة" style="width:110px"><button class="primary" data-so="subsave">إضافة</button><button class="ghost" data-so="catcancel">إلغاء</button></div>`:'';
+  const mains=soMains();
+  return `<details class="card"${SO.openCat?' open':''} id="soCatBox"><summary class="sec-h" style="cursor:pointer">قائمة الخامات (واحدة لكل المواقع) — ${soItems().length}</summary>
+    <p class="note">بند رئيسي (مثال: حديد تسليح) وتحته بنود فرعية لو احتجت (10 مم، 12 مم…). البند اللي من غير فرعي لازم يكون له وحدة علشان يتسجل عليه.</p>
+    <div class="row"><input id="so_cn" placeholder="اسم بند رئيسي جديد، مثال: أسمنت" aria-label="اسم البند الرئيسي" style="flex:1;min-width:180px"><input id="so_cu" placeholder="الوحدة (فاضي لو له فرعي)" aria-label="الوحدة" style="width:170px"><button class="primary" data-so="mainsave">إضافة بند رئيسي</button></div>
+    ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
+    <div class="so-cat">${mains.map(it=>line(it,false)+soSubs(it.id).map(s=>line(s,true)).join('')+addSub(it.id)).join('')||'<p class="note">القائمة فاضية. أضف أول بند.</p>'}</div>
+  </details>`;
+}
+function soEnableHTML(sites){
+  return `<details class="card"${SO.openEn?' open':''} id="soEnBox"><summary class="sec-h" style="cursor:pointer">تفعيل المخزن على المواقع</summary>
+    <p class="note">المخزن اختياري. فعّله على المواقع اللي فيها مخزن بس.</p>
+    <div class="qs-checks">${sites.map(s=>`<label class="chk"><input type="checkbox" data-soen="${esc(s.id)}" ${s.enabled?'checked':''}> ${esc(s.name)}</label>`).join('')||'<p class="note">لا توجد مواقع.</p>'}</div></details>`;
+}
+function soGrantHTML(sites){
+  const ppl=SO.people||[],p=SO.grantP,en=sites.filter(s=>s.enabled),acc=SO.d.access;
+  return `<details class="card"${SO.openGr?' open':''} id="soGrBox"><summary class="sec-h" style="cursor:pointer">مين يسجّل في المخزن</summary>
+    <p class="note">صاحب الموقع يسجّل دايمًا. مهندس الموقع${APPU.owner?' وأمين المخزن':''} يسجّلوا في المواقع اللي تحددها هنا بس.${APPU.owner?'':' أمين المخزن يحدده المدير.'}</p>
+    ${ppl.length?`<div class="row"><label for="so_gp">الشخص</label><select id="so_gp" style="width:auto"><option value="">اختر</option>${ppl.map(x=>`<option value="${esc(x.id)}" ${p===x.id?'selected':''}>${esc(x.name||x.email)} — ${x.role==='store'?'أمين مخزن':'مهندس موقع'}</option>`).join('')}</select></div>
+    ${p?(en.length?`<div class="qs-checks">${en.map(s=>`<label class="chk"><input type="checkbox" data-sogrant="${esc(s.id)}" ${acc.some(a=>a.person===p&&a.site_id===s.id)?'checked':''}> ${esc(s.name)}</label>`).join('')}</div>`:'<p class="note">فعّل المخزن على موقع الأول.</p>'):''}`
+    :`<p class="note">لا يوجد مهندسو مواقع${APPU.owner?' أو أمناء مخازن':''} بعد. ${APPU.owner?'غيّر نوع المستخدم من «الإعدادات» ← «المستخدمون».':''}</p>`}
+    ${acc.length?`<div class="tbl-wrap"><table><thead><tr><th>الشخص</th><th>المواقع</th></tr></thead><tbody>${[...new Set(acc.map(a=>a.person))].map(id=>{const x=ppl.find(q=>q.id===id);return `<tr><td>${esc(x?(x.name||x.email):'مستخدم')}</td><td>${acc.filter(a=>a.person===id).map(a=>esc(a.site_name||siteNameOf(a.site_id))).join('، ')}</td></tr>`}).join('')}</tbody></table></div>`:''}
+  </details>`;
+}
+/* ---------- forms: توريد / جرد ---------- */
+function soBook(siteId,itemId,date,skipId){const r=soCalc(soSiteMoves(siteId).filter(m=>m.id!==skipId),null,date).get(itemId);return r?r.bal:0}
+function soFormHTML(site){
+  const f=SO.form;if(!f)return '';const m=SO.msg;
+  if(f.kind==='in'){const u=soUnit(f.item),sups=soSuppliers();
+    return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${f.id?'تعديل توريد':'توريد خامة للمخزن'} — ${esc(site.name)}</div>
+    <form id="soForm" class="entry" novalidate>
+      <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}"></div>
+      <div class="f c2"><label for="so_item">الخامة</label><select id="so_item"><option value="">اختر الخامة</option>${soItemOpts(f.item,true)}</select></div>
+      <div class="f c1 half"><label for="so_qty">الكمية${u?' ('+esc(u)+')':''}</label><input id="so_qty" type="number" inputmode="decimal" min="0" step="any" value="${f.qty??''}"></div>
+      <div class="f c2"><label for="so_sup">المورد (اختياري)</label><input id="so_sup" list="so_supl" maxlength="80" value="${esc(f.supplier||'')}"><datalist id="so_supl">${sups.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
+      <div class="f fw"><label for="so_notes">ملاحظات (اختياري)</label><input id="so_notes" maxlength="200" value="${esc(f.notes||'')}" placeholder="مثال: رقم البون أو الفاتورة"></div>
+      <p class="note fw">الخامة مش موجودة؟ أضفها من «قائمة الخامات» تحت.</p>
+      <div class="form-foot"><button class="primary" type="submit">حفظ التوريد</button><button type="button" data-so="cancel">إلغاء</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
+    </form></div>`}
+  const moves=soSiteMoves(site.id).filter(x=>x.id!==f.id),calc=soCalc(moves,null,f.date);
+  const ids=[...new Set([...calc.keys(),...Object.keys(f.lines||{}),...(f.extra||[])])].filter(id=>soItem(id));
+  const rows=soGroups(new Map(ids.map(id=>[id,calc.get(id)||{bal:0}])));
+  const cell=it=>{const v=(f.lines||{})[it.id],bk=calc.has(it.id)?calc.get(it.id).bal:0,used=v===''||v==null?'':r2(bk-(+v));
+    return `<tr><td>${esc(it.name)}</td><td>${esc(it.unit||'')}</td><td class="num plain">${fmt(bk)}</td><td><input class="ct-in" id="so_c_${esc(it.id)}" data-soc="${esc(it.id)}" type="number" inputmode="decimal" min="0" step="any" value="${v??''}" aria-label="الموجود فعلًا ${esc(it.name)}"></td><td class="num" id="so_d_${esc(it.id)}">${used===''?'—':fmt(used)}</td></tr>`};
+  return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${f.id?'تعديل جرد':'جرد المخزن'} — ${esc(site.name)}</div>
+  <form id="soForm" class="entry" novalidate>
+    <div class="f c1 half"><label for="so_date">تاريخ الجرد</label><input id="so_date" type="date" value="${esc(f.date)}"></div>
+    <div class="fw tbl-wrap"><table class="ct-lines"><thead><tr><th>الخامة</th><th>الوحدة</th><th class="num">الرصيد الدفتري</th><th class="num">الموجود فعلًا</th><th class="num">المنصرف</th></tr></thead><tbody>
+      ${rows.map(g=>(g.subs?`<tr class="ct-sec"><td colspan="5"><b>${esc(g.main.name)}</b></td></tr>`:'')+g.rows.map(x=>cell(x.it)).join('')).join('')||'<tr><td colspan="5" class="note">اختر الخامات اللي هتجردها من القائمة تحت.</td></tr>'}
+    </tbody></table></div>
+    <div class="f c2"><label for="so_addc">إضافة خامة للجرد</label><select id="so_addc"><option value="">اختر الخامة</option>${soItemOpts('',true)}</select></div>
+    <div class="f fw"><label for="so_notes">ملاحظات (اختياري)</label><input id="so_notes" maxlength="200" value="${esc(f.notes||'')}"></div>
+    <p class="note fw">اكتب الكمية الموجودة فعلًا في الموقع. الخامة اللي تسيبها فاضية ما بتتجردش المرة دي. أول جرد لأي خامة بيبقى رصيدها الافتتاحي.</p>
+    <div class="form-foot"><button class="primary" type="submit">حفظ الجرد</button><button type="button" data-so="cancel">إلغاء</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
+  </form></div>`;
+}
+function soReadForm(){
+  const f=SO.form;if(!f)return;const v=id=>{const e=document.getElementById(id);return e?e.value:null};
+  const d=v('so_date');if(d!=null)f.date=d;const n=v('so_notes');if(n!=null)f.notes=n;
+  if(f.kind==='in'){const i=v('so_item');if(i!=null)f.item=i;const q=v('so_qty');if(q!=null)f.qty=q===''?'':+q;const s=v('so_sup');if(s!=null)f.supplier=s}
+  else{f.lines=f.lines||{};document.querySelectorAll('#soForm [data-soc]').forEach(e=>{if(e.value==='')delete f.lines[e.dataset.soc];else f.lines[e.dataset.soc]=+e.value})}
+}
+async function soSaveForm(site){
+  soReadForm();const f=SO.form;if(!f)return;
+  if(!f.date){SO.msg={t:'اكتب التاريخ.'};return render()}
+  const old=f.id?(SO.d.moves||[]).find(x=>x.id===f.id):null;
+  const base={id:f.id||'sm'+newId(),site_id:site.id,site_owner:site.owner||null,kind:f.kind,date:f.date,deleted:false,created_by:old?old.created_by:soMe(),data:{...(old?old.data:{}),notes:(f.notes||'').trim(),by:(old&&old.data&&old.data.by)||myBy()||(APPU.me&&APPU.me.name)||'',at:(old&&old.data&&old.data.at)||Date.now()}};
+  if(old&&old.created_at)base.created_at=old.created_at;
+  if(f.kind==='in'){
+    if(!f.item){SO.msg={t:'اختر الخامة.'};return render()}
+    if(!(+f.qty>0)){SO.msg={t:'اكتب كمية أكبر من صفر.'};return render()}
+    base.data={...base.data,item:f.item,qty:+f.qty,supplier:(f.supplier||'').trim()};
+  }else{
+    const L={};for(const [k,x] of Object.entries(f.lines||{}))if(x!==''&&x!=null&&!isNaN(+x)&&+x>=0)L[k]=+x;
+    if(!Object.keys(L).length){SO.msg={t:'اكتب الكمية الموجودة لخامة واحدة على الأقل.'};return render()}
+    base.data={...base.data,lines:L};
+  }
+  if(old)base.data.editedAt=Date.now();
+  const ok=await soPut('store_moves',base);
+  SO.form=null;SO.msg={ok:1,t:(f.kind==='in'?'تم حفظ التوريد':'تم حفظ الجرد')+(ok?'.':' على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.')};
+  render();
+}
+function soBindForm(site){
+  const fm=$('#soForm');if(!fm)return;
+  fm.onsubmit=ev=>{ev.preventDefault();soSaveForm(site)};
+  const it=$('#so_item');if(it)it.onchange=()=>{soReadForm();render()};
+  const dt=$('#so_date');if(dt&&SO.form.kind==='count')dt.onchange=()=>{soReadForm();render()};
+  const ad=$('#so_addc');if(ad)ad.onchange=()=>{soReadForm();if(ad.value){SO.form.extra=[...(SO.form.extra||[]),ad.value]}render();const n=document.getElementById('so_c_'+ad.value);if(n)n.focus()};
+  fm.querySelectorAll('[data-soc]').forEach(e=>e.oninput=()=>{soReadForm();const id=e.dataset.soc,bk=soBook(site.id,id,SO.form.date,SO.form.id),o=$('#so_d_'+CSS.escape(id));if(o)o.textContent=e.value===''?'—':fmt(r2(bk-(+e.value)))});
+  fm.querySelectorAll('input,select').forEach(e=>{if(!e.oninput&&!e.onchange)e.addEventListener('input',()=>soReadForm())});
+}
+function soRenderPage(){
+  if(!SO.loaded){soLoad().then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
+  const appr=soIsAppr(),eng=appIsEngineer();
+  if(appr&&(SO.people===null||Date.now()-(SO.pplAt||0)>60000)){SO.people=SO.people||[];SO.pplAt=Date.now();custEngs().then(()=>render())}
+  const sites=soMySites(),en=sites.filter(s=>s.enabled);
+  if(SO.want&&en.some(s=>s.id===SO.want)){SO.site=SO.want;SO.want=''}
+  if(!SO.site||!en.some(s=>s.id===SO.site))SO.site=(en[0]||{}).id||'';
+  const site=en.find(s=>s.id===SO.site)||null,wantSite=SO.want?sites.find(s=>s.id===SO.want):null;
+  const tab=SO.tab,msg=!SO.form&&SO.msg;if(!SO.form)SO.msg=null;
+  $('#pane').innerHTML=`<div class="pane-h"><h2>المخزن${site?' — '+esc(site.name):''}</h2><div class="actions">
+    ${site&&!SO.form?'<button class="primary" data-so="new" data-k="in">+ توريد</button><button data-so="new" data-k="count">+ جرد</button>':''}
+    ${eng?`<button class="ghost" data-cu="eng-settings">${CU.engSettings?'إخفاء الإعدادات':'الإعدادات'}</button>`:''}</div></div>${soNeedSql()}
+  ${eng&&CU.engSettings?appSecurityCard():''}
+  ${wantSite&&!wantSite.enabled&&soCanAppr(wantSite.id)?`<div class="card due-card"><p>المخزن مش مفعّل في موقع <b>${esc(wantSite.name)}</b>.</p><div class="row"><button class="primary" data-so="enable" data-id="${esc(wantSite.id)}">تفعيل المخزن في هذا الموقع</button><button class="ghost" data-so="nowant">لا</button></div></div>`:''}
+  ${msg?`<p class="msg ${msg.ok?'ok':'err'}">${esc(msg.t)}</p>`:''}
+  ${en.length>1?`<div class="row"><label for="so_site">الموقع</label><select id="so_site" style="width:auto">${en.map(s=>`<option value="${esc(s.id)}" ${s.id===SO.site?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`:''}
+  ${!en.length?(appr?`<div class="card blank"><h3>المخزن مش مفعّل في أي موقع</h3><p>فعّله من «تفعيل المخزن على المواقع» تحت، أو من ⋯ في صفحة الموقع.</p></div>`:`<div class="card blank"><h3>لا توجد مخازن متاحة لك بعد</h3><p>اطلب من المدير أو صاحب الموقع يضيفك على مخزن الموقع.</p></div>`):''}
+  ${site?soFormHTML(site):''}
+  ${site?`<div class="seg" role="tablist" aria-label="المخزن"><button role="tab" data-so="tab" data-v="bal" aria-selected="${tab==='bal'}">الأرصدة</button><button role="tab" data-so="tab" data-v="moves" aria-selected="${tab==='moves'}">الحركات</button><button role="tab" data-so="tab" data-v="rep" aria-selected="${tab==='rep'}">التقارير</button></div>
+  ${tab==='moves'?soMovesHTML(site):tab==='rep'?soRepHTML(site):soBalHTML(site)}`:''}
+  ${appr||en.length?soCatHTML():''}
+  ${appr?soEnableHTML(sites)+soGrantHTML(sites):''}`;
+  if(site)soBindForm(site);
+  const ss=$('#so_site');if(ss)ss.onchange=()=>{SO.site=ss.value;SO.form=null;render()};
+  for(const [id,k] of [['so_rmain','main'],['so_rsub','sub'],['so_rfrom','from'],['so_rto','to']]){const e=document.getElementById(id);if(e)e.onchange=()=>{SO.rep[k]=e.value;if(k==='main')SO.rep.sub='';render()}}
+  const rs=$('#so_rsup');if(rs)rs.onchange=()=>{SO.rep.sup=rs.value;render()};
+  const gp=$('#so_gp');if(gp)gp.onchange=()=>{SO.grantP=gp.value;render()};
+  for(const [id,k] of [['soCatBox','openCat'],['soEnBox','openEn'],['soGrBox','openGr']]){const b=document.getElementById(id);if(b)b.ontoggle=()=>{if(SO[k]===b.open)return;SO[k]=b.open;if(id==='soGrBox'&&b.open){SO.pplAt=Date.now();custEngs().then(()=>render())}}}
+  for(const id of ['so_cn','so_cu','so_sn','so_su','so_en','so_eu']){const e=document.getElementById(id);if(e)e.addEventListener('input',()=>{const A=SO.cat.add,E=SO.cat.edit;if(id==='so_sn'&&A)A.name=e.value;if(id==='so_su'&&A)A.unit=e.value;if(id==='so_en'&&E)E.name=e.value;if(id==='so_eu'&&E)E.unit=e.value})}
+  document.querySelectorAll('[data-soen]').forEach(cb=>cb.onchange=()=>soEnable(cb.dataset.soen,cb.checked,cb));
+  document.querySelectorAll('[data-sogrant]').forEach(cb=>cb.onchange=()=>soGrant(cb.dataset.sogrant,cb.checked,cb));
+  document.querySelectorAll('[data-sophoto]').forEach(inp=>inp.onchange=()=>{const f=inp.files&&inp.files[0];inp.value='';if(f)soPhoto(inp.dataset.sophoto,f)});
+  soLoadThumbs();
+}
+/* ---------- actions ---------- */
+async function soEnable(id,on,cb){
+  const s=soMySites().find(x=>x.id===id);if(!s||!SB)return;
+  if(!on&&soSiteMoves(id).length&&!confirm('إيقاف المخزن في موقع «'+s.name+'»؟ الحركات المسجّلة هتفضل محفوظة وترجع لو فعّلته تاني.')){if(cb)cb.checked=true;return}
+  if(cb)cb.disabled=true;
+  const r=on?await SB.from('store_sites').upsert({site_id:id,site_owner:s.owner||null,site_name:s.name},{onConflict:'site_id'}):await SB.from('store_sites').delete().eq('site_id',id);
+  if(r.error)showBanner(ctNetErr(r.error)?'تفعيل المخزن يحتاج اتصال بالإنترنت.':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100));
+  if(on&&!r.error){SO.site=id;SO.want=''}
+  await soLoad();render();
+}
+async function soGrant(siteId,on,cb){
+  const p=SO.grantP,s=soMySites().find(x=>x.id===siteId);if(!p||!s||!SB)return;if(cb)cb.disabled=true;
+  const r=on?await SB.from('store_access').upsert({person:p,site_id:siteId,site_owner:s.owner||null,site_name:s.name},{onConflict:'person,site_id'}):await SB.from('store_access').delete().eq('person',p).eq('site_id',siteId);
+  if(r.error)showBanner(ctNetErr(r.error)?'الصلاحيات تحتاج اتصال بالإنترنت.':'تعذّر حفظ الصلاحية: '+String(r.error.message||'').slice(0,100));
+  await soLoad();render();
+}
+async function soPhoto(id,file){
+  const it=soItem(id);if(!it)return;
+  if(!navigator.onLine||!SB){showBanner('رفع الصورة يحتاج اتصال بالإنترنت.');return}
+  flash('جاري رفع الصورة…');
+  try{const b=await shrinkImage(file);const up=await APPASSETS.upload(b,{type:b.type||'image/jpeg'});
+    const ok=await soPut('store_items',{...soClean(it),photo:up.id});SO.catMsg={ok,t:ok?'تم حفظ الصورة.':'تعذّر حفظ الصورة.'}}
+  catch(e){SO.catMsg={t:'تعذّر رفع الصورة'+(e&&e.code==='too_large'?': الصورة كبيرة جدًا.':'.')}}
+  SO.openCat=true;render();
+}
+function soDup(name,parent,skip){const n=soNorm(name);return soItems().some(i=>(i.parent||'')===(parent||'')&&i.id!==skip&&soNorm(i.name)===n)}
+async function soAddItem(name,unit,parent){
+  name=String(name||'').trim();unit=String(unit||'').trim();
+  if(!name){SO.catMsg={t:'اكتب اسم الخامة.'};return false}
+  if(parent&&!unit){SO.catMsg={t:'البند الفرعي محتاج وحدة (شيكارة، طن، م3، عدد…).'};return false}
+  if(soDup(name,parent)){SO.catMsg={t:'«'+name+'» موجود بالفعل'+(parent?' تحت نفس البند.':' في القائمة.')};return false}
+  const row={id:'si'+newId(),parent:parent||null,name,unit,photo:'',deleted:false,created_by:soMe()};
+  const ok=await soPut('store_items',row);SO.catMsg={ok:1,t:'تمت إضافة «'+name+'»'+(ok?'.':' على هذا الجهاز، وسيُرفع عند عودة الاتصال.')};return true;
+}
+document.addEventListener('click',async ev=>{
+  const b=ev.target.closest('[data-so]');if(!b)return;const a=b.dataset.so,id=b.dataset.id;
+  const site=soMySites().find(s=>s.id===SO.site&&s.enabled);
+  if(a==='tab'){SO.tab=b.dataset.v;render();return}
+  if(a==='new'){SO.form={kind:b.dataset.k,date:today(),lines:{},extra:[]};SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
+  if(a==='cancel'){SO.form=null;SO.msg=null;render();return}
+  if(a==='edit'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;const d=m.data||{};
+    SO.form=m.kind==='in'?{id:m.id,kind:'in',date:m.date,item:d.item,qty:d.qty,supplier:d.supplier||'',notes:d.notes||''}:{id:m.id,kind:'count',date:m.date,lines:{...(d.lines||{})},extra:[],notes:d.notes||''};
+    SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
+  if(a==='del'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;if(!confirm('حذف '+(m.kind==='in'?'التوريد':'الجرد')+' بتاريخ '+m.date+'؟'))return;
+    await soPut('store_moves',{...soClean(m),deleted:true});SO.msg={ok:1,t:'اتنقل للمحذوفات.'};render();return}
+  if(a==='restore'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m)return;await soPut('store_moves',{...soClean(m),deleted:false});render();return}
+  if(a==='purge'){if(!confirm('حذف نهائي؟ مش هينفع ترجّعه.'))return;soQueue('store_moves','del',id,null);await soFlush();render();return}
+  if(a==='showdel'){SO.showDel=!SO.showDel;render();return}
+  if(a==='more'){SO.lim+=50;render();return}
+  if(a==='enable'){soEnable(id,true);return}
+  if(a==='nowant'){SO.want='';render();return}
+  if(a==='mainsave'){const n=$('#so_cn'),u=$('#so_cu');SO.openCat=true;if(await soAddItem(n&&n.value,u&&u.value,null)){if(n)n.value='';if(u)u.value=''}render();return}
+  if(a==='addsub'){SO.cat={add:{parent:id,name:'',unit:''},edit:null};SO.openCat=true;render();const n=$('#so_sn');if(n)n.focus();return}
+  if(a==='subsave'){const A=SO.cat.add;if(!A)return;const n=$('#so_sn'),u=$('#so_su');A.name=n?n.value:A.name;A.unit=u?u.value:A.unit;
+    const p=soItem(A.parent);if(p&&soUsed(p.id)&&!soSubs(p.id).length){SO.catMsg={t:'«'+p.name+'» عليه حركات مباشرة، فمينفعش يبقى له بنود فرعية. أضف الفرعي كبند رئيسي جديد.'};render();return}
+    if(await soAddItem(A.name,A.unit,A.parent))SO.cat.add=null;render();return}
+  if(a==='catcancel'){SO.cat={add:null,edit:null};render();return}
+  if(a==='catedit'){const it=soItem(id);if(!it)return;SO.cat={add:null,edit:{id,name:it.name,unit:it.unit||''}};SO.openCat=true;render();const n=$('#so_en');if(n)n.focus();return}
+  if(a==='catsave'){const E=SO.cat.edit,it=E&&soItem(E.id);if(!it)return;const n=$('#so_en'),u=$('#so_eu');const name=(n?n.value:E.name).trim(),unit=(u?u.value:E.unit).trim();
+    if(!name){SO.catMsg={t:'اكتب اسم الخامة.'};render();return}
+    if(it.parent&&!unit){SO.catMsg={t:'البند الفرعي محتاج وحدة.'};render();return}
+    if(soDup(name,it.parent,it.id)){SO.catMsg={t:'الاسم ده موجود بالفعل.'};render();return}
+    const ok=await soPut('store_items',{...soClean(it),name,unit});SO.cat.edit=null;SO.catMsg={ok:1,t:'تم الحفظ'+(ok?'.':' على هذا الجهاز.')};render();return}
+  if(a==='catdel'){const it=soItem(id);if(!it||!APPU.owner)return;if(!confirm('حذف «'+it.name+'» من قائمة الخامات؟'))return;const ok=await soPut('store_items',{...soClean(it),deleted:true});SO.catMsg={ok,t:ok?'تم الحذف.':'تعذّر الحذف.'};render();return}
+  if(a==='print'&&site){SO.printing={site,rep:{...SO.rep}};printReport('store');return}
+  if(a==='xlsx'&&site){soExcel(site);return}
+});
+/* ---------- print + Excel ---------- */
+function soDocBody(P){
+  const site=P.site,rep=P.rep,x=soReport(site,rep),money=v=>fmt(v).replace(/[⁦⁩]/g,''),td=(v,c)=>`<td${c?` class="${c}"`:''}>${v}</td>`;
+  const sub=['البنود: '+soScopeLabel(rep),'الفترة: '+(rep.from||'البداية')+' إلى '+(rep.to||today())];if(rep.sup)sub.push('المورد: '+rep.sup);
+  let body=`<table><thead><tr><th>الخامة</th><th>الوحدة</th><th>رصيد أول المدة</th><th>التوريد</th><th>المنصرف</th><th>رصيد آخر المدة</th><th>آخر جرد</th></tr></thead><tbody>
+  ${x.gs.map(g=>(g.subs?`<tr class="open"><td colspan="7" class="tl">${esc(g.main.name)}</td></tr>`:'')+g.rows.map(y=>`<tr>${td(esc(y.it.name),'tl')}${td(esc(y.it.unit||''))}${td(money(y.r.open),'n')}${td(money(y.r.inQ),'n')}${td(money(y.r.out),'n')}${td(money(y.r.bal),'n b')}${td(y.r.last?esc(y.r.last.date):'—')}</tr>`).join('')).join('')||'<tr><td colspan="7">لا توجد حركات</td></tr>'}
+  </tbody></table>`;
+  if(x.ins.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">التوريدات${rep.sup?' من '+esc(rep.sup):''}</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الكمية</th><th>الوحدة</th><th>المورد</th><th>ملاحظات</th><th>سجّله</th></tr></thead><tbody>
+  ${x.ins.map(y=>{const d=y.m.data||{};return `<tr>${td(esc(y.m.date))}${td(esc(soLabel(y.it.id)),'tl')}${td(money(d.qty),'n')}${td(esc(y.it.unit||''))}${td(esc(d.supplier||''),'tl')}${td(esc(d.notes||''),'tl')}${td(esc(d.by||''))}</tr>`}).join('')}</tbody></table>`;
+  if(x.counts.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">الجرد</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الوحدة</th><th>الرصيد الدفتري</th><th>الموجود فعلًا</th><th>المنصرف</th></tr></thead><tbody>
+  ${x.counts.map(c=>`<tr>${td(esc(c.date))}${td(esc(soLabel(c.it.id)),'tl')}${td(esc(c.it.unit||''))}${td(money(c.book),'n')}${td(money(c.actual),'n b')}${td(c.adj?'رصيد افتتاحي':money(c.out),'n')}</tr>`).join('')}</tbody></table>`;
+  body+=`<p class="sub" style="margin-top:8px">المنصرف يُحسب عند كل جرد: الرصيد قبله + ما ورد − الموجود فعلًا.</p>`;
+  return {title:'تقرير مخزن موقع: '+site.name,sub:sub.join(' · '),body,signs:['أمين المخزن','مهندس الموقع','الاعتماد']};
+}
+function soRepName(P){return safeName('تقرير مخزن - '+P.site.name+' - '+soScopeLabel(P.rep)+' - '+(P.rep.to||today()))}
+async function soExcel(site){
+  const rep={...SO.rep},x=soReport(site,rep);
+  const sum={name:'الأرصدة',rows:[['الخامة الرئيسية','الخامة','الوحدة','رصيد أول المدة','التوريد','المنصرف','رصيد آخر المدة','آخر جرد']],styles:{0:1},widths:[22,26,10,15,13,13,15,13],freeze:1};
+  for(const g of x.gs)for(const y of g.rows)sum.rows.push([g.subs?g.main.name:'',y.it.name,y.it.unit||'',y.r.open,y.r.inQ,y.r.out,y.r.bal,y.r.last?y.r.last.date:'']);
+  const ins={name:'التوريدات',rows:[['التاريخ','الخامة','الكمية','الوحدة','المورد','ملاحظات','سجّله']],styles:{0:1},widths:[12,30,12,10,22,26,16],freeze:1};
+  for(const y of x.ins){const d=y.m.data||{};ins.rows.push([y.m.date,soLabel(y.it.id),+d.qty||0,y.it.unit||'',d.supplier||'',d.notes||'',d.by||''])}
+  const cnt={name:'الجرد',rows:[['التاريخ','الخامة','الوحدة','الرصيد الدفتري','الموجود فعلًا','المنصرف']],styles:{0:1},widths:[12,30,10,15,15,13],freeze:1};
+  for(const c of x.counts)cnt.rows.push([c.date,soLabel(c.it.id),c.it.unit||'',c.book,c.actual,c.adj?'رصيد افتتاحي':c.out]);
+  const nm=await askFileName(soRepName({site,rep}),'Excel (.xlsx)');if(!nm)return;
+  try{await saveFile(nm+'.xlsx',XLSX_W.build([sum,ins,cnt]));flash('تم الحفظ: '+nm+'.xlsx')}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر حفظ الملف.',1)}
 }
 
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
@@ -1669,9 +2167,9 @@ function renderSites(){
   const tool=(id,name,t)=>`<button class="site-btn jbtn" role="menuitem" data-site="${id}" aria-current="${cur===id}"><span class="n">${name}</span><span class="t">${t}</span></button>`;
   const tm=$('#toolMenu');
   if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+tool('__banks','الحسابات البنكية',bankList().length||'')+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'')+tool('__trash','سلة المهملات',(S.trash||[]).length||'');
-  if(APP&&tm&&!appIsEngineer()){const n=ctBadgeCount();tm.insertAdjacentHTML('beforeend','');const t=tool('__certs','المستخلصات',n?`<b class="neg">${n} للاعتماد</b>`:'');const anchor=tm.querySelector('[data-site="__banks"]');if(anchor)anchor.insertAdjacentHTML('beforebegin',t);else tm.insertAdjacentHTML('beforeend',t)}
+  if(APP&&tm&&!appIsEngineer()){const n=ctBadgeCount();tm.insertAdjacentHTML('beforeend','');const t=tool('__certs','المستخلصات',n?`<b class="neg">${n} للاعتماد</b>`:'')+tool('__store','المخزن',typeof SO!=='undefined'&&SO.d?(SO.d.sites.filter(x=>ctMySites().some(s=>s.id===x.site_id)).length||''):'');const anchor=tm.querySelector('[data-site="__banks"]');if(anchor)anchor.insertAdjacentHTML('beforebegin',t);else tm.insertAdjacentHTML('beforeend',t)}
   {const sb=$('#setBtn');if(sb){sb.classList.toggle('on',cur==='__settings');sb.setAttribute('aria-current',String(cur==='__settings'))}}
-  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__certs:'المستخلصات',__custody:'العُهد',__trash:'سلة المهملات'};
+  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__certs:'المستخلصات',__store:'المخزن',__custody:'العُهد',__trash:'سلة المهملات'};
   const mb=$('#menuBtn');if(mb){const pend=APP&&!appIsEngineer()&&typeof custMine==='function'?custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length+ctBadgeCount():0;
     mb.innerHTML=`<span aria-hidden="true">☰</span> ${TOOLS[cur]?esc(TOOLS[cur]):'القائمة'}${pend?`<span class="badge" title="بانتظار مراجعتك">${pend}</span>`:''}`;mb.classList.toggle('on',!!TOOLS[cur])}
   const am=$('#addMenu');
@@ -1726,6 +2224,7 @@ function renderBanks(){
   const known=new Map(list.map(b=>[b.name,{...b,inn:0,out:0,later:0,n:0}]));const other=new Map();const none={name:'غير محدد',inn:0,out:0,later:0,n:0};
   const add=(x,sign)=>{if(!BANKY(x.method))return;const k=(x.bank||'').trim();const r=k?(known.get(k)||other.get(k)||(other.set(k,{name:k,inn:0,out:0,later:0,n:0}),other.get(k))):none;r.n++;if(notDue(x,td)){r.later+=sign*amt(x);return}if(sign>0)r.inn+=amt(x);else r.out+=amt(x)};
   for(const e of S.dep)add(e,1);for(const e of S.exp)add(e,-1);
+  if(APP&&typeof custMine==='function')for(const r of custMine())if(r.kind==='issue'&&(r.data||{}).source==='bank')add({method:'bank',bank:(r.data.bank||''),amount:+r.data.amount||0,date:r.data.date},-1);
   const row=(r,isKnown)=>{const op=+r.opening||0,bal=op+r.inn-r.out;return `<tr><td><b>${esc(r.name)}</b>${isKnown?'':'<span class="pend">'+(r===none?'لم يُحدَّد البنك':'أخرى')+'</span>'}</td><td class="num plain">${isKnown&&op?fmt(op):'—'}</td><td class="num in">${fmt(r.inn)}</td><td class="num">${fmt(r.out)}</td><td class="num strong${bal<0?' neg':''}">${fmt(bal)}</td><td class="num plain">${r.later?fmt(r.later):'—'}</td><td class="plain">${r.n}</td>${canBanks()?`<td class="acts">${isKnown?bankActs(r):''}</td>`:''}</tr>${isKnown&&S.bankEdit===r.name?bankEditRow(r):''}`};
   const bankActs=r=>S.bankDel===r.name?(r.n?`<span class="confirm"><span class="msg err">عليه ${r.n} حركة، لا يمكن حذفه.</span><button data-bankhide="${esc(r.name)}">إخفاؤه من القائمة</button><button data-bankno="1">إلغاء</button></span>`:`<span class="confirm"><button class="danger" data-bankdelyes="${esc(r.name)}">تأكيد الحذف</button><button data-bankno="1">إلغاء</button></span>`)
     :`<button class="ghost" data-bankedit="${esc(r.name)}">تعديل</button><button class="ghost" data-bankdel="${esc(r.name)}">حذف</button>`;
@@ -2002,6 +2501,7 @@ function renderSite(){
     <div class="pop pop-end" id="siteMenu" role="menu" hidden>
     ${S.canWrite&&canEditRec(site)?'<button role="menuitem" id="impOpen">استيراد من Excel</button>':''}
     <button role="menuitem" data-print="site">طباعة كشف الحساب / PDF</button>
+    ${APP?`<button role="menuitem" data-sogo="${esc(site.id)}">مخزن الموقع</button>`:''}
     ${S.downloads&&hasAny?'<button role="menuitem" id="exportSite">Excel هذا الموقع</button>':''}
     ${canEditRec(site)&&!S.confirmSite?'<button role="menuitem" class="pop-danger" id="delSite">حذف الموقع</button>':''}
     </div></div>
@@ -2379,7 +2879,7 @@ async function exportExcel(siteId,auto){
   const T=(sh,row)=>{sh.rows.push(row);sh.styles[sh.rows.length-1]=3};
   const sites=S.sites.filter(s=>!siteId||s.id===siteId);
   const sum1={name:'الملخص',rows:[],styles:{},widths:[26,14,14,14,14,14,13,14,14,12,14],freeze:0};
-  sum1.rows.push(['ADC Construction · حسابات المواقع'+(siteId?' · '+siteNameOf(siteId):'')]);sum1.styles[0]=3;
+  sum1.rows.push(['ADC CONSTRUCTION'+(siteId?' · '+siteNameOf(siteId):'')]);sum1.styles[0]=3;
   sum1.rows.push(['تم حفظ الملف: '+stamp(now)]);sum1.rows.push([]);
   H(sum1,['الموقع','الإيداعات','المصروفات','الرصيد الدفتري','دفتري نقدي','دفتري بنك','تاريخ آخر جرد','نقدي موجود','في البنك','الفرق','الحالة']);
   let tot=[0,0,0,0,0];
@@ -2993,7 +3493,7 @@ function bindConItem(conId,itemId){
   it.addEventListener('change',()=>{it.dataset.auto=''});
 }
 /* the claim total covers all sites; a regular user only sees his own payments, so he sees a claim only on a contractor he registered himself */
-function claimOf(name){const r=(S.cons||[]).find(x=>x.name.trim()===name&&!x.hidden);if(!r||!(r.claim>0))return null;if(!S.isManager&&!OFF&&S.pfx&&(r._p??'')!==S.pfx)return null;return +r.claim}
+function claimOf(name){if(APP)return null;const r=(S.cons||[]).find(x=>x.name.trim()===name&&!x.hidden);if(!r||!(r.claim>0))return null;if(!S.isManager&&!OFF&&S.pfx&&(r._p??'')!==S.pfx)return null;return +r.claim}
 function regStats(col,name){
   const f=REG[col].field,l=S.exp.filter(e=>(e[f]||'').trim()===name);
   return {n:l.length,total:sum(l),sites:new Set(l.map(e=>e.siteId)).size,last:l.map(e=>e.date).sort().pop()||''};
@@ -3015,23 +3515,23 @@ function renderRegister(col){
     <div class="f c2"><label for="r_name">اسم ال${R.one}</label><input id="r_name" maxlength="100" placeholder="${col==='contractors'?'مثال: مؤسسة الفتح للمباني':'مثال: خرسانة مسلحة'}"></div>
     ${col==='contractors'?`<div class="f c2"><label for="r_spec">التخصص (اختياري)</label><input id="r_spec" maxlength="80" placeholder="مباني، كهرباء، نجارة…"></div>
     <div class="f c2"><label for="r_phone">الهاتف (اختياري)</label><input id="r_phone" maxlength="30" inputmode="tel" dir="ltr"></div>
-    <div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    ${APP?'':`<div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>`}
     <div class="f c2"><label for="r_item">البند الأساسي (اختياري)</label><select id="r_item"><option value="">— بدون —</option>${regNames('items').map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`
     :`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div><div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="sec-h">${list.length} ${R.one==='بند'?'بند':'مقاول'} · إجمالي المصروف عليهم ${fmt(totalAll)} ${CUR}</div>
-    ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>الاسم</th>${col==='contractors'?'<th>البند الأساسي</th><th>التخصص</th><th>الهاتف</th>':'<th>الكود</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th>${col==='contractors'?'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المصروف ('+CUR+')</th>'}<th>آخر صرف</th><th></th></tr></thead><tbody>
+    ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>الاسم</th>${col==='contractors'?'<th>البند الأساسي</th><th>التخصص</th><th>الهاتف</th>':'<th>الكود</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th>${col==='contractors'?(APP?'<th class="num">المستحق حسب المستخلصات</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>'):'<th class="num">إجمالي المصروف ('+CUR+')</th>'}<th>آخر صرف</th><th></th></tr></thead><tbody>
     ${list.map(x=>{const st=regStats(col,x.name),r=recs.get(x.name)||{};const delKey=col+'|'+x.name;
       return `<tr><td><b>${esc(x.name)}</b>${x.reg?'':`<span class="pend">غير مسجّل</span>`}</td>${col==='contractors'?`<td>${esc(r.item)||'—'}</td><td>${esc(r.spec)||'—'}</td><td class="date">${esc(r.phone)||'—'}</td>`:`<td class="date">${esc(r.code)||'—'}</td>`}
-      <td class="num plain">${st.n}</td><td class="num plain">${st.sites}</td>${col==='contractors'?(()=>{const c=claimOf(x.name);return `<td class="num plain">${c==null?'—':fmt(c)}</td><td class="num">${fmt(st.total)}</td><td class="num strong${c!=null&&c-st.total<0?' neg':''}">${c==null?'—':fmt(c-st.total)}</td>`})():`<td class="num">${fmt(st.total)}</td>`}<td class="date">${esc(st.last)||'—'}</td>
+      <td class="num plain">${st.n}</td><td class="num plain">${st.sites}</td>${col==='contractors'?(()=>{if(APP){const q=ctConSummary(x.name);return q?`<td class="num plain">${fmt(q.after)}</td><td class="num">${fmt(q.paid)}</td><td class="num strong${q.left<0?' neg':''}">${fmt(q.left)}</td>`:`<td class="num plain">—</td><td class="num">${fmt(st.total)}</td><td class="num">—</td>`}const c=claimOf(x.name);return `<td class="num plain">${c==null?'—':fmt(c)}</td><td class="num">${fmt(st.total)}</td><td class="num strong${c!=null&&c-st.total<0?' neg':''}">${c==null?'—':fmt(c-st.total)}</td>`})():`<td class="num">${fmt(st.total)}</td>`}<td class="date">${esc(st.last)||'—'}</td>
       <td class="acts"><button class="ghost" data-stmt="${col}" data-name="${esc(x.name)}">كشف حساب</button>${x.reg&&canEditRec(r)?`<button class="ghost" data-regedit="${col}" data-name="${esc(x.name)}">تعديل</button>`:''}${!x.reg&&canReg()?`<button class="ghost" data-regadd="${col}" data-name="${esc(x.name)}">تسجيل</button>`:''}${x.reg&&canEditRec(r)?(S.confirmReg===delKey?`<span class="confirm"><button class="danger" data-regdelyes="${col}" data-name="${esc(x.name)}">إزالة من القائمة</button><button data-regdelno="1">إلغاء</button></span>`:`<button class="ghost" data-regdel="${col}" data-name="${esc(x.name)}">حذف</button>`):''}</td></tr>`}).join('')}
     </tbody></table></div><p class="foot-note" style="margin:0">الحذف يزيل الاسم من قائمة الاختيار فقط، وتبقى الحركات المسجلة عليه كما هي. الأسماء التي عليها «غير مسجّل» موجودة في حركات قديمة، ويمكنك تسجيلها بضغطة واحدة.</p>`
     :`<div class="blank" style="padding:24px"><h3>لا يوجد ${R.title} بعد</h3><p>${canReg()?'أضف أول '+R.one+' من النموذج أعلاه.':'اطلب من المدير إضافتهم.'}</p></div>`}
   </div>`;
   const f=$('#regForm');if(f)f.onsubmit=ev=>{ev.preventDefault();const m=$('#regMsg'),name=$('#r_name').value.trim();
     if(!name){m.className='msg err';m.textContent='أدخل الاسم.';return}
-    const data={name};if(col==='contractors'){data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();data.item=($('#r_item')||{}).value||'';const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim()}
+    const data={name};if(col==='contractors'){data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();data.item=($('#r_item')||{}).value||'';if($('#r_claim')){const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim()}
     if(S.regEdit){const old=(S[R.key]||[]).find(r=>r.id===S.regEdit.id);if(!old)return;
       if(name!==old.name.trim()&&(S[R.key]||[]).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
       const upd={...clean(old),...data,updated:Date.now()};delete upd.id;queue(col,old.id,upd);
@@ -3079,7 +3579,7 @@ function renderStatement(col,name){
     <div class="stat"><div class="l">إجمالي المصروف${filtOn?' · حسب الفلتر':''}</div><div class="v">${fmt(sum(rows))}<small>${CUR}</small></div></div>
     <div class="stat"><div class="l">عدد الحركات</div><div class="v plain">${rows.length}</div></div>
     <div class="stat"><div class="l">عدد المواقع</div><div class="v plain">${new Set(rows.map(e=>e.siteId)).size}</div></div>
-  </div>${multi?`<div class="card" style="display:flex;flex-direction:column;gap:8px"><div class="sec-h">الإجمالي لكل ${R.one}${filtOn?' · حسب الفلتر':''}</div><div class="tbl-wrap"><table><thead><tr><th>ال${R.one}</th><th class="num">عدد الحركات</th><th class="num">الإجمالي (${CUR})</th></tr></thead><tbody>${byName.map(([n,t,k])=>`<tr><td><b>${esc(n)}</b></td><td class="num plain">${k}</td><td class="num">${fmt(t)}</td></tr>`).join('')}</tbody><tfoot><tr><td>الإجمالي</td><td class="num plain">${rows.length}</td><td class="num">${fmt(sum(rows))}</td></tr></tfoot></table></div></div>`:''}${col==='contractors'&&S.isManager&&!multi?`<p class="foot-note" style="margin:-6px 0 0">يمكنك إضافة «إجمالي المستخلص» لهذا المقاول من «تعديل» في صفحة المقاولين، وعندها سيظهر المتبقي له.</p>`:''}`})()}
+  </div>${APP&&col==='contractors'&&!multi?ctConCard(name):''}${multi?`<div class="card" style="display:flex;flex-direction:column;gap:8px"><div class="sec-h">الإجمالي لكل ${R.one}${filtOn?' · حسب الفلتر':''}</div><div class="tbl-wrap"><table><thead><tr><th>ال${R.one}</th><th class="num">عدد الحركات</th><th class="num">الإجمالي (${CUR})</th></tr></thead><tbody>${byName.map(([n,t,k])=>`<tr><td><b>${esc(n)}</b></td><td class="num plain">${k}</td><td class="num">${fmt(t)}</td></tr>`).join('')}</tbody><tfoot><tr><td>الإجمالي</td><td class="num plain">${rows.length}</td><td class="num">${fmt(sum(rows))}</td></tr></tfoot></table></div></div>`:''}${col==='contractors'&&S.isManager&&!multi&&!APP?`<p class="foot-note" style="margin:-6px 0 0">يمكنك إضافة «إجمالي المستخلص» لهذا المقاول من «تعديل» في صفحة المقاولين، وعندها سيظهر المتبقي له.</p>`:''}`})()}
   <div class="card" style="display:flex;flex-direction:column;gap:12px">
     <div class="filters">
       <div class="f"><label for="sf_site">الموقع</label><select id="sf_site"><option value="">كل المواقع</option>${sitesIn.map(id=>`<option value="${esc(id)}" ${sf.site===id?'selected':''}>${esc(siteNameOf(id))}</option>`).join('')}</select></div>
@@ -3321,6 +3821,8 @@ function reportDoc(kind){
     ${f.from?`<tr class="open">${td(esc(f.from))}<td colspan="7" class="tl">رصيد أول الفترة</td>${td(money(open),'n b')}</tr>`:''}${tr||'<tr><td colspan="9">لا توجد حركات في هذه الفترة</td></tr>'}
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(ti),'n')}${td(money(to),'n')}<td colspan="5"></td>${td(money(run),'n')}</tr></tfoot></table>`;
     land=true;
+  }else if(kind==='store'&&APP&&SO.printing){
+    const x=soDocBody(SO.printing);title=x.title;sub=x.sub;body=x.body;signs=x.signs;
   }else if(kind==='cert'&&APP&&CT.printing){
     const x=ctDocBody(CT.printing);title=x.title;sub=x.sub;body=x.body;if(x.signs)signs=x.signs;if(x.land)land=true;
   }else if(kind==='stmt'){
@@ -3382,10 +3884,10 @@ table.pg>tfoot{display:table-footer-group}
 <div class="bar"><span>اختر الطابعة من نافذة الطباعة، أو اختر «Save as PDF» لحفظه بصيغة PDF.</span><button onclick="print()">طباعة / PDF</button></div>
 <table class="pg"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot><tbody><tr><td>
 <div class="hd"><div><h1>${esc(title)}</h1></div>${logo?`<img src="${logo}" alt="AFAQ Development Construction">`:''}</div>
-<p class="sub">${esc(sub)}${sub?' · ':''}طُبع: ${esc(now)}${who?' · بواسطة: '+esc(who):''} · المبالغ بالجنيه المصري</p>
+<p class="sub">${esc(sub)}${sub?' · ':''}طُبع: ${esc(now)}${who?' · بواسطة: '+esc(who):''}${kind==='store'?'':' · المبالغ بالجنيه المصري'}</p>
 ${body}
 <div class="sign">${signs.map(x=>`<div>${x}</div>`).join('')}</div>
-<p class="foot">ADC Construction · حسابات المواقع</p>
+<p class="foot">ADC CONSTRUCTION</p>
 </td></tr></tbody></table>
 <script>window.addEventListener('load',function(){setTimeout(function(){try{print()}catch(e){}},400)})<\/script>
 </body></html>`;
@@ -3408,6 +3910,7 @@ function reportName(kind){
   const d=today();
   if(kind==='stmt'&&S.stmt){const R=REG[S.stmt.col];return R.stmt+(isMulti(S.stmt.name)?' مجمّع':'')+' - '+nmLabel(S.stmt.name)+' - '+d}
   if(kind==='site')return 'كشف حساب موقع - '+siteNameOf(S.sel)+' - '+d;
+  if(kind==='store'&&APP&&SO.printing)return soRepName(SO.printing);
   if(kind==='cert'&&APP&&CT.printing){const c=CT.printing,it=(c.data||{}).item;return 'مستخلص رقم '+c.no+' - '+c.contractor+(it?' - '+it:'')+' - '+(c.data.date||d)}
   return ({summary:'ملخص المواقع',journal:'دفتر اليومية'}[kind]||'تقرير')+' - '+d;
 }
@@ -3463,7 +3966,7 @@ function render(){
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
-  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__settings'?renderSettings():renderSite();
+  S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__settings'?renderSettings():renderSite();
   const bar=(APP&&appIsEngineer())?'':excelBar();if(bar)$('#pane').insertAdjacentHTML('afterbegin',bar);
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
@@ -3485,6 +3988,7 @@ document.addEventListener('click',ev=>{
   const ry=ev.target.closest('[data-regdelyes]');if(ry){const col=ry.dataset.regdelyes,R=REG[col],r=(S[R.key]||[]).find(x=>x.name.trim()===ry.dataset.name&&!x.hidden);
     if(r&&canEditRec(r)){queue(col,r.id,{...clean(r),hidden:true,updated:Date.now()});logChange('delete',col,{name:r.name})}S.confirmReg='';render();return}
   const pb=ev.target.closest('[data-print]');if(pb){printReport(pb.dataset.print);return}
+  const sgo=ev.target.closest('[data-sogo]');if(sgo&&APP){closePops();S.sel='__store';SO.want=sgo.dataset.sogo;SO.site=sgo.dataset.sogo;SO.form=null;S.justSaved=true;render();window.scrollTo({top:0});return}
   if(ev.target.closest('[data-xlsx]')){exportExcel(null);return}
   const eb=ev.target.closest('[data-edit]');
   if(eb){const [col,id]=eb.dataset.edit.split(':');const r=(S[COLS[col]]||[]).find(x=>x.id===id);if(!r||!canEditRec(r))return;
@@ -3561,7 +4065,7 @@ $('#dlgRegForm').addEventListener('submit',ev=>{
       if(w===false)S.canWrite=false;S.isManager=!!own;S.uid=id||null;S.myName=nm||'';if(id&&nm)S.names[id]=nm}catch(e){}
   }
   S.roleKnown=true;
-  if(APP){custStart();ctStart()}
+  if(APP){custStart();ctStart();soStart()}
   if(S.isManager){
     S.pfx='';subAll('',true);
     need++;let firstU=true;
