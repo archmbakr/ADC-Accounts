@@ -289,6 +289,7 @@ body.eng-mode .hdr-acts{display:none!important}
 @media (max-width:560px){.hdr-acts .set-btn{flex:0 0 auto}.set-btn .set-l{display:none}}
 .qs-multi{margin-top:10px}
 .ct-lines{min-width:860px}.ct-lines td,.ct-lines th{padding:5px 6px;vertical-align:middle}.ct-lines input{padding:5px 6px;min-width:70px}.ct-lines input.sm{width:72px;min-width:60px}
+.amt-w{display:block;min-height:1.2em;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
 .so-t tr.ct-sec td{background:var(--sunk);font-weight:600}.so-t tr.bad td{background:color-mix(in srgb,var(--danger) 12%,transparent)}.so-ph{padding:0;border:0;background:none;width:34px;height:34px;margin-inline-end:8px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden;cursor:zoom-in;font-size:18px}.so-ph img{width:34px;height:34px;object-fit:cover}.so-cat{display:flex;flex-direction:column;gap:2px;margin-top:10px}.so-cat-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid var(--line)}.so-cat-row.sub{padding-inline-start:28px}.so-cat-row .nm{flex:1;min-width:140px;font-weight:600}.so-cat-row.sub .nm{font-weight:400}.so-cat-row input{width:auto;flex:1;min-width:120px}.so-cat-row .acts{display:flex;flex-wrap:wrap;gap:4px}
 .ct-lines tr.ct-sec td{background:var(--sunk);font-weight:600}.ct-ded{gap:6px;margin:4px 0;flex-wrap:nowrap}.ct-ded input:first-child{flex:1}
 .ct-calc table{max-width:520px}
@@ -617,6 +618,7 @@ function appSecurityCard(){
       <div class="f c2" style="align-self:end"><button type="submit">غيّر كلمة المرور</button></div>
       ${APPU.pwMsg?`<p class="msg ${APPU.pwMsg.ok?'ok':'err'}" style="grid-column:1/-1">${esc(APPU.pwMsg.t)}</p>`:''}
     </form>
+    ${APPU.owner?lockCard():''}
     ${appBioCard()}
     ${appPushCard()}
     ${appRepCard()}
@@ -1035,7 +1037,7 @@ async function custFlush(){
           const {error}=await SB.from('custody').upsert(row,{onConflict:'id'});if(error)throw error;
         }
         q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);
-      }catch(e){const m=String(e&&e.message||'');if(/row-level|permission|violates/i.test(m)){q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);showBanner('تعذّر حفظ حركة عهدة: غير مسموح.')}break}
+      }catch(e){const m=String(e&&e.message||'');if(/row-level|permission|violates|locked period/i.test(m)){q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);showBanner('تعذّر حفظ حركة عهدة: '+(/locked period/.test(m)?lockMsg():'غير مسموح.'))}break}
     }
   }finally{CU.busy=false}
   await custLoad();try{render()}catch(e){}
@@ -1088,7 +1090,7 @@ function appRenderCustody(){
   ${engs.length?`<form id="cuIssue" class="entry" novalidate>
     <div class="f c2"><label for="cu_eng">المهندس</label><select id="cu_eng"><option value="">اختر المهندس</option>${engs.map(e=>`<option value="${esc(e.id)}">${esc(e.name||e.email)}</option>`).join('')}</select></div>
     <div class="f c2"><label for="cu_site">الموقع</label><select id="cu_site"><option value="">اختر الموقع</option>${mySites.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select></div>
-    <div class="f c1"><label for="cu_amount">المبلغ (${CUR})</label><input id="cu_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    <div class="f c1"><label for="cu_amount">المبلغ (${CUR})</label><input id="cu_amount" data-words type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"><small class="amt-w" id="cu_amount_w"></small></div>
     <div class="f c1"><label for="cu_date">التاريخ</label><input id="cu_date" type="date" value="${today()}"></div>
     <div class="f c1 half"><label for="cu_src">صُرفت من</label><select id="cu_src"><option value="cash">نقدي</option><option value="bank">بنك</option></select></div>
     <div class="f c2" id="cu_bank_w" hidden><label for="cu_bank">البنك / الحساب</label>${bankList().length?`<select id="cu_bank"><option value="">— اختر —</option>${bankList().map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}<option value="__other">أخرى…</option></select>`:''}<input id="cu_bank_o" maxlength="60" placeholder="اكتب الاسم، مثال: إنستاباي" ${bankList().length?'hidden':''}></div>
@@ -1174,8 +1176,8 @@ function appRenderCustEng(){
   ${sites.size?`<div class="card entry-card"><div class="sec-h">تسجيل مصروف من العهدة</div>
   <form id="enForm" class="entry" novalidate>
     <div class="f c2"><label for="en_site">الموقع</label><select id="en_site">${[...sites.values()].map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div>
-    <div class="f c1"><label for="en_amount">المبلغ (${CUR})</label><input id="en_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
-    <div class="f c1"><label for="en_date">التاريخ</label><input id="en_date" type="date" value="${today()}"></div>
+    <div class="f c1"><label for="en_amount">المبلغ (${CUR})</label><input id="en_amount" data-words type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"><small class="amt-w" id="en_amount_w"></small></div>
+    <div class="f c1"><label for="en_date">التاريخ</label><input id="en_date" type="date" value="${today()}" ${lockMin()}></div>${lockNote()}
     <div class="f c2"><label for="en_item">البند</label><select id="en_item"><option value="">اختر البند</option>${its.map(x=>`<option>${esc(x.name)}</option>`).join('')}</select></div>
     <div class="f c2"><label for="en_con">المقاول / المورد (اختياري)</label><input id="en_con" list="en_cons" maxlength="100"><datalist id="en_cons">${cons.map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist></div>
     <div class="f c4"><label for="en_notes">البيان</label><input id="en_notes" maxlength="200" placeholder="مثال: شراء مسامير ولوازم نجارة"></div>
@@ -1185,13 +1187,15 @@ function appRenderCustEng(){
   </form></div>`:'<div class="card blank"><h3>لا توجد عهدة مصروفة لك بعد</h3><p>عندما يصرف لك المدير أو صاحب الموقع عهدة ستظهر هنا، ويمكنك بعدها تسجيل مصروفاتك منها.</p></div>'}
   <div class="card"><div class="sec-h">حركات عهدتي</div>
   ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
-  ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.kind==='claim'&&r.status==='pending'?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
+  ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.kind==='claim'&&r.status==='pending'&&!isLocked(d.date)?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
   </tbody></table></div>`:'<p class="note">لا توجد حركات بعد.</p>'}</div>`;
   const ph=$('#en_photo');if(ph)ph.onchange=e=>{CU.pick=e.target.files&&e.target.files[0]||null;render()};
   const f=$('#enForm');if(f)f.onsubmit=async ev=>{ev.preventDefault();
     const site=$('#en_site').value,amount=parseFloat($('#en_amount').value),date=$('#en_date').value,item=$('#en_item').value,notes=$('#en_notes').value.trim();
     const miss=[];if(!(amount>0))miss.push('المبلغ');if(!date)miss.push('التاريخ');if(!item)miss.push('البند');if(!notes)miss.push('البيان');
     if(miss.length){CU.claimMsg={t:'يجب أن تكتب: '+miss.join('، ')+'.'};return render()}
+    if(isLocked(date)){CU.claimMsg={t:lockMsg()};return render()}
+    if(rows.some(r=>r.kind==='claim'&&r.status!=='rejected'&&r.site_id===site&&Math.abs((+r.data.amount||0)-amount)<0.005&&Math.abs(Date.parse(r.data.date)-Date.parse(date))<=2*864e5)&&!confirm('فيه مصروف عهدة بنفس المبلغ في نفس الموقع خلال يومين. ممكن يكون متسجل قبل كده.\n\nالمبلغ: '+fmtPlain(amount)+' '+CUR+' ('+amtWords(amount)+')\n\nتبعته برضه؟'))return;
     const sv=sites.get(site);const btn=$('#enSave');if(btn)btn.disabled=true;
     let receipt='',receiptType='';
     if(CU.pick){try{const blob=await shrinkImage(CU.pick);const r=await appStoreReceipt(blob,blob.type||CU.pick.type);receipt=r.id;receiptType=r.type}catch(e){CU.claimMsg={t:uploadErr(e)};return render()}}
@@ -1252,7 +1256,7 @@ async function ctFlush(){
       try{const r=op.op==='del'?await SB.from('certs').delete().eq('id',op.id):await SB.from('certs').upsert((()=>{const x={...op.row};delete x._local;delete x.updated_at;return x})(),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
       if(err&&ctNetErr(err))break;
       appLs(LS_CTQ,ctQ().filter(x=>x.qid!==op.qid));done++;
-      if(err){const m=String(err.message||'');fail[op.id]=/locked/.test(m)?'هذا المستخلص مقفول. اطلب من صاحب الموقع فتحه للتعديل.':/access/.test(m)?'ليس لديك صلاحية على هذا الموقع.':'تعذّر الحفظ: '+m.slice(0,120);showBanner('مستخلص لم يُحفظ: '+fail[op.id])}
+      if(err){const m=String(err.message||'');fail[op.id]=/locked period/.test(m)?lockMsg():/locked/.test(m)?'هذا المستخلص مقفول. اطلب من صاحب الموقع فتحه للتعديل.':/access/.test(m)?'ليس لديك صلاحية على هذا الموقع.':'تعذّر الحفظ: '+m.slice(0,120);showBanner('مستخلص لم يُحفظ: '+fail[op.id])}
     }
   }finally{ctBusy=false}
   if(done)await ctLoad();else CT.rows=ctMerged();
@@ -1349,7 +1353,7 @@ function ctFormHTML(){
     ${ctSel('ct_con','المقاول',cons.map(x=>({v:x.name,t:x.name})),f.con,'اختر المقاول')}
     ${ctSel('ct_item','البند',its.map(x=>({v:x.name,t:x.name})),f.item,'اختر البند')}
     <div class="f c1 half"><label for="ct_no">رقم المستخلص</label><input id="ct_no" type="number" min="1" step="1" value="${esc(String(c?c.no:(f.no||1)))}"></div>
-    <div class="f c1 half"><label for="ct_date">التاريخ</label><input id="ct_date" type="date" value="${esc(f.date||today())}"></div>
+    <div class="f c1 half"><label for="ct_date">التاريخ</label><input id="ct_date" type="date" value="${esc(f.date||today())}" ${lockMin()}></div>${lockNote()}
     ${linesHTML}
     ${k&&k.lines.length?`<label class="chk fw"><input type="checkbox" id="ct_final" ${f.final?'checked':''}> مستخلص ختامي (يُرد معه تأمين الأعمال المحجوز)</label>
     <div class="f fw"><label for="ct_notes">ملاحظات عامة (اختياري)</label><input id="ct_notes" maxlength="200" value="${esc(f.notes||'')}"></div>
@@ -1388,6 +1392,7 @@ function ctBindForm(){
   {const e=$('#ct_final');if(e)e.onchange=upd}
   let st='submitted';fm.querySelectorAll('button[type=submit]').forEach(b=>b.onclick=()=>{st=b.dataset.v});
   fm.onsubmit=async ev=>{ev.preventDefault();ctReadForm();const f=CT.form;
+    if(isLocked(f.date)){CT.msg={t:lockMsg()};return render()}
     const miss=[];if(!f.site)miss.push('الموقع');if(!f.con)miss.push('المقاول');if(!f.item)miss.push('البند');if(!(f.no>0))miss.push('رقم المستخلص');
     const c=ctFormCert(f),k=ctCalc(c);
     if(!(k.works>0))miss.push('كمية واحدة على الأقل في «الإجمالي حتى تاريخه»');
@@ -1495,7 +1500,7 @@ function ctListHTML(rows){
   return `<div class="tbl-wrap"><table><thead><tr><th>رقم</th><th>الموقع</th><th>المقاول</th><th>البند</th><th>التاريخ</th><th class="num">الأعمال حتى تاريخه</th><th class="num">صافي المستخلص</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${rows.map(c=>{const k=ctCalc(c),d=c.data||{},ap=ctCanApprove(c),mine=appIsEngineer();
     const acts=[`<button class="ghost" data-ct="print" data-id="${esc(c.id)}">طباعة</button>`];
-    if(c.status==='draft'&&(ap||mine))acts.push(`<button class="ghost" data-ct="edit" data-id="${esc(c.id)}">تعديل</button>`,`<button class="ghost" data-ct="del" data-id="${esc(c.id)}">حذف</button>`);
+    if(c.status==='draft'&&(ap||(mine&&!isLocked((c.data||{}).date))))acts.push(`<button class="ghost" data-ct="edit" data-id="${esc(c.id)}">تعديل</button>`,`<button class="ghost" data-ct="del" data-id="${esc(c.id)}">حذف</button>`);
     if(ap&&c.status==='submitted')acts.unshift(`<button class="primary" data-ct="approve" data-id="${esc(c.id)}">اعتماد</button>`);
     if(ap&&c.status!=='draft')acts.push(`<button class="ghost" data-ct="reopen" data-id="${esc(c.id)}">فتح للتعديل</button>`);
     if(ap&&c.edit_req)acts.push(`<button class="ghost" data-ct="noreq" data-id="${esc(c.id)}">رفض طلب التعديل</button>`);
@@ -1654,6 +1659,7 @@ async function soLoad(){
   if(SB&&navigator.onLine){
     try{
       const [m,i,s,a]=await Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll));
+      try{const r=await SB.from('app_settings').select('*');if(!r.error){const x=(r.data||[]).find(z=>z.key==='lock_until');SO.lock=x?x.value:'';appLs('adc_lock_v1',SO.lock)}}catch(e){}
       if(m.error&&/store_moves|relation|does not exist|schema cache/i.test(m.error.message||'')){SO.missing=true;SO.srv=SO.srv||soEmpty();ok=true}
       else if(!m.error){SO.missing=false;SO.srv={moves:m.data||[],items:i.data||[],sites:s.data||[],access:a.data||[]};ok=true;appLs(LS_SO,{...SO.srv,at:Date.now()})}
     }catch(e){}
@@ -1661,6 +1667,31 @@ async function soLoad(){
   if(!ok&&!SO.srv){const c=appLs(LS_SO);SO.srv=c?{moves:c.moves||[],items:c.items||[],sites:c.sites||[],access:c.access||[]}:soEmpty()}
   SO.d=soData();SO.loaded=true;
 }
+/* ---------- قفل الفترات: المدير يقفل لحد تاريخ، والمهندسين وأمين المخزن ما يعدّلوش قبله ---------- */
+if(SO.lock==null)SO.lock=appLs('adc_lock_v1')||'';
+const isLocked=d=>!!(appIsEngineer()&&SO.lock&&d&&d<=SO.lock);
+const lockNext=()=>{if(!SO.lock)return '';const t=new Date(SO.lock+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+1);return t.toISOString().slice(0,10)};
+const lockMin=()=>appIsEngineer()&&SO.lock?`min="${lockNext()}"`:'';
+const lockMsg=()=>'الفترة لحد '+SO.lock+' مقفولة. التسجيل والتعديل متاح من '+lockNext()+'. لو محتاج تعديل قبل كده كلّم صاحب الموقع.';
+const lockNote=()=>appIsEngineer()&&SO.lock?`<p class="note fw">الحركات لحد ${esc(SO.lock)} مقفولة.</p>`:'';
+function lastMonthEnd(){const d=new Date();d.setDate(0);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function lockCard(){
+  const m=SO.lockMsg;SO.lockMsg=null;
+  return `<div class="sec-h" style="margin-top:14px">قفل الفترات</div>
+  <p class="note">بعد ما تراجع الشهر اقفله: مهندس الموقع ومهندس المكتب الفني وأمين المخزن مش هيقدروا يضيفوا أو يعدّلوا أو يمسحوا أي حركة تاريخها قبل القفل (مصروفات العهدة، المستخلصات، المخزن). انت وأصحاب المواقع تقدروا تعدّلوا عادي.</p>
+  <p>${SO.lock?`مقفول لحد: <b>${esc(SO.lock)}</b>`:'<b>مفيش قفل حاليًا.</b>'}</p>
+  <div class="row"><input id="lk_date" type="date" value="${esc(SO.lock||lastMonthEnd())}" aria-label="تاريخ القفل" style="width:auto"><button type="button" class="primary" data-lock="set">قفل لحد التاريخ ده</button><button type="button" data-lock="last">قفل الشهر اللي فات (${esc(lastMonthEnd())})</button>${SO.lock?'<button type="button" class="ghost" data-lock="clear">إلغاء القفل</button>':''}</div>
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}`;
+}
+async function lockSet(v){
+  if(!SB||!APPU.owner)return;
+  const r=v?await SB.from('app_settings').upsert({key:'lock_until',value:v},{onConflict:'key'}):await SB.from('app_settings').delete().eq('key','lock_until');
+  if(r.error)SO.lockMsg={t:ctNetErr(r.error)?'القفل يحتاج اتصال بالإنترنت.':/app_settings|relation|schema cache/i.test(r.error.message||'')?'شغّل ملف «ADC-قفل-الفترات.sql» في Supabase الأول.':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100)};
+  else{SO.lock=v||'';appLs('adc_lock_v1',SO.lock);SO.lockMsg={ok:1,t:v?'تم القفل لحد '+v+'.':'تم إلغاء القفل.'};logChange('edit','files',{details:v?'قفل الفترات لحد '+v:'إلغاء قفل الفترات'})}
+  render();
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-lock]');if(!b)return;const a=b.dataset.lock;
+  if(a==='set'){const d=$('#lk_date');if(d&&d.value)lockSet(d.value)}else if(a==='last')lockSet(lastMonthEnd());else if(a==='clear'){if(confirm('إلغاء القفل؟ المهندسين هيقدروا يعدّلوا في الفترات القديمة.'))lockSet('')}});
 const soClean=r=>{const x={...r};delete x._local;delete x.updated_at;delete x.created_at;return x};
 let soBusy=false;
 async function soFlush(){
@@ -1671,7 +1702,7 @@ async function soFlush(){
       try{const r=op.op==='del'?await SB.from(op.t).delete().eq('id',op.id):await SB.from(op.t).upsert(soClean(op.row),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
       if(err&&ctNetErr(err))break;
       appLs(LS_SOQ,soQ().filter(x=>x.qid!==op.qid));done++;
-      if(err){const m=String(err.message||'');showBanner('المخزن: لم يُحفظ — '+(/later stock count|locked/.test(m)?'الحركة مقفولة لأن بعدها جرد. اطلب من صاحب الموقع تعديلها.':/no access/.test(m)?'ليس لديك صلاحية على مخزن هذا الموقع.':/only the owner/.test(m)?'حذف الخامات من القائمة للمدير فقط.':m.slice(0,120)))}
+      if(err){const m=String(err.message||'');showBanner('المخزن: لم يُحفظ — '+(/locked period/.test(m)?lockMsg():/later stock count|locked/.test(m)?'الحركة مقفولة لأن بعدها جرد. اطلب من صاحب الموقع تعديلها.':/no access/.test(m)?'ليس لديك صلاحية على مخزن هذا الموقع.':/only the owner/.test(m)?'حذف الخامات من القائمة للمدير فقط.':m.slice(0,120)))}
     }
   }finally{soBusy=false}
   if(done)await soLoad();else SO.d=soData();
@@ -1682,7 +1713,7 @@ function soQueue(t,op,id,row){const q=soQ().filter(x=>!(x.t===t&&x.id===id));q.p
 async function soPut(t,row){soQueue(t,'put',row.id,row);await soFlush();return !soQ().some(x=>x.t===t&&x.id===row.id)}
 let soT=null;
 function soRefresh(){clearTimeout(soT);soT=setTimeout(async()=>{await soLoad();try{if(!document.activeElement||!/^so_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
-function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access','site_access'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
+function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access','site_access','app_settings'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
 function soStart(){if(!SB)return;soLoad().then(()=>{try{render()}catch(e){}});soChannel()}
 function soNeedSql(){return SO.missing?'<div class="card"><p class="msg err">جداول المخزن غير موجودة في قاعدة البيانات. شغّل ملف «ADC-إعداد-المخزن.sql» في Supabase.</p></div>':''}
 
@@ -1701,7 +1732,7 @@ function soHasAccess(){return !!(SO.d&&(SO.d.sites.length||SO.d.access.some(a=>a
 const soCanAppr=siteId=>soIsAppr()&&ctMySites().some(s=>s.id===siteId);
 const soTs=m=>m.created_at?Date.parse(m.created_at):((m.data||{}).at||0);
 function soLocked(m){const t=soTs(m);return (SO.d.moves||[]).some(c=>c.site_id===m.site_id&&c.kind==='count'&&!c.deleted&&c.id!==m.id&&(c.date>m.date||(c.date===m.date&&soTs(c)>t)))}
-function soCanEdit(m){return soCanAppr(m.site_id)||(m.created_by===soMe()&&!soLocked(m))}
+function soCanEdit(m){return soCanAppr(m.site_id)||(m.created_by===soMe()&&!soLocked(m)&&!isLocked(m.date))}
 
 /* ---------- the shared list of materials ---------- */
 const soNorm=s=>String(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[ً-ْ]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
@@ -1782,7 +1813,7 @@ function soMovesHTML(site){
   const live=all.filter(m=>!m.deleted),del=all.filter(m=>m.deleted),list=live.slice(0,SO.lim);
   return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">حركات المخزن (${live.length})</div>${appr&&del.length?`<button class="ghost" data-so="showdel">${SO.showDel?'إخفاء المحذوفات':'المحذوفات ('+del.length+')'}</button>`:''}</div>
   ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>سجّله</th><th></th></tr></thead><tbody>
-  ${list.map(m=>{const ed=soCanEdit(m);return `<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'<span class="pill-ok">توريد</span>':'<span class="pill-over">جرد</span>'}${m._local?'<span class="pend">على الجهاز</span>':''}</td><td>${soMoveText(m)}</td><td>${esc((m.data||{}).by||'')}</td><td class="acts">${ed?`<button class="ghost" data-so="edit" data-id="${esc(m.id)}">تعديل</button><button class="ghost" data-so="del" data-id="${esc(m.id)}">حذف</button>`:'<span class="note">مقفول بعد جرد لاحق</span>'}</td></tr>`}).join('')}
+  ${list.map(m=>{const ed=soCanEdit(m);return `<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'<span class="pill-ok">توريد</span>':'<span class="pill-over">جرد</span>'}${m._local?'<span class="pend">على الجهاز</span>':''}</td><td>${soMoveText(m)}</td><td>${esc((m.data||{}).by||'')}</td><td class="acts">${ed?`<button class="ghost" data-so="edit" data-id="${esc(m.id)}">تعديل</button><button class="ghost" data-so="del" data-id="${esc(m.id)}">حذف</button>`:(isLocked(m.date)?'<span class="note">الفترة مقفولة</span>':'<span class="note">مقفول بعد جرد لاحق</span>')}</td></tr>`}).join('')}
   </tbody></table></div>${live.length>list.length?`<button class="ghost" data-so="more">عرض المزيد</button>`:''}`:'<p class="note">لا توجد حركات بعد.</p>'}
   ${SO.showDel&&appr&&del.length?`<div class="sec-h" style="margin-top:12px">المحذوفات</div><div class="tbl-wrap"><table><tbody>${del.map(m=>`<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'توريد':'جرد'}</td><td>${soMoveText(m)}</td><td class="acts"><button class="ghost" data-so="restore" data-id="${esc(m.id)}">استرجاع</button><button class="ghost" data-so="purge" data-id="${esc(m.id)}">حذف نهائي</button></td></tr>`).join('')}</tbody></table></div>`:''}
   <p class="note">من سجّل الحركة يقدر يعدّلها لحد ما يتعمل الجرد اللي بعدها. بعد كده التعديل للمدير أو صاحب الموقع فقط.</p></div>`;
@@ -1845,7 +1876,7 @@ function soFormHTML(site){
   if(f.kind==='in'){const u=soUnit(f.item),sups=soSuppliers();
     return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${f.id?'تعديل توريد':'توريد خامة للمخزن'} — ${esc(site.name)}</div>
     <form id="soForm" class="entry" novalidate>
-      <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}"></div>
+      <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}" ${lockMin()}></div>${lockNote()}
       <div class="f c2"><label for="so_item">الخامة</label><select id="so_item"><option value="">اختر الخامة</option>${soItemOpts(f.item,true)}</select></div>
       <div class="f c1 half"><label for="so_qty">الكمية${u?' ('+esc(u)+')':''}</label><input id="so_qty" type="number" inputmode="decimal" min="0" step="any" value="${f.qty??''}"></div>
       <div class="f c2"><label for="so_sup">المورد (اختياري)</label><input id="so_sup" list="so_supl" maxlength="80" value="${esc(f.supplier||'')}"><datalist id="so_supl">${sups.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
@@ -1860,7 +1891,7 @@ function soFormHTML(site){
     return `<tr><td>${esc(it.name)}</td><td>${esc(it.unit||'')}</td><td class="num plain">${fmt(bk)}</td><td><input class="ct-in" id="so_c_${esc(it.id)}" data-soc="${esc(it.id)}" type="number" inputmode="decimal" min="0" step="any" value="${v??''}" aria-label="الموجود فعلًا ${esc(it.name)}"></td><td class="num" id="so_d_${esc(it.id)}">${used===''?'—':fmt(used)}</td></tr>`};
   return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${f.id?'تعديل جرد':'جرد المخزن'} — ${esc(site.name)}</div>
   <form id="soForm" class="entry" novalidate>
-    <div class="f c1 half"><label for="so_date">تاريخ الجرد</label><input id="so_date" type="date" value="${esc(f.date)}"></div>
+    <div class="f c1 half"><label for="so_date">تاريخ الجرد</label><input id="so_date" type="date" value="${esc(f.date)}" ${lockMin()}></div>${lockNote()}
     <div class="fw tbl-wrap"><table class="ct-lines"><thead><tr><th>الخامة</th><th>الوحدة</th><th class="num">الرصيد الدفتري</th><th class="num">الموجود فعلًا</th><th class="num">المنصرف</th></tr></thead><tbody>
       ${rows.map(g=>(g.subs?`<tr class="ct-sec"><td colspan="5"><b>${esc(g.main.name)}</b></td></tr>`:'')+g.rows.map(x=>cell(x.it)).join('')).join('')||'<tr><td colspan="5" class="note">اختر الخامات اللي هتجردها من القائمة تحت.</td></tr>'}
     </tbody></table></div>
@@ -1879,6 +1910,7 @@ function soReadForm(){
 async function soSaveForm(site){
   soReadForm();const f=SO.form;if(!f)return;
   if(!f.date){SO.msg={t:'اكتب التاريخ.'};return render()}
+  if(isLocked(f.date)){SO.msg={t:lockMsg()};return render()}
   const old=f.id?(SO.d.moves||[]).find(x=>x.id===f.id):null;
   const base={id:f.id||'sm'+newId(),site_id:site.id,site_owner:site.owner||null,kind:f.kind,date:f.date,deleted:false,created_by:old?old.created_by:soMe(),data:{...(old?old.data:{}),notes:(f.notes||'').trim(),by:(old&&old.data&&old.data.by)||myBy()||(APPU.me&&APPU.me.name)||'',at:(old&&old.data&&old.data.at)||Date.now()}};
   if(old&&old.created_at)base.created_at=old.created_at;
@@ -2313,6 +2345,36 @@ function balTiles(b,mine){
       <div class="split"><span>نقدي <b class="${negCls(b.cash)}">${fmt(b.cash)}</b></span><span>بنك وتحويلات <b class="${negCls(b.bank)}">${fmt(b.bank)}</b></span>${b.defer?`<span>شيكات لم تُستحق <b class="${negCls(b.defer)}">${fmt(b.defer)}</b></span>`:''}${b.cust?`<span>عهد لدى المهندسين <b>${fmt(b.cust)}</b></span>`:''}</div></div>
   </div>`;
 }
+/* ---------- money safety: amount in words, duplicates, unusual amounts ---------- */
+function amtWords(v){
+  const O=['','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر'];
+  const T=['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون'];
+  const H=['','مائة','مائتان','ثلاثمائة','أربعمائة','خمسمائة','ستمائة','سبعمائة','ثمانمائة','تسعمائة'];
+  const g=n=>{const h=Math.floor(n/100),r=n%100,p=[];if(h)p.push(H[h]);if(r){if(r<20)p.push(O[r]);else{const u=r%10;p.push(u?O[u]+' و'+T[Math.floor(r/10)]:T[Math.floor(r/10)])}}return p.join(' و')};
+  const sc=(c,one,two,few,many)=>c===1?one:c===2?two:(c>=3&&c<=10?g(c)+' '+few:g(c)+' '+many);
+  const words=n=>{if(!n)return 'صفر';const p=[];const b=Math.floor(n/1e9),m=Math.floor(n/1e6)%1000,t=Math.floor(n/1000)%1000,r=n%1000;
+    if(b)p.push(sc(b,'مليار','ملياران','مليارات','مليار'));if(m)p.push(sc(m,'مليون','مليونان','ملايين','مليون'));if(t)p.push(sc(t,'ألف','ألفان','آلاف','ألف'));if(r)p.push(g(r));return p.join(' و')};
+  v=Math.abs(Math.round((+v||0)*100))/100;const n=Math.floor(v),pt=Math.round((v-n)*100);
+  return words(n)+' جنيه'+(pt?' و'+words(pt)+' قرش':'');
+}
+function wordsRefresh(el){const w=document.getElementById(el.id+'_w');if(!w)return;const v=parseFloat(el.value);w.textContent=v>0?amtWords(v):''}
+document.addEventListener('input',ev=>{const t=ev.target;if(t&&t.hasAttribute&&t.hasAttribute('data-words'))wordsRefresh(t)});
+/* before saving money: same amount for the same contractor on the same site within 2 days, or far above what he usually gets */
+function moneyCheck(kind,rec,old){
+  const list=kind==='exp'?S.exp:S.dep,day=864e5,d0=Date.parse(rec.date),con=(rec.contractor||'').trim(),warn=[];
+  const changed=!old||Math.abs(amt(old)-rec.amount)>0.004||old.date!==rec.date||(old.contractor||'').trim()!==con;
+  if(changed){
+    const dup=list.find(x=>(!old||x.id!==old.id)&&x.siteId===rec.siteId&&Math.abs(amt(x)-rec.amount)<0.005&&(kind!=='exp'||(x.contractor||'').trim()===con)&&Math.abs(Date.parse(x.date)-d0)<=2*day);
+    if(dup)warn.push('فيه '+(kind==='exp'?'مصروف':'إيداع')+' بنفس المبلغ'+(kind==='exp'?' لنفس المقاول':'')+' في نفس الموقع بتاريخ '+dup.date+(dup.notes?' («'+dup.notes+'»)':'')+'.\nممكن يكون متسجل قبل كده.');
+  }
+  if(kind==='exp'&&(!old||Math.abs(amt(old)-rec.amount)>0.004)){
+    const hist=S.exp.filter(x=>(!old||x.id!==old.id)&&(x.contractor||'').trim()===con).map(amt);
+    if(hist.length>=3){const top=Math.max(...hist);if(rec.amount>3*top)warn.push('المبلغ أكبر من 3 أضعاف أكبر مبلغ اتصرف قبل كده لـ«'+con+'» ('+fmtPlain(top)+' '+CUR+').')}
+    else if(rec.amount>=1000000)warn.push('المبلغ كبير.');
+  }
+  if(!warn.length)return true;
+  return confirm(warn.join('\n\n')+'\n\nالمبلغ: '+fmtPlain(rec.amount)+' '+CUR+'\n('+amtWords(rec.amount)+')\n\nتحفظ برضه؟');
+}
 const myBy=()=>(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
 const moreBox=(inner,open)=>`<details class="more" id="moreBox" ${open?'open':''}><summary>تفاصيل أكثر (ملاحظات، صورة الإيصال)</summary><div class="more-in">${inner}</div></details>`;
 const isUserView=()=>S.roleKnown&&!S.isManager;
@@ -2475,7 +2537,7 @@ function renderSite(){
   const moreOpen=S.moreOpen||!!S.pickedFile||!!(edRec&&(edRec.remarks||edRec.receipt));
   const photoField=`<div class="f c2"><label for="e_photo">صورة الإيصال</label>${canPhoto?`<input id="e_photo" type="file" accept="image/*,application/pdf">${S.pickedFile?`<span class="note ok-note">المحدد: ${esc(S.pickedFile.name||'صورة')}</span>`:''}${edRec&&edRec.receipt?'<label class="chk sm"><input type="checkbox" id="e_rmphoto"> إزالة الإيصال الحالي</label>':''}`:`<input disabled placeholder="${OFF?'تُرفع الصور من النسخة على الإنترنت فقط':'رفع الصور غير متاح بهذه الصلاحية'}">`}</div>`;
   const form=kind==='exp'?`
-      <div class="f c1 half"><label for="e_amount">المبلغ (${CUR})</label><input id="e_amount" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="0.00"></div>
+      <div class="f c1 half"><label for="e_amount">المبلغ (${CUR})</label><input id="e_amount" data-words type="number" inputmode="decimal" min="0" step="0.01" required placeholder="0.00"><small class="amt-w" id="e_amount_w"></small></div>
       <div class="f c1 half"><label for="e_date">تاريخ الصرف</label><input id="e_date" type="date" required value="${today()}"></div>
       <div class="f c2"><label for="e_contractor">المقاول</label>${regSelect('e_contractor','contractors')}</div>
       <div class="f c2"><label for="e_item">البند</label>${regSelect('e_item','items')}</div>
@@ -2486,7 +2548,7 @@ function renderSite(){
       <datalist id="dl_con">${allCons.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
       <datalist id="dl_item">${allItems.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`
   :`
-      <div class="f c1 half"><label for="e_amount">المبلغ (${CUR})</label><input id="e_amount" type="number" inputmode="decimal" min="0" step="0.01" required placeholder="0.00"></div>
+      <div class="f c1 half"><label for="e_amount">المبلغ (${CUR})</label><input id="e_amount" data-words type="number" inputmode="decimal" min="0" step="0.01" required placeholder="0.00"><small class="amt-w" id="e_amount_w"></small></div>
       <div class="f c1 half"><label for="e_date">تاريخ الإيداع</label><input id="e_date" type="date" required value="${today()}"></div>
       ${methodSelect('أُودع في')}
       <div class="f c3"><label for="e_notes">البيان</label><input id="e_notes" required maxlength="300" placeholder="مثال: دفعة من المالك على حساب الموقع"></div>
@@ -2552,6 +2614,7 @@ function bindSite(site){
     if(!(amount>0)){msg.className='msg err';msg.textContent='أدخل مبلغًا أكبر من صفر.';return}
     const miss=[];if(!rec.date)miss.push('التاريخ');if(kind==='exp'&&!rec.contractor)miss.push('المقاول');if(kind==='exp'&&!rec.item)miss.push('البند');if(!rec.notes)miss.push('البيان');dueRead('e',rec,miss);
     if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','البند':'#e_item','البيان':'#e_notes','تاريخ الاستحقاق':'#e_due'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
+    if(!moneyCheck(kind,rec,old)){msg.className='msg';msg.textContent='لم يُحفظ. راجع البيانات.';return}
     if(kind==='exp')commitNewRegs([['e_contractor','contractors'],['e_item','items']]);
     const file=S.pickedFile;
     if(old){rec.receipt=old.receipt||'';rec.receiptType=old.receiptType||''}
@@ -2661,7 +2724,7 @@ function renderJournal(){
     <form class="entry j-entry" id="jForm" autocomplete="off" novalidate>
       <div class="f c1 half"><label for="j_type">النوع</label><select id="j_type"><option value="exp" ${isExp?'selected':''}>مصروف</option><option value="dep" ${!isExp?'selected':''}>إيداع من المالك</option></select></div>
       <div class="f c2 half"><label for="j_site">الموقع</label><select id="j_site"><option value="">اختر الموقع</option>${siteOpts}</select></div>
-      <div class="f c1 half"><label for="j_amount">المبلغ (${CUR})</label><input id="j_amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="f c1 half"><label for="j_amount">المبلغ (${CUR})</label><input id="j_amount" data-words type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"><small class="amt-w" id="j_amount_w"></small></div>
       <div class="f c1 half"><label for="j_date">التاريخ</label><input id="j_date" type="date" value="${esc(K.date||today())}"></div>
       <div class="f c1 half"><label for="j_method">طريقة الدفع</label><select id="j_method">${Object.entries(METHOD).map(([k,v])=>`<option value="${k}" ${(K.method||'cash')===k?'selected':''}>${v}</option>`).join('')}</select></div>${dueFields('j')}
       <div class="f c2"><label for="j_notes">البيان</label><input id="j_notes" maxlength="300" placeholder="${isExp?'وصف المصروف':'مثال: دفعة من المالك على حساب الموقع'}"></div>
@@ -2722,6 +2785,7 @@ function bindJournal(){
     if(type==='exp'){rec.contractor=regValue('j_contractor','contractors');rec.item=regValue('j_item','items')}
     const miss=[];if(!site)miss.push('الموقع');if(!(amount>0))miss.push('المبلغ');if(!rec.date)miss.push('التاريخ');if(!rec.notes)miss.push('البيان');if(type==='exp'&&!rec.item)miss.push('البند');if(type==='exp'&&!rec.contractor)miss.push('المقاول');dueRead('j',rec,miss);
     if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor','تاريخ الاستحقاق':'#j_due'}[miss[0]]);if(el)el.focus();return}
+    if(!moneyCheck(type,rec,null)){msg.className='msg';msg.textContent='لم يُحفظ. راجع البيانات.';return}
     if(type==='exp')commitNewRegs([['j_contractor','contractors'],['j_item','items']]);
     if(S.pickedFile){
       if(!OFF&&S.mode!=='live'){msg.className='msg err';msg.textContent='رفع الصورة يحتاج إلى الإنترنت. احذف الصورة وسجّل، ثم أضفها لاحقًا من «تعديل».';return}
@@ -3977,6 +4041,7 @@ function render(){
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
   for(const id in keep){const el=document.getElementById(id);if(el)el.value=keep[id]}
   dueToggle('e');dueToggle('j');
+  document.querySelectorAll('[data-words]').forEach(wordsRefresh);
   if(focusId){const el=document.getElementById(focusId);if(el&&(el.tagName==='INPUT'||el.tagName==='SELECT')&&el.type!=='file')el.focus()}
 }
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.viewer){S.viewer=null;render()}});
