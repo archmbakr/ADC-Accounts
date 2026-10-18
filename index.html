@@ -2106,54 +2106,210 @@ async function soExcel(site){
   try{await saveFile(nm+'.xlsx',XLSX_W.build([sum,ins,cnt]));flash('تم الحفظ: '+nm+'.xlsx')}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر حفظ الملف.',1)}
 }
 
-/* ---------- استيراد توريدات من Excel ---------- */
-const SO_IMP_HEAD=['التاريخ *','التصنيف (البند الرئيسي) *','الخامة (البند الفرعي)','الوحدة','الكمية *','سعر الوحدة','المورد','ملاحظات'];
-function soImpTemplate(site){
-  const d=SO_IMP_HEAD;
-  const main={name:'التوريدات',rows:[d],styles:{0:1},widths:[13,24,24,10,11,12,20,24],freeze:1};
-  const ex={name:'مثال',rows:[d,[today(),'حديد تسليح','حديد 12 مم','طن',3,38000,'حديد عز',''],[today(),'أسمنت','','شيكارة',200,'','مصنع السويس','بون 4521'],[],['اكتب في شيت «التوريدات». التاريخ والتصنيف والكمية إجباري.'],['لو التصنيف مالوش بنود فرعية سيب «الخامة» فاضية.'],['الوحدة لازم تتكتب لو الخامة جديدة مش في القائمة.'],['السطور اللي ليها نفس التاريخ ونفس المورد بتتسجل بون واحد.']],styles:{0:1},widths:[13,24,24,10,11,12,20,24]};
-  const cat={name:'قائمة الخامات',rows:[['التصنيف (البند الرئيسي)','الخامة (البند الفرعي)','الوحدة']],styles:{0:1},widths:[26,26,12],freeze:1};
-  for(const m of soMains()){const subs=soSubs(m.id);if(!subs.length)cat.rows.push([m.name,'',m.unit||'']);for(const x of subs)cat.rows.push([m.name,x.name,x.unit||''])}
-  return XLSX_W.build([main,ex,cat]);
+/* ---------- استيراد توريدات من Excel: كل تاب = فاتورة ---------- */
+/* a small .xlsx writer with styles, formulas, merged cells and drop-down lists (the generic one has none of these) */
+const SOX=(()=>{
+  const enc=new TextEncoder();
+  const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+  const crc32=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
+  function zip(files){
+    const parts=[],central=[];let off=0;
+    for(const [name,str] of files){
+      const nb=enc.encode(name),data=enc.encode(str),crc=crc32(data);
+      const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nb.length,true);
+      parts.push(new Uint8Array(h.buffer),nb,data);
+      const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+      central.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+data.length;
+    }
+    const cs=central.reduce((a,b)=>a+b.length,0),e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+    return new Blob([...parts,...central,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }
+  const x=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+  const col=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+  /* style ids: see STYLES below */
+  const STYLES=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.##"/><numFmt numFmtId="165" formatCode="yyyy-mm-dd"/></numFmts>
+<fonts count="7"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="15"/><color rgb="FF1F3864"/><name val="Arial"/></font><font><i/><sz val="9"/><color rgb="FF595959"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFC00000"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font></fonts>
+<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF9DB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDEDED"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border/><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom></border></borders>
+<cellStyleXfs count="1"><xf/></cellStyleXfs>
+<cellXfs count="16">
+<xf/>
+<xf fontId="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="2" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf fontId="3" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf fontId="3" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="center" vertical="center"/><protection locked="0"/></xf>
+<xf numFmtId="165" fontId="3" fillId="2" borderId="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="5" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf fillId="2" borderId="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="164" fillId="2" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fillId="3" borderId="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fillId="3" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="5" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="164" fontId="3" fillId="5" borderId="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="6" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+</cellXfs></styleSheet>`;
+  /* sheet = {name, cells:{ 'A1':{v|f, s} }, cols:[widths], merges:['A1:H1'], dv:[{sqref,type,f1,style,title,msg,show}], freeze:'A9', heights:{1:26}} */
+  function sheetXml(sh){
+    const byRow=new Map();
+    for(const [ref,c] of Object.entries(sh.cells)){const m=/^([A-Z]+)(\d+)$/.exec(ref);const r=+m[2];if(!byRow.has(r))byRow.set(r,[]);byRow.get(r).push([m[1],ref,c])}
+    const cidx=l=>{let n=0;for(const ch of l)n=n*26+(ch.charCodeAt(0)-64);return n};
+    let o='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    if(sh.fit)o+='<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
+    o+='<sheetViews><sheetView workbookViewId="0" rightToLeft="1"'+(sh.active?' tabSelected="1"':'')+'>'+(sh.freeze?`<pane ySplit="${+sh.freeze.replace(/\D/g,'')-1}" topLeftCell="${sh.freeze}" activePane="bottomLeft" state="frozen"/>`:'')+'</sheetView></sheetViews><sheetFormatPr defaultRowHeight="18"/>';
+    if(sh.cols&&sh.cols.length)o+='<cols>'+sh.cols.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')+'</cols>';
+    o+='<sheetData>';
+    for(const r of [...byRow.keys()].sort((a,b)=>a-b)){
+      const cs=byRow.get(r).sort((a,b)=>cidx(a[0])-cidx(b[0]));const ht=sh.heights&&sh.heights[r];
+      o+=`<row r="${r}"${ht?` ht="${ht}" customHeight="1"`:''}>`;
+      for(const [,ref,c] of cs){const s=c.s?` s="${c.s}"`:'';
+        if(c.f!=null)o+=`<c r="${ref}"${s}><f>${x(c.f)}</f></c>`;
+        else if(typeof c.v==='number'&&isFinite(c.v))o+=`<c r="${ref}"${s}><v>${c.v}</v></c>`;
+        else if(c.v!=null&&c.v!=='')o+=`<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${x(c.v)}</t></is></c>`;
+        else o+=`<c r="${ref}"${s}/>`}
+      o+='</row>';
+    }
+    o+='</sheetData>';
+    if(sh.merges&&sh.merges.length)o+=`<mergeCells count="${sh.merges.length}">`+sh.merges.map(m=>`<mergeCell ref="${m}"/>`).join('')+'</mergeCells>';
+    if(sh.dv&&sh.dv.length)o+=`<dataValidations count="${sh.dv.length}">`+sh.dv.map(d=>`<dataValidation type="${d.type}"${d.op?` operator="${d.op}"`:''} allowBlank="1" showInputMessage="1" showErrorMessage="${d.show===false?0:1}"${d.style?` errorStyle="${d.style}"`:''}${d.title?` errorTitle="${x(d.title)}"`:''}${d.msg?` error="${x(d.msg)}"`:''} sqref="${d.sqref}"><formula1>${x(d.f1)}</formula1></dataValidation>`).join('')+'</dataValidations>';
+    o+='<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>';
+    return o;
+  }
+  function build(sheets){
+    const f=[];
+    f.push(['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>']);
+    f.push(['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>']);
+    f.push(['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0"/></bookViews><sheets>'+sheets.map((s,i)=>`<sheet name="${x(s.name).slice(0,31)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')+'</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>']);
+    f.push(['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+`<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`]);
+    f.push(['xl/styles.xml',STYLES]);
+    sheets.forEach((s,i)=>f.push([`xl/worksheets/sheet${i+1}.xml`,sheetXml(s)]));
+    return zip(f);
+  }
+  return {build,col};
+})();
+const SO_INV_N=5,SO_INV_LINES=20,SO_INV_FIRST=8;
+/* the template: one tab per invoice, the lists come from the app (store catalogue + known suppliers) */
+function soImpTemplate(){
+  const C=SOX.col,LS="'القوائم'",mains=soMains(),sups=soSuppliers();
+  const lists={name:'القوائم',cells:{},cols:[26,4,24,4],merges:[],dv:[]};
+  const put=(sh,ref,v,s)=>{sh.cells[ref]={v,s}};
+  put(lists,'A1','الموردين',3);sups.forEach((v,i)=>put(lists,'A'+(i+2),v));
+  put(lists,'C1','البنود الرئيسية',3);mains.forEach((m,i)=>put(lists,'C'+(i+2),m.name));
+  const firstCat=4;let kr=2;const keyCol=C(firstCat+Math.max(mains.length,1)+1),unitCol=C(firstCat+Math.max(mains.length,1)+2);
+  mains.forEach((m,j)=>{const c=C(firstCat+j),subs=soSubs(m.id);put(lists,c+'1',m.name,3);
+    (subs.length?subs:[m]).forEach((it,i)=>{put(lists,c+(i+2),it.name);put(lists,keyCol+kr,m.name+'|'+it.name);put(lists,unitCol+kr,it.unit||'');kr++});lists.cols[firstCat+j]=20});
+  put(lists,keyCol+'1','مفتاح',3);put(lists,unitCol+'1','الوحدة',3);
+  const lastCat=C(firstCat+Math.max(mains.length,1)-1),FC=C(firstCat),F=SO_INV_FIRST,LL=F+SO_INV_LINES-1,T=LL+1;
+  const isNewMain=`AND($C$4<>"",ISNA(MATCH($C$4,${LS}!$C$2:$C$1000,0)))`,isNewSup=`AND($C$5<>"",ISNA(MATCH($C$5,${LS}!$A$2:$A$2000,0)))`;
+  const inv=[];
+  for(let n=1;n<=SO_INV_N;n++){
+    const sh={name:'فاتورة '+n,cells:{},cols:[6,32,12,12,14,16,24,24],merges:['A1:H1','A2:H2','A4:B4','C4:D4','F4:G4','A5:B5','C5:D5','F5:G5','A6:H6',`A${T}:E${T}`,`G${T}:H${T}`],dv:[],freeze:'A'+F,heights:{1:26,7:24},active:n===1,fit:true};
+    put(sh,'A1','فاتورة توريد للمخزن — '+n,1);
+    put(sh,'A2','القوائم من «قائمة الخامات» في مخزن الأبلكيشن. اختار منها، ولو حاجة مش موجودة اكتبها بإيدك وهتظهرلك في الأبلكيشن عشان تضيفها. كل فاتورة في تاب لوحدها.',2);
+    put(sh,'A4','البند الرئيسي *',3);put(sh,'B4','',3);put(sh,'C4','',4);put(sh,'D4','',4);put(sh,'E4','التاريخ *',3);put(sh,'F4','',5);put(sh,'G4','',5);
+    put(sh,'A5','المورد',3);put(sh,'B5','',3);put(sh,'C5','',4);put(sh,'D5','',4);put(sh,'E5','رقم الفاتورة',3);put(sh,'F5','',4);put(sh,'G5','',4);
+    sh.cells.A6={f:`TRIM(IF(${isNewMain},"⚠ البند الرئيسي جديد   ","")&IF(${isNewSup},"⚠ المورد جديد",""))&IF(OR(${isNewMain},${isNewSup})," (هيتضاف بعد المراجعة في الأبلكيشن)","")`,s:6};
+    ['م','البند الفرعي (الخامة) *','الوحدة','الكمية *','سعر الوحدة','القيمة','ملاحظات','تنبيه'].forEach((h,i)=>put(sh,C(i)+7,h,7));
+    for(let r=F;r<=LL;r++){
+      sh.cells['A'+r]={f:`IF(B${r}="","",ROW()-${F-1})`,s:10};
+      put(sh,'B'+r,'',8);
+      sh.cells['C'+r]={f:`IF(B${r}="","",IFERROR(INDEX(${LS}!$${unitCol}:$${unitCol},MATCH($C$4&"|"&B${r},${LS}!$${keyCol}:$${keyCol},0)),""))`,s:12};
+      put(sh,'D'+r,'',9);put(sh,'E'+r,'',9);
+      sh.cells['F'+r]={f:`IF(OR(D${r}="",E${r}=""),"",D${r}*E${r})`,s:11};
+      put(sh,'G'+r,'',8);
+      sh.cells['H'+r]={f:`IF(B${r}="","",IF(ISNA(MATCH($C$4&"|"&B${r},${LS}!$${keyCol}:$${keyCol},0)),"⚠ خامة جديدة"&IF(C${r}=""," — اكتب الوحدة",""),""))`,s:13};
+    }
+    put(sh,'A'+T,'إجمالي الفاتورة',14);for(const c of 'BCDE')put(sh,c+T,'',14);sh.cells['F'+T]={f:`SUM(F${F}:F${LL})`,s:14};put(sh,'G'+T,'',14);put(sh,'H'+T,'',14);
+    const sub=`OFFSET(${LS}!$${FC}$2,0,MATCH($C$4,${LS}!$${FC}$1:$${lastCat}$1,0)-1,MAX(1,COUNTA(OFFSET(${LS}!$${FC}$2,0,MATCH($C$4,${LS}!$${FC}$1:$${lastCat}$1,0)-1,500,1))),1)`;
+    sh.dv=[{type:'list',sqref:'C4',f1:`${LS}!$C$2:$C$1000`,style:'warning',title:'بند رئيسي جديد؟',msg:'البند الرئيسي ده مش مسجّل في قائمة المخزن. لو كملت هيظهرلك في الأبلكيشن عشان تضيفه.'},
+      {type:'list',sqref:'C5',f1:`${LS}!$A$2:$A$2000`,show:false},
+      {type:'date',op:'greaterThan',sqref:'F4',f1:'36526',title:'التاريخ',msg:'اكتب تاريخ صحيح، مثال 2026-10-15'},
+      {type:'list',sqref:`B${F}:B${LL}`,f1:sub,style:'warning',title:'خامة جديدة؟',msg:'الخامة دي مش مسجّلة في قائمة المخزن تحت البند الرئيسي ده. لو كملت اكتب وحدتها في خانة الوحدة، وهتظهرلك في الأبلكيشن عشان تضيفها.'},
+      {type:'decimal',op:'greaterThanOrEqual',sqref:`D${F}:E${LL}`,f1:'0',msg:'اكتب رقم بس.'}];
+    inv.push(sh);
+  }
+  const how={name:'طريقة الاستخدام',cells:{},cols:[100],merges:[],dv:[]};
+  ['طريقة ملء النموذج',
+   '1) كل فاتورة في تاب لوحدها (فاتورة 1، فاتورة 2، …). لو محتاج تابات أكتر: كليك يمين على أي تاب ← Move or Copy ← Create a copy.',
+   '2) فوق في كل فاتورة: اختار «البند الرئيسي» (زي توريدات سباكة) و«المورد» من القائمة، واكتب «التاريخ» مرة واحدة.',
+   '3) في الجدول: اختار «البند الفرعي» من القائمة (بيظهر اللي تحت البند الرئيسي اللي اخترته بس)، واكتب الكمية، والسعر لو موجود.',
+   '4) الوحدة والقيمة وإجمالي الفاتورة بيتحسبوا لوحدهم.',
+   '5) القوائم هي «قائمة الخامات» في مخزن الأبلكيشن والموردين المسجّلين وقت تنزيل النموذج.',
+   '6) لو بند رئيسي أو فرعي أو مورد مش موجود اكتبه بإيدك (والخامة الجديدة اكتب وحدتها). هيظهر جنبه «⚠ جديد»، ولما ترفع الملف الأبلكيشن هيعرضهم عليك عشان توافق على إضافتهم قبل الحفظ.',
+   '7) التاب اللي البند الرئيسي بتاعه فاضي بيتساب ومش بيتقري.',
+   '8) شيت «القوائم» بيتملا من الأبلكيشن — ما تعدّلش فيه.'].forEach((t,i)=>put(how,'A'+(i+1),t,i?0:15));
+  return SOX.build([...inv,how,lists]);
 }
-function soImpParse(rows,site){
-  const norm=v=>String(v??'').replace(/[*\s]+/g,' ').trim();
-  let hr=-1,col={};
+/* read raw lines: the invoice tabs, or the older one-sheet format */
+function soImpLines(sheets){
+  const norm=v=>String(v??'').replace(/[*\s]+/g,' ').trim(),lines=[];
+  const LABELS=/^(البند الرئيسي|التصنيف|المورد|التاريخ|رقم الفاتورة)/;
+  let invoices=0;
+  for(const sh of sheets){
+    const rows=sh.rows||[];if(/القوائم|طريقة|مثال/.test(sh.name||''))continue;
+    const head={};let hr=-1;
+    for(let r=0;r<Math.min(rows.length,15);r++){const row=rows[r]||[];
+      row.forEach((v,i)=>{const t=norm(v);const m=LABELS.exec(t);if(!m||t.length>20)return;let val='';for(let j=i+1;j<row.length;j++){const w=row[j];if(w===undefined||w==='')continue;if(LABELS.test(norm(w)))break;val=w;break}
+        const k=/المورد/.test(m[1])?'sup':/التاريخ/.test(m[1])?'date':/رقم/.test(m[1])?'inv':'main';if(head[k]===undefined)head[k]=val});
+      const t=row.map(norm);
+      if(t.some(x=>/فرعي|الخامة/.test(x))&&t.some(x=>/الكمية/.test(x))&&!t.some(x=>/^التاريخ/.test(x))){hr=r;break}
+    }
+    if(hr<0||head.main===undefined)continue;     /* not an invoice tab */
+    const col={};(rows[hr]||[]).forEach((v,i)=>{const t=norm(v);if(/سعر/.test(t))col.price=i;else if(/فرعي|الخامة/.test(t))col.item=i;else if(/الوحدة/.test(t))col.unit=i;else if(/الكمية/.test(t))col.qty=i;else if(/ملاحظ/.test(t))col.notes=i});
+    const g=(row,k)=>col[k]===undefined?'':row[col[k]];const got=[];
+    for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[];if(row.some(v=>/إجمالي/.test(String(v??''))))break;
+      const it=norm(g(row,'item')),q=g(row,'qty');if(!it&&String(q??'').trim()==='')continue;
+      got.push({sheet:sh.name,n:r+1,date:head.date,cat:norm(head.main),item:it,unit:norm(g(row,'unit')),qty:q,price:g(row,'price'),sup:norm(head.sup),notes:norm(g(row,'notes')),inv:norm(head.inv),bonKey:'s:'+sh.name})}
+    if(!norm(head.main)&&!got.length)continue;
+    invoices++;
+    if(!got.length){lines.push({sheet:sh.name,n:hr+2,date:head.date,cat:norm(head.main),item:'',unit:'',qty:'',price:'',sup:norm(head.sup),notes:'',inv:'',bonKey:'s:'+sh.name,empty:true});continue}
+    lines.push(...got);
+  }
+  if(invoices)return {lines,format:'tabs'};
+  /* older format: one sheet, one row per supply */
+  const rows=(sheets[0]||{}).rows||[];let hr=-1,col={};
   for(let r=0;r<Math.min(rows.length,30)&&hr<0;r++){const c={};(rows[r]||[]).forEach((v,i)=>{const t=norm(v);if(!t)return;
       if(/سعر|price/i.test(t))c.price=i;else if(/فرعي|الخامة|الصنف/.test(t))c.item=i;else if(/تصنيف|رئيسي|^البند/.test(t))c.cat=i;else if(/الوحدة|وحدة/.test(t))c.unit=i;else if(/الكمية|كمية/.test(t))c.qty=i;else if(/التاريخ|تاريخ/.test(t))c.date=i;else if(/المورد|مورد/.test(t))c.sup=i;else if(/ملاحظ|بيان/.test(t))c.notes=i});
     if(c.date!==undefined&&c.qty!==undefined&&(c.cat!==undefined||c.item!==undefined)){hr=r;col=c}}
-  if(hr<0)return {err:'الملف مش على شكل نموذج التوريدات: مش لاقي أعمدة «التاريخ» و«التصنيف» و«الكمية». نزّل النموذج من الزرار واملاه.'};
-  const N=soNorm,out=[],newMains=new Map(),newSubs=new Map();
-  const moves=soSiteMoves(site.id);
+  if(hr<0)return {err:'الملف مش على شكل نموذج التوريدات. نزّل النموذج من زرار «تنزيل النموذج» واملاه.'};
   const g=(row,k)=>col[k]===undefined?'':row[col[k]];
-  for(let r=hr+1;r<rows.length;r++){
-    const row=rows[r]||[];
-    const raw={date:g(row,'date'),cat:norm(g(row,'cat')),item:norm(g(row,'item')),unit:norm(g(row,'unit')),qty:g(row,'qty'),price:g(row,'price'),sup:norm(g(row,'sup')),notes:norm(g(row,'notes'))};
-    if(!String(raw.date).trim()&&!raw.cat&&!raw.item&&String(raw.qty).trim()===''&&!raw.sup)continue;
-    const L={n:r+1,...raw,errs:[],st:'ok'};
+  for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[];
+    const L={sheet:'',n:r+1,date:g(row,'date'),cat:norm(g(row,'cat')),item:norm(g(row,'item')),unit:norm(g(row,'unit')),qty:g(row,'qty'),price:g(row,'price'),sup:norm(g(row,'sup')),notes:norm(g(row,'notes')),inv:''};
+    if(!String(L.date??'').trim()&&!L.cat&&!L.item&&String(L.qty??'').trim()===''&&!L.sup)continue;
+    L.bonKey='d:'+parseDate(L.date)+'|'+soNorm(L.sup);lines.push(L)}
+  return {lines,format:'flat'};
+}
+function soImpParse(sheets,site){
+  const src=soImpLines(sheets);if(src.err)return src;
+  const N=soNorm,out=[],moves=soSiteMoves(site.id),knownSup=new Set(soSuppliers().map(N));
+  for(const raw of src.lines){
+    const L={...raw,errs:[],st:'ok'};L.where=(raw.sheet?raw.sheet+' — ':'')+'سطر '+raw.n;
+    if(raw.empty){L.errs.push('الفاتورة مفيهاش ولا خامة');L.st='err';out.push(L);continue}
     L.d=parseDate(raw.date);if(!L.d)L.errs.push('التاريخ');
     L.q=parseAmount(raw.qty);if(!(L.q>0))L.errs.push('الكمية');
     L.p=String(raw.price??'').trim()===''?0:parseAmount(raw.price);if(isNaN(L.p)||L.p<0){L.errs.push('السعر');L.p=0}
-    let cat=raw.cat,item=raw.item;if(!cat&&item){cat=item;item=''}
+    let cat=raw.cat,item=raw.item;if(!cat&&item&&src.format==='flat'){cat=item;item=''}
     L.ccat=cat;L.citem=item;
-    if(!cat)L.errs.push('التصنيف');
+    if(!cat)L.errs.push('البند الرئيسي');
     if(cat){
       const m=soMains().find(x=>N(x.name)===N(cat));
-      if(m){
-        const subs=soSubs(m.id);
-        if(item){
-          const sb=subs.find(x=>N(x.name)===N(item));
+      if(m){const subs=soSubs(m.id);
+        if(item&&N(item)!==N(m.name)){const sb=subs.find(x=>N(x.name)===N(item));
           if(sb)L.id=sb.id;
-          else if(!subs.length&&soUsed(m.id))L.errs.push('«'+m.name+'» مالوش بنود فرعية، سيب خانة الخامة فاضية');
-          else{L.newSub=m.id;L.label=m.name+' — '+item;if(!raw.unit)L.errs.push('الوحدة (خامة جديدة)')}
-        }else if(subs.length)L.errs.push('«'+m.name+'» له بنود فرعية، اكتب الخامة');
+          else if(!subs.length&&soUsed(m.id))L.errs.push('«'+m.name+'» مالوش بنود فرعية، سيب خانة الخامة فاضية أو اكتب نفس الاسم');
+          else{L.newSub=m.id;L.label=m.name+' — '+item;if(!raw.unit)L.errs.push('الوحدة (خامة جديدة)')}}
+        else if(subs.length)L.errs.push('«'+m.name+'» له بنود فرعية، اختار الخامة');
         else if(!m.unit){if(raw.unit)L.setUnit=m.id;else L.errs.push('الوحدة')}
         else L.id=m.id;
-      }else{L.newMain=cat;L.label=item?cat+' — '+item:cat;if(!raw.unit)L.errs.push('الوحدة (خامة جديدة)')}
+      }else{L.newMain=cat;if(item&&N(item)===N(cat)){item='';L.citem=''}L.label=item?cat+' — '+item:cat;if(!raw.unit)L.errs.push('الوحدة (خامة جديدة)')}
       if(L.id){const u=soUnit(L.id);if(raw.unit&&u&&N(u)!==N(raw.unit))L.errs.push('الوحدة في الملف «'+raw.unit+'» غير وحدة الخامة «'+u+'»');L.label=soLabel(L.id);L.u=u}
       else L.u=raw.unit;
     }
+    if(L.sup&&!knownSup.has(N(L.sup)))L.newSup=true;
     if(L.d&&isLocked(L.d))L.errs.push('الفترة لحد '+SO.lock+' مقفولة');
+    if(L.inv&&!L.notes)L.notes='فاتورة رقم '+L.inv;else if(L.inv)L.notes='فاتورة رقم '+L.inv+' — '+L.notes;
     if(L.errs.length)L.st='err';
     else{
       if(L.newMain||L.newSub)L.st='new';
@@ -2163,33 +2319,42 @@ function soImpParse(rows,site){
     }
     out.push(L);
   }
-  if(!out.length)return {err:'مفيش ولا سطر في الملف.'};
-  return {lines:out};
+  if(!out.length)return {err:'مفيش ولا فاتورة متعبية في الملف.'};
+  return {lines:out,format:src.format};
+}
+function soImpNew(L){
+  const ok=L.filter(x=>x.st!=='err');
+  return {mains:[...new Set(ok.filter(x=>x.newMain).map(x=>x.newMain))],subs:[...new Set(ok.filter(x=>x.newSub||(x.newMain&&x.citem)).map(x=>x.label))],sups:[...new Set(ok.filter(x=>x.newSup).map(x=>x.sup))]};
 }
 function soImpHTML(site){
   const I=SO.imp;if(!I)return '';const m=I.msg;
-  const L=I.lines||[],errs=L.filter(x=>x.st==='err'),dups=L.filter(x=>x.dup&&x.st!=='err'),news=[...new Set(L.filter(x=>x.st==='new').map(x=>x.label))];
-  const use=L.filter(x=>x.st!=='err'&&(!x.dup||I.keepDup));
-  const tag=x=>x.st==='err'?`<span class="neg">❌ ${esc(x.errs.join('، '))}</span>`:x.dup?`<span class="pill-over">مكرر: ${esc(x.dup)}</span>`:x.st==='new'?'<span class="pill-none">🆕 خامة جديدة</span>':'<span class="pill-ok">✓</span>';
-  return `<div class="card entry-card" id="soImpCard"><div class="sec-h">استيراد توريدات من Excel — ${esc(site.name)}</div>
-    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر الملف</button><input type="file" id="soImpFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="ملف التوريدات"></span><button type="button" data-so="imptpl">تنزيل النموذج</button><button type="button" class="ghost" data-so="impclose">إلغاء</button></div>
+  const L=I.lines||[],errs=L.filter(x=>x.st==='err'),dups=L.filter(x=>x.dup&&x.st!=='err'),nw=soImpNew(L),anyNew=nw.mains.length+nw.subs.length+nw.sups.length;
+  const use=L.filter(x=>x.st!=='err'&&(!x.dup||I.keepDup)),invs=new Set(use.map(x=>x.bonKey)).size;
+  const tag=x=>x.st==='err'?`<span class="neg">❌ ${esc(x.errs.join('، '))}</span>`:x.dup?`<span class="pill-over">مكرر: ${esc(x.dup)}</span>`:x.st==='new'?'<span class="pill-none">🆕 جديد</span>':'<span class="pill-ok">✓</span>';
+  const canSave=!errs.length&&use.length&&(!anyNew||I.okNew);
+  return `<div class="card entry-card" id="soImpCard"><div class="sec-h">استيراد فواتير توريد من Excel — ${esc(site.name)}</div>
+    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر الملف</button><input type="file" id="soImpFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="ملف الفواتير"></span><button type="button" data-so="imptpl">تنزيل النموذج</button><button type="button" class="ghost" data-so="impclose">إلغاء</button></div>
     ${m?`<p class="msg ${m.ok?'ok':'err'}" style="white-space:pre-line">${esc(m.t)}</p>`:''}
-    ${L.length?`<p>${L.length} سطر: <b>${L.length-errs.length-dups.length}</b> جاهز${news.length?` · <b>${news.length}</b> خامة جديدة هتتضاف للقائمة`:''}${dups.length?` · <b>${dups.length}</b> مكرر`:''}${errs.length?` · <b class="neg">${errs.length} فيه أخطاء</b>`:''}</p>
-    ${news.length?`<p class="note">الخامات الجديدة: ${news.map(esc).join('، ')}. لو فيه غلطة إملائية صلّحها في الملف قبل الحفظ.</p>`:''}
-    <div class="tbl-wrap"><table><thead><tr><th>سطر</th><th>التاريخ</th><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th><th class="num">السعر</th><th>المورد</th><th>الحالة</th></tr></thead><tbody>
-    ${L.map(x=>`<tr${x.st==='err'?' class="bad"':''}><td>${x.n}</td><td class="date">${esc(x.d||String(x.date||''))}</td><td>${esc(x.label||x.cat||x.item||'')}</td><td class="num plain">${x.q>0?fmt(x.q):esc(String(x.qty||''))}</td><td>${esc(x.u||x.unit||'')}</td><td class="num plain">${x.p?fmt(x.p):''}</td><td>${esc(x.sup||'')}</td><td>${tag(x)}</td></tr>`).join('')}
+    ${L.length?`<p>${L.length} سطر في ${new Set(L.map(x=>x.bonKey)).size} فاتورة: <b>${L.length-errs.length-dups.length}</b> جاهز${dups.length?` · <b>${dups.length}</b> مكرر`:''}${errs.length?` · <b class="neg">${errs.length} فيه أخطاء</b>`:''}</p>
+    ${anyNew?`<div class="card due-card" style="margin:8px 0"><div class="sec-h">حاجات جديدة مش في الأبلكيشن</div>
+      ${nw.mains.length?`<p><b>بنود رئيسية:</b> ${nw.mains.map(esc).join('، ')}</p>`:''}${nw.subs.length?`<p><b>بنود فرعية (خامات):</b> ${nw.subs.map(esc).join('، ')}</p>`:''}${nw.sups.length?`<p><b>موردين:</b> ${nw.sups.map(esc).join('، ')}</p>`:''}
+      <p class="note">راجع الأسماء كويس. لو فيه غلطة إملائية صلّحها في الملف وارفعه تاني بدل ما تتضاف كحاجة جديدة.</p>
+      <label class="chk"><input type="checkbox" id="soImpOkNew" ${I.okNew?'checked':''}> موافق على إضافة الحاجات الجديدة دي</label></div>`:''}
+    <div class="tbl-wrap"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th><th class="num">السعر</th><th>المورد</th><th>الحالة</th></tr></thead><tbody>
+    ${L.map(x=>`<tr${x.st==='err'?' class="bad"':''}><td>${esc(x.where)}</td><td class="date">${esc(x.d||String(x.date??''))}</td><td>${esc(x.label||x.cat||x.item||'')}</td><td class="num plain">${x.q>0?fmt(x.q):esc(String(x.qty??''))}</td><td>${esc(x.u||x.unit||'')}</td><td class="num plain">${x.p?fmt(x.p):''}</td><td>${esc(x.sup||'')}${x.newSup?' <span class="pill-none">🆕</span>':''}</td><td>${tag(x)}</td></tr>`).join('')}
     </tbody></table></div>
     ${dups.length?`<label class="chk"><input type="checkbox" id="soImpDup" ${I.keepDup?'checked':''}> سجّل السطور المكررة برضه</label>`:''}
-    <div class="form-foot">${errs.length?'<span class="msg err">صلّح الأخطاء في الملف وارفعه تاني. مفيش حاجة اتسجلت.</span>':`<button class="primary" type="button" data-so="impsave" ${use.length?'':'disabled'}>حفظ ${use.length} توريد</button>`}</div>`
-    :'<p class="note">نزّل النموذج، واملا شيت «التوريدات» (فيه شيت «مثال» وشيت «قائمة الخامات» تنقل منها الأسماء زي ما هي)، وبعدين اختار الملف. مفيش حاجة بتتسجل غير لما تراجع وتدوس «حفظ».</p>'}
+    <div class="form-foot">${errs.length?'<span class="msg err">صلّح الأخطاء في الملف وارفعه تاني. مفيش حاجة اتسجلت.</span>':`<button class="primary" type="button" data-so="impsave" ${canSave?'':'disabled'}>حفظ ${use.length} توريد (${invs} ${invs===1?'فاتورة':'فواتير'})</button>${anyNew&&!I.okNew?'<span class="note">علّم على «موافق» الأول.</span>':''}`}</div>`
+    :'<p class="note">نزّل النموذج: كل تاب فيه فاتورة، وفوق كل فاتورة البند الرئيسي والمورد والتاريخ، والقوائم من قائمة الخامات اللي في الأبلكيشن. بعد ما تملاه اختار الملف. مفيش حاجة بتتسجل غير لما تراجع وتدوس «حفظ».</p>'}
   </div>`;
 }
 async function soImpRead(file,site){
-  let rows;try{rows=await XLSX_R.read(await file.arrayBuffer())}catch(e){SO.imp={msg:{t:'تعذّرت قراءة الملف. تأكد إنه ملف Excel (.xlsx).'}};return render()}
-  const p=soImpParse(rows,site);SO.imp={lines:p.lines||[],msg:p.err?{t:p.err}:null,keepDup:false};render();
+  let sheets;try{sheets=await XLSX_R.readAll(await file.arrayBuffer())}catch(e){SO.imp={msg:{t:'تعذّرت قراءة الملف. تأكد إنه ملف Excel (.xlsx).'}};return render()}
+  const p=soImpParse(sheets,site);SO.imp={lines:p.lines||[],msg:p.err?{t:p.err}:null,keepDup:false,okNew:false};render();
 }
 async function soImpSave(site){
   const I=SO.imp;if(!I||!I.lines)return;
+  const nw=soImpNew(I.lines);if(nw.mains.length+nw.subs.length+nw.sups.length&&!I.okNew)return;
   const use=I.lines.filter(x=>x.st!=='err'&&(!x.dup||I.keepDup));if(!use.length)return;
   const N=soNorm,mainIds=new Map(),subIds=new Map(),me=soMe();
   for(const x of use){
@@ -2199,16 +2364,16 @@ async function soImpSave(site){
       if(!x.citem){x.id=mid;continue}
       x.newSub=mid;
     }
-    if(x.newSub){const nm=x.citem,k=x.newSub+'|'+N(nm);let sid=subIds.get(k);
-      if(!sid){sid='si'+newId();subIds.set(k,sid);soQueue('store_items','put',sid,{id:sid,parent:x.newSub,name:nm,unit:x.u,photo:'',deleted:false,created_by:me})}
+    if(x.newSub){const k=x.newSub+'|'+N(x.citem);let sid=subIds.get(k);
+      if(!sid){sid='si'+newId();subIds.set(k,sid);soQueue('store_items','put',sid,{id:sid,parent:x.newSub,name:x.citem,unit:x.u,photo:'',deleted:false,created_by:me})}
       x.id=sid}
   }
   const bons=new Map(),by=myBy()||(APPU.me&&APPU.me.name)||'',at=Date.now();let k=0;
-  for(const x of use){const bk=x.d+'|'+N(x.sup);if(!bons.has(bk))bons.set(bk,'b'+newId());
-    const row={id:'sm'+newId(),site_id:site.id,site_owner:site.owner||null,kind:'in',date:x.d,deleted:false,created_by:me,data:{item:x.id,qty:x.q,supplier:x.sup||'',notes:x.notes||'',bon:bons.get(bk),by,at:at+(k++),imported:true}};
-    if(x.p)row.data.price=x.p;soQueue('store_moves','put',row.id,row)}
+  for(const x of use){if(!bons.has(x.bonKey))bons.set(x.bonKey,'b'+newId());
+    const row={id:'sm'+newId(),site_id:site.id,site_owner:site.owner||null,kind:'in',date:x.d,deleted:false,created_by:me,data:{item:x.id,qty:x.q,supplier:x.sup||'',notes:x.notes||'',bon:bons.get(x.bonKey),by,at:at+(k++),imported:true}};
+    if(x.p)row.data.price=x.p;if(x.inv)row.data.inv=x.inv;soQueue('store_moves','put',row.id,row)}
   await soFlush();const ok=!soQ().length;
-  SO.imp=null;SO.msg={ok:1,t:'تم استيراد '+use.length+' توريد في '+bons.size+(bons.size===1?' بون':' بونات')+(mainIds.size+subIds.size?' وإضافة '+(mainIds.size+subIds.size)+' خامة جديدة للقائمة':'')+(ok?'.':' على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.')};
+  SO.imp=null;SO.msg={ok:1,t:'تم استيراد '+use.length+' توريد في '+bons.size+(bons.size===1?' فاتورة':' فواتير')+(mainIds.size+subIds.size?' وإضافة '+(mainIds.size+subIds.size)+' بند جديد لقائمة الخامات':'')+(ok?'.':' على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.')};
   SO.tab='moves';render();
 }
 document.addEventListener('click',async ev=>{
@@ -2216,13 +2381,14 @@ document.addEventListener('click',async ev=>{
   const site=soMySites().find(s=>s.id===SO.site&&s.enabled);if(!site)return;
   if(a==='imp'){SO.imp={};SO.form=null;render();const c=$('#soImpCard');if(c)c.scrollIntoView({block:'start'});return}
   if(a==='impclose'){SO.imp=null;render();return}
-  if(a==='imptpl'){try{await saveFile(safeName('نموذج توريدات المخزن - '+site.name)+'.xlsx',soImpTemplate(site))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تجهيز النموذج.',1)}return}
+  if(a==='imptpl'){try{await saveFile(safeName('نموذج فواتير المخزن - '+site.name)+'.xlsx',soImpTemplate())}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تجهيز النموذج.',1)}return}
   if(a==='impsave'){b.disabled=true;await soImpSave(site);return}
 });
 document.addEventListener('change',ev=>{
   const t=ev.target;if(!t)return;
   if(t.id==='soImpFile'){const f=t.files&&t.files[0];t.value='';const site=soMySites().find(s=>s.id===SO.site&&s.enabled);if(f&&site)soImpRead(f,site)}
   if(t.id==='soImpDup'&&SO.imp){SO.imp.keepDup=t.checked;render()}
+  if(t.id==='soImpOkNew'&&SO.imp){SO.imp.okNew=t.checked;render()}
 });
 
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
@@ -3872,17 +4038,21 @@ const XLSX_R=(()=>{
     return {async text(name){const f=files[name];if(!f)return null;const raw=f.method===0?f.data:await inflate(f.data);return new TextDecoder().decode(raw)},has:n=>!!files[n]};
   }
   const colIdx=r=>{const m=/^([A-Z]+)/.exec(r||'');if(!m)return -1;let n=0;for(const ch of m[1])n=n*26+(ch.charCodeAt(0)-64);return n-1};
-  async function read(buf){
+  async function read(buf){return (await readAll(buf,1))[0].rows}
+  /* every sheet: [{name, rows}] (limit = how many sheets to read) */
+  async function readAll(buf,limit){
     const z=await unzip(buf),P=s=>new DOMParser().parseFromString(s,'application/xml');
     const wb=P(await z.text('xl/workbook.xml')||'<x/>');
     const rels=P(await z.text('xl/_rels/workbook.xml.rels')||'<x/>');
-    const sh=wb.getElementsByTagName('sheet')[0];
+    const ssx=await z.text('xl/sharedStrings.xml');const ss=[];
+    if(ssx){for(const si of P(ssx).getElementsByTagName('si')){let t='';for(const x of si.getElementsByTagName('t'))t+=x.textContent;ss.push(t)}}
+    const sheets=[...wb.getElementsByTagName('sheet')].slice(0,limit||999),out=[];
+    if(!sheets.length)sheets.push(null);
+    for(const sh of sheets){
     let path='xl/worksheets/sheet1.xml';
     if(sh){const rid=sh.getAttribute('r:id')||sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
       for(const r of rels.getElementsByTagName('Relationship'))if(r.getAttribute('Id')===rid){let t=r.getAttribute('Target');t=t.replace(/^\//,'');path=t.startsWith('xl/')?t:'xl/'+t}}
-    const ssx=await z.text('xl/sharedStrings.xml');const ss=[];
-    if(ssx){for(const si of P(ssx).getElementsByTagName('si')){let t='';for(const x of si.getElementsByTagName('t'))t+=x.textContent;ss.push(t)}}
-    const sx=await z.text(path);if(!sx)throw {code:'nosheet'};
+    const sx=await z.text(path);if(!sx){if(out.length||sheets.length>1)continue;throw {code:'nosheet'}}
     const rows=[];
     for(const r of P(sx).getElementsByTagName('row')){
       const row=[];
@@ -3893,7 +4063,10 @@ const XLSX_R=(()=>{
       }
       rows[(+r.getAttribute('r')||rows.length+1)-1]=row;
     }
-    return rows.map(r=>r||[]);
+    out.push({name:sh?sh.getAttribute('name')||'':'',rows:[...rows].map(r=>r||[])});
+    }
+    if(!out.length)throw {code:'nosheet'};
+    return out;
   }
   function csv(text){
     text=text.replace(/^﻿/,'');const sep=(text.split('\n')[0].match(/;/g)||[]).length>(text.split('\n')[0].match(/,/g)||[]).length?';':',';
@@ -3904,7 +4077,7 @@ const XLSX_R=(()=>{
     if(cur!==''||row.length){row.push(cur);rows.push(row)}
     return rows;
   }
-  return {read,csv};
+  return {read,readAll,csv};
 })();
 const IMP_FIELDS=[
   ['type','النوع',['النوع','نوع الحركة']],
