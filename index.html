@@ -289,6 +289,7 @@ body.eng-mode .hdr-acts{display:none!important}
 @media (max-width:560px){.hdr-acts .set-btn{flex:0 0 auto}.set-btn .set-l{display:none}}
 .qs-multi{margin-top:10px}
 .ct-lines{min-width:860px}.ct-lines td,.ct-lines th{padding:5px 6px;vertical-align:middle}.ct-lines input{padding:5px 6px;min-width:70px}.ct-lines input.sm{width:72px;min-width:60px}
+.so-bon{table-layout:fixed;width:100%;min-width:0}.so-bon th:nth-child(2),.so-bon td:nth-child(2){width:86px}.so-bon th:nth-child(3),.so-bon td:nth-child(3){width:58px;font-size:12px}.so-bon th:nth-child(4),.so-bon td:nth-child(4){width:38px}.so-bon td{padding:4px}.so-bon input{width:100%;min-width:0;box-sizing:border-box}
 .amt-w{display:block;min-height:1.2em;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
 .so-t tr.ct-sec td{background:var(--sunk);font-weight:600}.so-t tr.bad td{background:color-mix(in srgb,var(--danger) 12%,transparent)}.so-ph{padding:0;border:0;background:none;width:34px;height:34px;margin-inline-end:8px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden;cursor:zoom-in;font-size:18px}.so-ph img{width:34px;height:34px;object-fit:cover}.so-cat{display:flex;flex-direction:column;gap:2px;margin-top:10px}.so-cat-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid var(--line)}.so-cat-row.sub{padding-inline-start:28px}.so-cat-row .nm{flex:1;min-width:140px;font-weight:600}.so-cat-row.sub .nm{font-weight:400}.so-cat-row input{width:auto;flex:1;min-width:120px}.so-cat-row .acts{display:flex;flex-wrap:wrap;gap:4px}
 .ct-lines tr.ct-sec td{background:var(--sunk);font-weight:600}.ct-ded{gap:6px;margin:4px 0;flex-wrap:nowrap}.ct-ded input:first-child{flex:1}
@@ -1752,6 +1753,17 @@ function soItemOpts(sel,onlyPick){
     return `<optgroup label="${esc(m.name)}">${subs.filter(s=>!onlyPick||soPickable(s)).map(s=>`<option value="${esc(s.id)}" ${sel===s.id?'selected':''}>${esc(s.name)}${s.unit?' ('+esc(s.unit)+')':''}</option>`).join('')}</optgroup>`}).join('');
 }
 
+/* ---------- picking a material by typing: «أسمنت (شيكارة)» or «حديد تسليح — حديد 12 مم (طن)» ---------- */
+const soPickText=id=>soLabel(id)+(soUnit(id)?' ('+soUnit(id)+')':'');
+function soPickList(siteId){
+  const use=new Map();for(const m of ((SO.d&&SO.d.moves)||[]))if(m.kind==='in'&&!m.deleted){const id=(m.data||{}).item;use.set(id,(use.get(id)||0)+(m.site_id===siteId?3:1))}
+  return soItems().filter(soPickable).map(i=>({id:i.id,t:soPickText(i.id),n:use.get(i.id)||0})).sort((a,b)=>b.n-a.n||a.t.localeCompare(b.t,'ar'));
+}
+function soPickId(txt){
+  const t=soNorm(txt);if(!t)return '';const all=soItems().filter(soPickable);
+  const ex=all.find(i=>soNorm(soPickText(i.id))===t)||all.find(i=>soNorm(soLabel(i.id))===t);if(ex)return ex.id;
+  const byName=all.filter(i=>soNorm(i.name)===t);return byName.length===1?byName[0].id:'';
+}
 /* ---------- balances: المنصرف = الرصيد قبل الجرد + التوريد − الجرد ---------- */
 function soSorted(moves){return moves.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.kind===b.kind?0:a.kind==='in'?-1:1)||soTs(a)-soTs(b))}
 function soCalc(moves,from,to){
@@ -1798,23 +1810,30 @@ const soQty=(v,u)=>`${fmt(v)}${u?' <small>'+esc(u)+'</small>':''}`;
 function soBalHTML(site){
   const calc=soCalc(soSiteMoves(site.id)),gs=soGroups(calc);
   if(!gs.length)return `<div class="card blank"><h3>لا توجد حركات في هذا المخزن بعد</h3><p>ابدأ بـ«+ جرد» لتسجيل الرصيد الموجود حاليًا (رصيد افتتاحي)، وبعدها سجّل كل توريد يدخل الموقع.</p></div>`;
-  return `<div class="card"><div class="sec-h">أرصدة المخزن</div><div class="tbl-wrap"><table class="so-t"><thead><tr><th>الخامة</th><th>الوحدة</th><th class="num">إجمالي التوريد</th><th class="num">إجمالي المنصرف</th><th class="num">الرصيد الحالي</th><th>آخر جرد</th></tr></thead><tbody>
-  ${gs.map(g=>(g.subs?`<tr class="ct-sec"><td colspan="6">${soThumb(g.main)}<b>${esc(g.main.name)}</b></td></tr>`:'')+g.rows.map(x=>`<tr${x.r.bal<0?' class="bad"':''}><td>${g.subs&&!x.own?'':soThumb(x.it)}${esc(x.it.name)}</td><td>${esc(x.it.unit||'')}</td><td class="num plain">${fmt(x.r.inQ)}</td><td class="num plain">${fmt(x.r.out)}</td><td class="num strong${x.r.bal<0?' neg':''}">${fmt(x.r.bal)}</td><td>${x.r.last?esc(x.r.last.date)+' <small>('+fmt(x.r.last.qty)+')</small>':'<span class="note">لم يُجرد</span>'}</td></tr>`).join('')).join('')}
+  return `<div class="card"><div class="sec-h">أرصدة المخزن</div><div class="tbl-wrap"><table class="so-t"><thead><tr><th>الخامة</th><th>الوحدة</th><th class="num">إجمالي التوريد</th><th class="num">إجمالي المنصرف</th><th class="num">الرصيد الحالي</th><th>آخر جرد</th><th></th></tr></thead><tbody>
+  ${gs.map(g=>(g.subs?`<tr class="ct-sec"><td colspan="7">${soThumb(g.main)}<b>${esc(g.main.name)}</b></td></tr>`:'')+g.rows.map(x=>`<tr${x.r.bal<0?' class="bad"':''}><td>${g.subs&&!x.own?'':soThumb(x.it)}${esc(x.it.name)}</td><td>${esc(x.it.unit||'')}</td><td class="num plain">${fmt(x.r.inQ)}</td><td class="num plain">${fmt(x.r.out)}</td><td class="num strong${x.r.bal<0?' neg':''}">${fmt(x.r.bal)}</td><td>${x.r.last?esc(x.r.last.date)+' <small>('+fmt(x.r.last.qty)+')</small>':'<span class="note">لم يُجرد</span>'}</td><td class="acts">${soItem(x.it.id)&&soPickable(x.it)&&!SO.form?`<button type="button" class="ghost" data-so="newfor" data-id="${esc(x.it.id)}" title="توريد ${esc(x.it.name)}">+ توريد</button>`:''}</td></tr>`).join('')).join('')}
   </tbody></table></div><p class="note">المنصرف يُحسب عند كل جرد: الرصيد قبله + ما ورد − الموجود فعلًا. الرصيد الحالي = آخر جرد + ما ورد بعده.</p></div>`;
 }
 function soMoveText(m){
   const d=m.data||{};
-  if(m.kind==='in')return `<b>${esc(soLabel(d.item))}</b> · ${soQty(d.qty,soUnit(d.item))}${d.supplier?' · المورد: '+esc(d.supplier):''}${d.notes?'<span class="note">'+esc(d.notes)+'</span>':''}`;
+  if(m.kind==='in')return `<b>${esc(soLabel(d.item))}</b> · ${soQty(d.qty,soUnit(d.item))}${+d.price?' · '+fmt(d.price)+' '+CUR+' للوحدة':''}${d.supplier?' · المورد: '+esc(d.supplier):''}${d.photo?` <button type="button" class="ghost rcpt" data-receipt="${esc(d.photo)}" data-rtype="image/jpeg">صورة البون</button>`:''}${d.notes?'<span class="note">'+esc(d.notes)+'</span>':''}`;
   const L=Object.entries(d.lines||{}).filter(([,v])=>v!==''&&v!=null);
   return `<b>جرد ${L.length} خامة</b><span class="note">${L.slice(0,4).map(([id,v])=>esc(soLabel(id))+': '+fmt(v)+' '+esc(soUnit(id))).join('، ')}${L.length>4?' و'+(L.length-4)+' أخرى':''}</span>${d.notes?'<span class="note">'+esc(d.notes)+'</span>':''}`;
 }
 function soMovesHTML(site){
   const appr=soCanAppr(site.id),all=soSiteMoves(site.id,true).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||soTs(b)-soTs(a));
-  const live=all.filter(m=>!m.deleted),del=all.filter(m=>m.deleted),list=live.slice(0,SO.lim);
+  const mf=SO.mf||(SO.mf={date:'',q:''}),qn=soNorm(mf.q);
+  const hit=m=>{const d=m.data||{};return (!mf.date||m.date===mf.date)&&(!qn||[d.supplier,d.notes,m.kind==='in'?soLabel(d.item):''].some(v=>soNorm(v).includes(qn)))};
+  const live=all.filter(m=>!m.deleted&&hit(m)),del=all.filter(m=>m.deleted),list=live.slice(0,SO.lim);
+  const bonN=new Map();for(const m of live){const b=(m.data||{}).bon;if(b)bonN.set(b,(bonN.get(b)||0)+1)}
+  const seenB=new Set(),bonHead=m=>{const d=m.data||{},b=d.bon;if(!b||bonN.get(b)<2||seenB.has(b))return '';seenB.add(b);
+    const ls=live.filter(x=>(x.data||{}).bon===b),val=ls.reduce((a,x)=>a+(+x.data.price||0)*(+x.data.qty||0),0);
+    return `<tr class="ct-sec"><td colspan="5">بون ${esc(m.date)}${d.supplier?' — '+esc(d.supplier):''} · ${ls.length} خامات${val?' · القيمة '+fmt(r2(val))+' '+CUR:''}${d.notes?' · '+esc(d.notes):''}</td></tr>`};
   return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">حركات المخزن (${live.length})</div>${appr&&del.length?`<button class="ghost" data-so="showdel">${SO.showDel?'إخفاء المحذوفات':'المحذوفات ('+del.length+')'}</button>`:''}</div>
-  ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>سجّله</th><th></th></tr></thead><tbody>
-  ${list.map(m=>{const ed=soCanEdit(m);return `<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'<span class="pill-ok">توريد</span>':'<span class="pill-over">جرد</span>'}${m._local?'<span class="pend">على الجهاز</span>':''}</td><td>${soMoveText(m)}</td><td>${esc((m.data||{}).by||'')}</td><td class="acts">${ed?`<button class="ghost" data-so="edit" data-id="${esc(m.id)}">تعديل</button><button class="ghost" data-so="del" data-id="${esc(m.id)}">حذف</button>`:(isLocked(m.date)?'<span class="note">الفترة مقفولة</span>':'<span class="note">مقفول بعد جرد لاحق</span>')}</td></tr>`}).join('')}
-  </tbody></table></div>${live.length>list.length?`<button class="ghost" data-so="more">عرض المزيد</button>`:''}`:'<p class="note">لا توجد حركات بعد.</p>'}
+  <div class="filters"><div class="f"><label for="so_mdate">تاريخ الفاتورة / البون</label><input id="so_mdate" type="date" value="${esc(mf.date)}"></div><div class="f"><label for="so_mq">بحث</label><input id="so_mq" value="${esc(mf.q)}" placeholder="المورد أو الخامة أو رقم البون"></div>${mf.date||mf.q?'<button class="ghost" data-so="mfclear">مسح البحث</button>':''}</div>
+  ${list.length?`<div class="tbl-wrap"><table class="so-t"><thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>سجّله</th><th></th></tr></thead><tbody>
+  ${list.map(m=>{const ed=soCanEdit(m);return bonHead(m)+`<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'<span class="pill-ok">توريد</span>':'<span class="pill-over">جرد</span>'}${m._local?'<span class="pend">على الجهاز</span>':''}</td><td>${soMoveText(m)}</td><td>${esc((m.data||{}).by||'')}</td><td class="acts">${ed?`<button class="ghost" data-so="edit" data-id="${esc(m.id)}">تعديل</button><button class="ghost" data-so="del" data-id="${esc(m.id)}">حذف</button>`:(isLocked(m.date)?'<span class="note">الفترة مقفولة</span>':'<span class="note">مقفول بعد جرد لاحق</span>')}</td></tr>`}).join('')}
+  </tbody></table></div>${live.length>list.length?`<button class="ghost" data-so="more">عرض المزيد</button>`:''}`:`<p class="note">${mf.date||mf.q?'مفيش حركات بالبحث ده.':'لا توجد حركات بعد.'}</p>`}
   ${SO.showDel&&appr&&del.length?`<div class="sec-h" style="margin-top:12px">المحذوفات</div><div class="tbl-wrap"><table><tbody>${del.map(m=>`<tr><td class="date">${esc(m.date)}</td><td>${m.kind==='in'?'توريد':'جرد'}</td><td>${soMoveText(m)}</td><td class="acts"><button class="ghost" data-so="restore" data-id="${esc(m.id)}">استرجاع</button><button class="ghost" data-so="purge" data-id="${esc(m.id)}">حذف نهائي</button></td></tr>`).join('')}</tbody></table></div>`:''}
   <p class="note">من سجّل الحركة يقدر يعدّلها لحد ما يتعمل الجرد اللي بعدها. بعد كده التعديل للمدير أو صاحب الموقع فقط.</p></div>`;
 }
@@ -1873,16 +1892,19 @@ function soEnableHTML(sites){
 function soBook(siteId,itemId,date,skipId){const r=soCalc(soSiteMoves(siteId).filter(m=>m.id!==skipId),null,date).get(itemId);return r?r.bal:0}
 function soFormHTML(site){
   const f=SO.form;if(!f)return '';const m=SO.msg;
-  if(f.kind==='in'){const u=soUnit(f.item),sups=soSuppliers();
-    return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${f.id?'تعديل توريد':'توريد خامة للمخزن'} — ${esc(site.name)}</div>
+  if(f.kind==='in'){const sups=soSuppliers(),rows=f.rows&&f.rows.length?f.rows:[{txt:'',qty:''}];
+    const line=(r,i)=>{const id=soPickId(r.txt),u=id?soUnit(id):'';return `<tr><td><input id="so_li_${i}" data-sol="${i}" list="so_items" value="${esc(r.txt||'')}" placeholder="اكتب أول حرفين من الخامة" autocomplete="off" aria-label="الخامة ${i+1}"></td><td><input id="so_lq_${i}" class="ct-in" data-solq="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.qty??''}" aria-label="الكمية ${i+1}"></td><td id="so_lu_${i}">${esc(u)}</td>${f.id?'':`<td class="acts">${rows.length>1?`<button type="button" class="ghost" data-so="rmline" data-i="${i}" aria-label="حذف السطر">×</button>`:''}</td>`}</tr>`};
+    return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${f.id?'تعديل توريد':'بون توريد'} — ${esc(site.name)}</div>
     <form id="soForm" class="entry" novalidate>
       <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}" ${lockMin()}></div>${lockNote()}
-      <div class="f c2"><label for="so_item">الخامة</label><select id="so_item"><option value="">اختر الخامة</option>${soItemOpts(f.item,true)}</select></div>
-      <div class="f c1 half"><label for="so_qty">الكمية${u?' ('+esc(u)+')':''}</label><input id="so_qty" type="number" inputmode="decimal" min="0" step="any" value="${f.qty??''}"></div>
       <div class="f c2"><label for="so_sup">المورد (اختياري)</label><input id="so_sup" list="so_supl" maxlength="80" value="${esc(f.supplier||'')}"><datalist id="so_supl">${sups.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
+      <div class="fw tbl-wrap"><table class="ct-lines so-bon"><thead><tr><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th>${f.id?'':'<th></th>'}</tr></thead><tbody>${rows.map(line).join('')}</tbody></table>
+      <datalist id="so_items">${soPickList(site.id).map(x=>`<option value="${esc(x.t)}">`).join('')}</datalist></div>
+      ${f.id?'':'<div class="fw"><button type="button" class="ghost" data-so="addline">+ خامة</button></div>'}
       <div class="f fw"><label for="so_notes">ملاحظات (اختياري)</label><input id="so_notes" maxlength="200" value="${esc(f.notes||'')}" placeholder="مثال: رقم البون أو الفاتورة"></div>
+      ${f.id?'':`<div class="f fw"><label for="so_photo">صورة البون (اختياري)</label><input id="so_photo" type="file" accept="image/*" capture="environment">${SO.pick?`<span class="note ok-note">تم اختيار: ${esc(SO.pick.name)}</span>`:''}</div>`}
       <p class="note fw">الخامة مش موجودة؟ أضفها من «قائمة الخامات» تحت.</p>
-      <div class="form-foot"><button class="primary" type="submit">حفظ التوريد</button><button type="button" data-so="cancel">إلغاء</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
+      <div class="form-foot"><button class="primary" type="submit">حفظ ${f.id?'التوريد':'البون'}</button><button type="button" data-so="cancel">إلغاء</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
     </form></div>`}
   const moves=soSiteMoves(site.id).filter(x=>x.id!==f.id),calc=soCalc(moves,null,f.date);
   const ids=[...new Set([...calc.keys(),...Object.keys(f.lines||{}),...(f.extra||[])])].filter(id=>soItem(id));
@@ -1904,7 +1926,8 @@ function soFormHTML(site){
 function soReadForm(){
   const f=SO.form;if(!f)return;const v=id=>{const e=document.getElementById(id);return e?e.value:null};
   const d=v('so_date');if(d!=null)f.date=d;const n=v('so_notes');if(n!=null)f.notes=n;
-  if(f.kind==='in'){const i=v('so_item');if(i!=null)f.item=i;const q=v('so_qty');if(q!=null)f.qty=q===''?'':+q;const s=v('so_sup');if(s!=null)f.supplier=s}
+  if(f.kind==='in'){const s=v('so_sup');if(s!=null)f.supplier=s;
+    if(document.querySelector('#soForm [data-sol]')){f.rows=[];document.querySelectorAll('#soForm [data-sol]').forEach(e=>{const i=+e.dataset.sol,q=v('so_lq_'+i);f.rows[i]={txt:e.value,qty:q===''||q==null?'':+q}})}}
   else{f.lines=f.lines||{};document.querySelectorAll('#soForm [data-soc]').forEach(e=>{if(e.value==='')delete f.lines[e.dataset.soc];else f.lines[e.dataset.soc]=+e.value})}
 }
 async function soSaveForm(site){
@@ -1915,9 +1938,28 @@ async function soSaveForm(site){
   const base={id:f.id||'sm'+newId(),site_id:site.id,site_owner:site.owner||null,kind:f.kind,date:f.date,deleted:false,created_by:old?old.created_by:soMe(),data:{...(old?old.data:{}),notes:(f.notes||'').trim(),by:(old&&old.data&&old.data.by)||myBy()||(APPU.me&&APPU.me.name)||'',at:(old&&old.data&&old.data.at)||Date.now()}};
   if(old&&old.created_at)base.created_at=old.created_at;
   if(f.kind==='in'){
-    if(!f.item){SO.msg={t:'اختر الخامة.'};return render()}
-    if(!(+f.qty>0)){SO.msg={t:'اكتب كمية أكبر من صفر.'};return render()}
-    base.data={...base.data,item:f.item,qty:+f.qty,supplier:(f.supplier||'').trim()};
+    const lines=[],seen=new Set();
+    for(const [i,r] of (f.rows||[]).entries()){
+      if(!r||(!String(r.txt||'').trim()&&(r.qty===''||r.qty==null)))continue;
+      const id=soPickId(r.txt);
+      if(!id){SO.msg={t:'السطر '+(i+1)+': «'+String(r.txt||'').trim()+'» مش في قائمة الخامات. اختارها من الاقتراحات أو أضفها للقائمة الأول.'};return render()}
+      if(!(+r.qty>0)){SO.msg={t:'السطر '+(i+1)+': اكتب كمية أكبر من صفر لـ«'+soLabel(id)+'».'};return render()}
+      if(seen.has(id)){SO.msg={t:'«'+soLabel(id)+'» متكررة في البون. اجمع الكمية في سطر واحد.'};return render()}
+      seen.add(id);lines.push({id,qty:+r.qty});
+    }
+    if(!lines.length){SO.msg={t:'اكتب خامة واحدة على الأقل وكميتها.'};return render()}
+    const sup=(f.supplier||'').trim();
+    if(old){base.data={...base.data,item:lines[0].id,qty:lines[0].qty,supplier:sup,editedAt:Date.now()};const ok=await soPut('store_moves',base);SO.form=null;SO.msg={ok:1,t:'تم حفظ التوريد'+(ok?'.':' على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.')};return render()}
+    let photo='';
+    if(SO.pick){
+      if(navigator.onLine&&SB){try{const b=await shrinkImage(SO.pick);const up=await APPASSETS.upload(b,{type:b.type||'image/jpeg'});photo=up.id}catch(e){SO.msg={t:'تعذّر رفع صورة البون. جرّب تاني أو احفظ من غير صورة.'};return render()}}
+      else showBanner('صورة البون محتاجة نت: البون اتسجل من غير الصورة.');
+    }
+    const bon='b'+newId(),at=Date.now();
+    for(const [k,l] of lines.entries()){const row={...base,id:k?'sm'+newId():base.id,data:{...base.data,item:l.id,qty:l.qty,supplier:sup,bon,at:at+k}};if(photo)row.data.photo=photo;soQueue('store_moves','put',row.id,row)}
+    await soFlush();const ok=!soQ().length;
+    SO.form=null;SO.pick=null;SO.msg={ok:1,t:'تم حفظ البون ('+lines.length+(lines.length===1?' خامة':' خامات')+')'+(ok?'.':' على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.')};
+    return render();
   }else{
     const L={};for(const [k,x] of Object.entries(f.lines||{}))if(x!==''&&x!=null&&!isNaN(+x)&&+x>=0)L[k]=+x;
     if(!Object.keys(L).length){SO.msg={t:'اكتب الكمية الموجودة لخامة واحدة على الأقل.'};return render()}
@@ -1931,7 +1973,8 @@ async function soSaveForm(site){
 function soBindForm(site){
   const fm=$('#soForm');if(!fm)return;
   fm.onsubmit=ev=>{ev.preventDefault();soSaveForm(site)};
-  const it=$('#so_item');if(it)it.onchange=()=>{soReadForm();render()};
+  fm.querySelectorAll('[data-sol]').forEach(e=>e.addEventListener('input',()=>{soReadForm();const u=$('#so_lu_'+e.dataset.sol),id=soPickId(e.value);if(u)u.textContent=id?soUnit(id):''}));
+  const ph=$('#so_photo');if(ph)ph.onchange=()=>{SO.pick=ph.files&&ph.files[0]||null;soReadForm();render()};
   const dt=$('#so_date');if(dt&&SO.form.kind==='count')dt.onchange=()=>{soReadForm();render()};
   const ad=$('#so_addc');if(ad)ad.onchange=()=>{soReadForm();if(ad.value){SO.form.extra=[...(SO.form.extra||[]),ad.value]}render();const n=document.getElementById('so_c_'+ad.value);if(n)n.focus()};
   fm.querySelectorAll('[data-soc]').forEach(e=>e.oninput=()=>{soReadForm();const id=e.dataset.soc,bk=soBook(site.id,id,SO.form.date,SO.form.id),o=$('#so_d_'+CSS.escape(id));if(o)o.textContent=e.value===''?'—':fmt(r2(bk-(+e.value)))});
@@ -1945,24 +1988,26 @@ function soRenderPage(){
   if(SO.want&&en.some(s=>s.id===SO.want)){SO.site=SO.want;SO.want=''}
   if(!SO.site||!en.some(s=>s.id===SO.site))SO.site=(en[0]||{}).id||'';
   const site=en.find(s=>s.id===SO.site)||null,wantSite=SO.want?sites.find(s=>s.id===SO.want):null;
-  const tab=SO.tab,msg=!SO.form&&SO.msg;if(!SO.form)SO.msg=null;
+  const tab=SO.tab,msg=!SO.form&&SO.msg;if(!SO.form&&SO.msg){if(SO.msg.ok&&!SO.msg.until)SO.msg.until=Date.now()+8000;if(!SO.msg.until||SO.msg.until<Date.now())SO.msg=null}
   $('#pane').innerHTML=`<div class="pane-h"><h2>المخزن${site?' — '+esc(site.name):''}</h2><div class="actions">
-    ${site&&!SO.form?'<button class="primary" data-so="new" data-k="in">+ توريد</button><button data-so="new" data-k="count">+ جرد</button>':''}
+    ${site&&!SO.form&&!SO.imp?'<button class="primary" data-so="new" data-k="in">+ توريد</button><button data-so="new" data-k="count">+ جرد</button><button class="ghost" data-so="imp">استيراد من Excel</button>':''}
     ${eng?`<button class="ghost" data-cu="eng-settings">${CU.engSettings?'إخفاء الإعدادات':'الإعدادات'}</button>`:''}</div></div>${soNeedSql()}
   ${eng&&CU.engSettings?appSecurityCard():''}
   ${wantSite&&!wantSite.enabled&&soCanAppr(wantSite.id)?`<div class="card due-card"><p>المخزن مش مفعّل في موقع <b>${esc(wantSite.name)}</b>.</p><div class="row"><button class="primary" data-so="enable" data-id="${esc(wantSite.id)}">تفعيل المخزن في هذا الموقع</button><button class="ghost" data-so="nowant">لا</button></div></div>`:''}
   ${msg?`<p class="msg ${msg.ok?'ok':'err'}">${esc(msg.t)}</p>`:''}
   ${en.length>1?`<div class="row"><label for="so_site">الموقع</label><select id="so_site" style="width:auto">${en.map(s=>`<option value="${esc(s.id)}" ${s.id===SO.site?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`:''}
   ${!en.length?(appr?`<div class="card blank"><h3>المخزن مش مفعّل في أي موقع</h3><p>فعّله من «تفعيل المخزن على المواقع» تحت، أو من ⋯ في صفحة الموقع.</p></div>`:`<div class="card blank"><h3>لا توجد مخازن متاحة لك بعد</h3><p>اطلب من المدير أو صاحب الموقع يضيفك على مخزن الموقع.</p></div>`):''}
-  ${site?soFormHTML(site):''}
+  ${site?soFormHTML(site)+soImpHTML(site):''}
   ${site?`<div class="seg" role="tablist" aria-label="المخزن"><button role="tab" data-so="tab" data-v="bal" aria-selected="${tab==='bal'}">الأرصدة</button><button role="tab" data-so="tab" data-v="moves" aria-selected="${tab==='moves'}">الحركات</button><button role="tab" data-so="tab" data-v="rep" aria-selected="${tab==='rep'}">التقارير</button></div>
   ${tab==='moves'?soMovesHTML(site):tab==='rep'?soRepHTML(site):soBalHTML(site)}`:''}
   ${appr||en.length?soCatHTML():''}
   ${appr?soEnableHTML(sites)+appRegSummary(ctMySites(),'store'):''}`;
   if(site)soBindForm(site);
-  const ss=$('#so_site');if(ss)ss.onchange=()=>{SO.site=ss.value;SO.form=null;render()};
+  const ss=$('#so_site');if(ss)ss.onchange=()=>{SO.site=ss.value;SO.form=null;SO.imp=null;render()};
   for(const [id,k] of [['so_rmain','main'],['so_rsub','sub'],['so_rfrom','from'],['so_rto','to']]){const e=document.getElementById(id);if(e)e.onchange=()=>{SO.rep[k]=e.value;if(k==='main')SO.rep.sub='';render()}}
   const rs=$('#so_rsup');if(rs)rs.onchange=()=>{SO.rep.sup=rs.value;render()};
+  const md=$('#so_mdate');if(md)md.onchange=()=>{SO.mf.date=md.value;render()};
+  const mq=$('#so_mq');if(mq)mq.onchange=()=>{SO.mf.q=mq.value;render()};
   const gp=$('#so_gp');if(gp)gp.onchange=()=>{SO.grantP=gp.value;render()};
   for(const [id,k] of [['soCatBox','openCat'],['soEnBox','openEn']]){const b=document.getElementById(id);if(b)b.ontoggle=()=>{if(SO[k]===b.open)return;SO[k]=b.open}}
   for(const id of ['so_cn','so_cu','so_sn','so_su','so_en','so_eu']){const e=document.getElementById(id);if(e)e.addEventListener('input',()=>{const A=SO.cat.add,E=SO.cat.edit;if(id==='so_sn'&&A)A.name=e.value;if(id==='so_su'&&A)A.unit=e.value;if(id==='so_en'&&E)E.name=e.value;if(id==='so_eu'&&E)E.unit=e.value})}
@@ -2002,15 +2047,18 @@ document.addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-so]');if(!b)return;const a=b.dataset.so,id=b.dataset.id;
   const site=soMySites().find(s=>s.id===SO.site&&s.enabled);
   if(a==='tab'){SO.tab=b.dataset.v;render();return}
-  if(a==='new'){SO.form={kind:b.dataset.k,date:today(),lines:{},extra:[]};SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
-  if(a==='cancel'){SO.form=null;SO.msg=null;render();return}
+  if(a==='new'||a==='newfor'){SO.imp=null;SO.form=b.dataset.k==='count'?{kind:'count',date:today(),lines:{},extra:[]}:{kind:'in',date:today(),rows:[{txt:a==='newfor'?soPickText(id):'',qty:''}]};SO.pick=null;SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});const q=document.getElementById(a==='newfor'?'so_lq_0':(b.dataset.k==='count'?'so_date':'so_li_0'));if(q)q.focus();return}
+  if(a==='addline'){soReadForm();SO.form.rows=[...(SO.form.rows||[]),{txt:'',qty:''}];render();const n=document.getElementById('so_li_'+(SO.form.rows.length-1));if(n)n.focus();return}
+  if(a==='rmline'){soReadForm();SO.form.rows.splice(+b.dataset.i,1);render();return}
+  if(a==='cancel'){SO.form=null;SO.pick=null;SO.msg=null;render();return}
   if(a==='edit'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;const d=m.data||{};
-    SO.form=m.kind==='in'?{id:m.id,kind:'in',date:m.date,item:d.item,qty:d.qty,supplier:d.supplier||'',notes:d.notes||''}:{id:m.id,kind:'count',date:m.date,lines:{...(d.lines||{})},extra:[],notes:d.notes||''};
+    SO.form=m.kind==='in'?{id:m.id,kind:'in',date:m.date,rows:[{txt:soItem(d.item)?soPickText(d.item):'',qty:d.qty}],supplier:d.supplier||'',notes:d.notes||''}:{id:m.id,kind:'count',date:m.date,lines:{...(d.lines||{})},extra:[],notes:d.notes||''};
     SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
   if(a==='del'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;if(!confirm('حذف '+(m.kind==='in'?'التوريد':'الجرد')+' بتاريخ '+m.date+'؟'))return;
     await soPut('store_moves',{...soClean(m),deleted:true});SO.msg={ok:1,t:'اتنقل للمحذوفات.'};render();return}
   if(a==='restore'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m)return;await soPut('store_moves',{...soClean(m),deleted:false});render();return}
   if(a==='purge'){if(!confirm('حذف نهائي؟ مش هينفع ترجّعه.'))return;soQueue('store_moves','del',id,null);await soFlush();render();return}
+  if(a==='mfclear'){SO.mf={date:'',q:''};render();return}
   if(a==='showdel'){SO.showDel=!SO.showDel;render();return}
   if(a==='more'){SO.lim+=50;render();return}
   if(a==='enable'){soEnable(id,true);return}
@@ -2038,8 +2086,8 @@ function soDocBody(P){
   let body=`<table><thead><tr><th>الخامة</th><th>الوحدة</th><th>رصيد أول المدة</th><th>التوريد</th><th>المنصرف</th><th>رصيد آخر المدة</th><th>آخر جرد</th></tr></thead><tbody>
   ${x.gs.map(g=>(g.subs?`<tr class="open"><td colspan="7" class="tl">${esc(g.main.name)}</td></tr>`:'')+g.rows.map(y=>`<tr>${td(esc(y.it.name),'tl')}${td(esc(y.it.unit||''))}${td(money(y.r.open),'n')}${td(money(y.r.inQ),'n')}${td(money(y.r.out),'n')}${td(money(y.r.bal),'n b')}${td(y.r.last?esc(y.r.last.date):'—')}</tr>`).join('')).join('')||'<tr><td colspan="7">لا توجد حركات</td></tr>'}
   </tbody></table>`;
-  if(x.ins.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">التوريدات${rep.sup?' من '+esc(rep.sup):''}</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الكمية</th><th>الوحدة</th><th>المورد</th><th>ملاحظات</th><th>سجّله</th></tr></thead><tbody>
-  ${x.ins.map(y=>{const d=y.m.data||{};return `<tr>${td(esc(y.m.date))}${td(esc(soLabel(y.it.id)),'tl')}${td(money(d.qty),'n')}${td(esc(y.it.unit||''))}${td(esc(d.supplier||''),'tl')}${td(esc(d.notes||''),'tl')}${td(esc(d.by||''))}</tr>`}).join('')}</tbody></table>`;
+  if(x.ins.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">التوريدات${rep.sup?' من '+esc(rep.sup):''}</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الكمية</th><th>الوحدة</th>${x.ins.some(y=>+(y.m.data||{}).price)?'<th>سعر الوحدة</th><th>القيمة</th>':''}<th>المورد</th><th>ملاحظات</th><th>سجّله</th></tr></thead><tbody>
+  ${x.ins.map(y=>{const d=y.m.data||{},pr=x.ins.some(z=>+(z.m.data||{}).price);return `<tr>${td(esc(y.m.date))}${td(esc(soLabel(y.it.id)),'tl')}${td(money(d.qty),'n')}${td(esc(y.it.unit||''))}${pr?td(+d.price?money(d.price):'','n')+td(+d.price?money(r2(d.price*d.qty)):'','n'):''}${td(esc(d.supplier||''),'tl')}${td(esc(d.notes||''),'tl')}${td(esc(d.by||''))}</tr>`}).join('')}</tbody></table>`;
   if(x.counts.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">الجرد</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الوحدة</th><th>الرصيد الدفتري</th><th>الموجود فعلًا</th><th>المنصرف</th></tr></thead><tbody>
   ${x.counts.map(c=>`<tr>${td(esc(c.date))}${td(esc(soLabel(c.it.id)),'tl')}${td(esc(c.it.unit||''))}${td(money(c.book),'n')}${td(money(c.actual),'n b')}${td(c.adj?'رصيد افتتاحي':money(c.out),'n')}</tr>`).join('')}</tbody></table>`;
   body+=`<p class="sub" style="margin-top:8px">المنصرف يُحسب عند كل جرد: الرصيد قبله + ما ورد − الموجود فعلًا.</p>`;
@@ -2050,13 +2098,132 @@ async function soExcel(site){
   const rep={...SO.rep},x=soReport(site,rep);
   const sum={name:'الأرصدة',rows:[['الخامة الرئيسية','الخامة','الوحدة','رصيد أول المدة','التوريد','المنصرف','رصيد آخر المدة','آخر جرد']],styles:{0:1},widths:[22,26,10,15,13,13,15,13],freeze:1};
   for(const g of x.gs)for(const y of g.rows)sum.rows.push([g.subs?g.main.name:'',y.it.name,y.it.unit||'',y.r.open,y.r.inQ,y.r.out,y.r.bal,y.r.last?y.r.last.date:'']);
-  const ins={name:'التوريدات',rows:[['التاريخ','الخامة','الكمية','الوحدة','المورد','ملاحظات','سجّله']],styles:{0:1},widths:[12,30,12,10,22,26,16],freeze:1};
-  for(const y of x.ins){const d=y.m.data||{};ins.rows.push([y.m.date,soLabel(y.it.id),+d.qty||0,y.it.unit||'',d.supplier||'',d.notes||'',d.by||''])}
+  const ins={name:'التوريدات',rows:[['التاريخ','الخامة','الكمية','الوحدة','سعر الوحدة','القيمة','المورد','ملاحظات','سجّله']],styles:{0:1},widths:[12,30,12,10,12,14,22,26,16],freeze:1};
+  for(const y of x.ins){const d=y.m.data||{};ins.rows.push([y.m.date,soLabel(y.it.id),+d.qty||0,y.it.unit||'',+d.price||'',+d.price?r2(d.price*(+d.qty||0)):'',d.supplier||'',d.notes||'',d.by||''])}
   const cnt={name:'الجرد',rows:[['التاريخ','الخامة','الوحدة','الرصيد الدفتري','الموجود فعلًا','المنصرف']],styles:{0:1},widths:[12,30,10,15,15,13],freeze:1};
   for(const c of x.counts)cnt.rows.push([c.date,soLabel(c.it.id),c.it.unit||'',c.book,c.actual,c.adj?'رصيد افتتاحي':c.out]);
   const nm=await askFileName(soRepName({site,rep}),'Excel (.xlsx)');if(!nm)return;
   try{await saveFile(nm+'.xlsx',XLSX_W.build([sum,ins,cnt]));flash('تم الحفظ: '+nm+'.xlsx')}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر حفظ الملف.',1)}
 }
+
+/* ---------- استيراد توريدات من Excel ---------- */
+const SO_IMP_HEAD=['التاريخ *','التصنيف (البند الرئيسي) *','الخامة (البند الفرعي)','الوحدة','الكمية *','سعر الوحدة','المورد','ملاحظات'];
+function soImpTemplate(site){
+  const d=SO_IMP_HEAD;
+  const main={name:'التوريدات',rows:[d],styles:{0:1},widths:[13,24,24,10,11,12,20,24],freeze:1};
+  const ex={name:'مثال',rows:[d,[today(),'حديد تسليح','حديد 12 مم','طن',3,38000,'حديد عز',''],[today(),'أسمنت','','شيكارة',200,'','مصنع السويس','بون 4521'],[],['اكتب في شيت «التوريدات». التاريخ والتصنيف والكمية إجباري.'],['لو التصنيف مالوش بنود فرعية سيب «الخامة» فاضية.'],['الوحدة لازم تتكتب لو الخامة جديدة مش في القائمة.'],['السطور اللي ليها نفس التاريخ ونفس المورد بتتسجل بون واحد.']],styles:{0:1},widths:[13,24,24,10,11,12,20,24]};
+  const cat={name:'قائمة الخامات',rows:[['التصنيف (البند الرئيسي)','الخامة (البند الفرعي)','الوحدة']],styles:{0:1},widths:[26,26,12],freeze:1};
+  for(const m of soMains()){const subs=soSubs(m.id);if(!subs.length)cat.rows.push([m.name,'',m.unit||'']);for(const x of subs)cat.rows.push([m.name,x.name,x.unit||''])}
+  return XLSX_W.build([main,ex,cat]);
+}
+function soImpParse(rows,site){
+  const norm=v=>String(v??'').replace(/[*\s]+/g,' ').trim();
+  let hr=-1,col={};
+  for(let r=0;r<Math.min(rows.length,30)&&hr<0;r++){const c={};(rows[r]||[]).forEach((v,i)=>{const t=norm(v);if(!t)return;
+      if(/سعر|price/i.test(t))c.price=i;else if(/فرعي|الخامة|الصنف/.test(t))c.item=i;else if(/تصنيف|رئيسي|^البند/.test(t))c.cat=i;else if(/الوحدة|وحدة/.test(t))c.unit=i;else if(/الكمية|كمية/.test(t))c.qty=i;else if(/التاريخ|تاريخ/.test(t))c.date=i;else if(/المورد|مورد/.test(t))c.sup=i;else if(/ملاحظ|بيان/.test(t))c.notes=i});
+    if(c.date!==undefined&&c.qty!==undefined&&(c.cat!==undefined||c.item!==undefined)){hr=r;col=c}}
+  if(hr<0)return {err:'الملف مش على شكل نموذج التوريدات: مش لاقي أعمدة «التاريخ» و«التصنيف» و«الكمية». نزّل النموذج من الزرار واملاه.'};
+  const N=soNorm,out=[],newMains=new Map(),newSubs=new Map();
+  const moves=soSiteMoves(site.id);
+  const g=(row,k)=>col[k]===undefined?'':row[col[k]];
+  for(let r=hr+1;r<rows.length;r++){
+    const row=rows[r]||[];
+    const raw={date:g(row,'date'),cat:norm(g(row,'cat')),item:norm(g(row,'item')),unit:norm(g(row,'unit')),qty:g(row,'qty'),price:g(row,'price'),sup:norm(g(row,'sup')),notes:norm(g(row,'notes'))};
+    if(!String(raw.date).trim()&&!raw.cat&&!raw.item&&String(raw.qty).trim()===''&&!raw.sup)continue;
+    const L={n:r+1,...raw,errs:[],st:'ok'};
+    L.d=parseDate(raw.date);if(!L.d)L.errs.push('التاريخ');
+    L.q=parseAmount(raw.qty);if(!(L.q>0))L.errs.push('الكمية');
+    L.p=String(raw.price??'').trim()===''?0:parseAmount(raw.price);if(isNaN(L.p)||L.p<0){L.errs.push('السعر');L.p=0}
+    let cat=raw.cat,item=raw.item;if(!cat&&item){cat=item;item=''}
+    L.ccat=cat;L.citem=item;
+    if(!cat)L.errs.push('التصنيف');
+    if(cat){
+      const m=soMains().find(x=>N(x.name)===N(cat));
+      if(m){
+        const subs=soSubs(m.id);
+        if(item){
+          const sb=subs.find(x=>N(x.name)===N(item));
+          if(sb)L.id=sb.id;
+          else if(!subs.length&&soUsed(m.id))L.errs.push('«'+m.name+'» مالوش بنود فرعية، سيب خانة الخامة فاضية');
+          else{L.newSub=m.id;L.label=m.name+' — '+item;if(!raw.unit)L.errs.push('الوحدة (خامة جديدة)')}
+        }else if(subs.length)L.errs.push('«'+m.name+'» له بنود فرعية، اكتب الخامة');
+        else if(!m.unit){if(raw.unit)L.setUnit=m.id;else L.errs.push('الوحدة')}
+        else L.id=m.id;
+      }else{L.newMain=cat;L.label=item?cat+' — '+item:cat;if(!raw.unit)L.errs.push('الوحدة (خامة جديدة)')}
+      if(L.id){const u=soUnit(L.id);if(raw.unit&&u&&N(u)!==N(raw.unit))L.errs.push('الوحدة في الملف «'+raw.unit+'» غير وحدة الخامة «'+u+'»');L.label=soLabel(L.id);L.u=u}
+      else L.u=raw.unit;
+    }
+    if(L.d&&isLocked(L.d))L.errs.push('الفترة لحد '+SO.lock+' مقفولة');
+    if(L.errs.length)L.st='err';
+    else{
+      if(L.newMain||L.newSub)L.st='new';
+      const same=x=>x.d===L.d&&x.q===L.q&&N(x.sup)===N(L.sup)&&(x.id&&x.id===L.id||!x.id&&N(x.label)===N(L.label));
+      if(L.id&&moves.some(m=>m.kind==='in'&&m.date===L.d&&(m.data||{}).item===L.id&&Math.abs((+m.data.qty||0)-L.q)<1e-9&&N(m.data.supplier)===N(L.sup)))L.dup='متسجل قبل كده';
+      else if(out.some(x=>x.st!=='err'&&same(x)))L.dup='متكرر في الملف';
+    }
+    out.push(L);
+  }
+  if(!out.length)return {err:'مفيش ولا سطر في الملف.'};
+  return {lines:out};
+}
+function soImpHTML(site){
+  const I=SO.imp;if(!I)return '';const m=I.msg;
+  const L=I.lines||[],errs=L.filter(x=>x.st==='err'),dups=L.filter(x=>x.dup&&x.st!=='err'),news=[...new Set(L.filter(x=>x.st==='new').map(x=>x.label))];
+  const use=L.filter(x=>x.st!=='err'&&(!x.dup||I.keepDup));
+  const tag=x=>x.st==='err'?`<span class="neg">❌ ${esc(x.errs.join('، '))}</span>`:x.dup?`<span class="pill-over">مكرر: ${esc(x.dup)}</span>`:x.st==='new'?'<span class="pill-none">🆕 خامة جديدة</span>':'<span class="pill-ok">✓</span>';
+  return `<div class="card entry-card" id="soImpCard"><div class="sec-h">استيراد توريدات من Excel — ${esc(site.name)}</div>
+    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر الملف</button><input type="file" id="soImpFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="ملف التوريدات"></span><button type="button" data-so="imptpl">تنزيل النموذج</button><button type="button" class="ghost" data-so="impclose">إلغاء</button></div>
+    ${m?`<p class="msg ${m.ok?'ok':'err'}" style="white-space:pre-line">${esc(m.t)}</p>`:''}
+    ${L.length?`<p>${L.length} سطر: <b>${L.length-errs.length-dups.length}</b> جاهز${news.length?` · <b>${news.length}</b> خامة جديدة هتتضاف للقائمة`:''}${dups.length?` · <b>${dups.length}</b> مكرر`:''}${errs.length?` · <b class="neg">${errs.length} فيه أخطاء</b>`:''}</p>
+    ${news.length?`<p class="note">الخامات الجديدة: ${news.map(esc).join('، ')}. لو فيه غلطة إملائية صلّحها في الملف قبل الحفظ.</p>`:''}
+    <div class="tbl-wrap"><table><thead><tr><th>سطر</th><th>التاريخ</th><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th><th class="num">السعر</th><th>المورد</th><th>الحالة</th></tr></thead><tbody>
+    ${L.map(x=>`<tr${x.st==='err'?' class="bad"':''}><td>${x.n}</td><td class="date">${esc(x.d||String(x.date||''))}</td><td>${esc(x.label||x.cat||x.item||'')}</td><td class="num plain">${x.q>0?fmt(x.q):esc(String(x.qty||''))}</td><td>${esc(x.u||x.unit||'')}</td><td class="num plain">${x.p?fmt(x.p):''}</td><td>${esc(x.sup||'')}</td><td>${tag(x)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${dups.length?`<label class="chk"><input type="checkbox" id="soImpDup" ${I.keepDup?'checked':''}> سجّل السطور المكررة برضه</label>`:''}
+    <div class="form-foot">${errs.length?'<span class="msg err">صلّح الأخطاء في الملف وارفعه تاني. مفيش حاجة اتسجلت.</span>':`<button class="primary" type="button" data-so="impsave" ${use.length?'':'disabled'}>حفظ ${use.length} توريد</button>`}</div>`
+    :'<p class="note">نزّل النموذج، واملا شيت «التوريدات» (فيه شيت «مثال» وشيت «قائمة الخامات» تنقل منها الأسماء زي ما هي)، وبعدين اختار الملف. مفيش حاجة بتتسجل غير لما تراجع وتدوس «حفظ».</p>'}
+  </div>`;
+}
+async function soImpRead(file,site){
+  let rows;try{rows=await XLSX_R.read(await file.arrayBuffer())}catch(e){SO.imp={msg:{t:'تعذّرت قراءة الملف. تأكد إنه ملف Excel (.xlsx).'}};return render()}
+  const p=soImpParse(rows,site);SO.imp={lines:p.lines||[],msg:p.err?{t:p.err}:null,keepDup:false};render();
+}
+async function soImpSave(site){
+  const I=SO.imp;if(!I||!I.lines)return;
+  const use=I.lines.filter(x=>x.st!=='err'&&(!x.dup||I.keepDup));if(!use.length)return;
+  const N=soNorm,mainIds=new Map(),subIds=new Map(),me=soMe();
+  for(const x of use){
+    if(x.setUnit){const it=soItem(x.setUnit);if(it&&!it.unit)soQueue('store_items','put',it.id,{...soClean(it),unit:x.u})}
+    if(x.newMain){const k=N(x.newMain);let mid=mainIds.get(k);
+      if(!mid){mid='si'+newId();mainIds.set(k,mid);soQueue('store_items','put',mid,{id:mid,parent:null,name:x.newMain,unit:x.citem?'':x.u,photo:'',deleted:false,created_by:me})}
+      if(!x.citem){x.id=mid;continue}
+      x.newSub=mid;
+    }
+    if(x.newSub){const nm=x.citem,k=x.newSub+'|'+N(nm);let sid=subIds.get(k);
+      if(!sid){sid='si'+newId();subIds.set(k,sid);soQueue('store_items','put',sid,{id:sid,parent:x.newSub,name:nm,unit:x.u,photo:'',deleted:false,created_by:me})}
+      x.id=sid}
+  }
+  const bons=new Map(),by=myBy()||(APPU.me&&APPU.me.name)||'',at=Date.now();let k=0;
+  for(const x of use){const bk=x.d+'|'+N(x.sup);if(!bons.has(bk))bons.set(bk,'b'+newId());
+    const row={id:'sm'+newId(),site_id:site.id,site_owner:site.owner||null,kind:'in',date:x.d,deleted:false,created_by:me,data:{item:x.id,qty:x.q,supplier:x.sup||'',notes:x.notes||'',bon:bons.get(bk),by,at:at+(k++),imported:true}};
+    if(x.p)row.data.price=x.p;soQueue('store_moves','put',row.id,row)}
+  await soFlush();const ok=!soQ().length;
+  SO.imp=null;SO.msg={ok:1,t:'تم استيراد '+use.length+' توريد في '+bons.size+(bons.size===1?' بون':' بونات')+(mainIds.size+subIds.size?' وإضافة '+(mainIds.size+subIds.size)+' خامة جديدة للقائمة':'')+(ok?'.':' على هذا الجهاز، وسيُرفع تلقائيًا عند عودة الاتصال.')};
+  SO.tab='moves';render();
+}
+document.addEventListener('click',async ev=>{
+  const b=ev.target.closest('[data-so]');if(!b)return;const a=b.dataset.so;
+  const site=soMySites().find(s=>s.id===SO.site&&s.enabled);if(!site)return;
+  if(a==='imp'){SO.imp={};SO.form=null;render();const c=$('#soImpCard');if(c)c.scrollIntoView({block:'start'});return}
+  if(a==='impclose'){SO.imp=null;render();return}
+  if(a==='imptpl'){try{await saveFile(safeName('نموذج توريدات المخزن - '+site.name)+'.xlsx',soImpTemplate(site))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تجهيز النموذج.',1)}return}
+  if(a==='impsave'){b.disabled=true;await soImpSave(site);return}
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;if(!t)return;
+  if(t.id==='soImpFile'){const f=t.files&&t.files[0];t.value='';const site=soMySites().find(s=>s.id===SO.site&&s.enabled);if(f&&site)soImpRead(f,site)}
+  if(t.id==='soImpDup'&&SO.imp){SO.imp.keepDup=t.checked;render()}
+});
 
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
