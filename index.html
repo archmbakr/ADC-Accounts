@@ -146,6 +146,7 @@ table.rc-t{min-width:0}
 .rc-hist table{min-width:560px;margin-top:8px}
 .rc-del{display:flex;justify-content:flex-end}
 .foot-note{margin:-6px 0 0;color:var(--muted);font-size:13px}
+.so-merge{display:flex;gap:6px;flex-basis:100%;width:100%;margin-top:6px}.so-merge select{flex:1;min-width:0}
 .nav-back{margin:0 0 10px}.nav-back button{padding:6px 16px;font-size:14px;min-height:36px}@media print{.nav-back{display:none}}
 .xbar{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;background:var(--accent-soft);color:var(--fg);font-size:14px}
 .xbar.ok{background:var(--sunk);color:var(--ok);justify-content:flex-start}
@@ -1871,8 +1872,8 @@ function soLoadThumbs(){
   for(const p of need){SO.urls[p]={busy:true,at:Date.now()};appBlobUrl(p).then(url=>{SO.urls[p]={url,at:Date.now()};document.querySelectorAll(`.so-ph[data-receipt="${CSS.escape(p)}"]`).forEach(b=>{if(url)b.innerHTML='<img src="'+esc(url)+'" alt="">'})})}
 }
 function soCatHTML(){
-  const A=SO.cat.add,E=SO.cat.edit,m=SO.catMsg;SO.catMsg=null;
-  const line=(it,isSub)=>E&&E.id===it.id?`<div class="so-cat-row${isSub?' sub':''}"><input id="so_en" value="${esc(E.name)}" aria-label="اسم الخامة"><input id="so_eu" value="${esc(E.unit)}" placeholder="الوحدة" aria-label="الوحدة" style="width:110px"><button class="primary" data-so="catsave">حفظ</button><button class="ghost" data-so="catcancel">إلغاء</button></div>`
+  const A=SO.cat.add,E=SO.cat.edit,m=SO.catMsg;if(m){m.at=m.at||Date.now();if(Date.now()-m.at>8000||!m.ok)SO.catMsg=null}
+  const line=(it,isSub)=>E&&E.id===it.id?`<div class="so-cat-row${isSub?' sub':''}"><input id="so_en" value="${esc(E.name)}" aria-label="اسم الخامة"><input id="so_eu" value="${esc(E.unit)}" placeholder="الوحدة" aria-label="الوحدة" style="width:110px"><button class="primary" data-so="catsave">حفظ</button><button class="ghost" data-so="catcancel">إلغاء</button>${APPU.owner?soMergePick(it,isSub):''}</div>`
     :`<div class="so-cat-row${isSub?' sub':''}">${soThumb(it)}<span class="nm">${esc(it.name)}${it.unit?` <small>(${esc(it.unit)})</small>`:(!isSub&&!soSubs(it.id).length?' <small class="neg">بدون وحدة</small>':'')}${it._local?'<span class="pend">على الجهاز</span>':''}</span><span class="acts">
       ${!isSub?`<button class="ghost" data-so="addsub" data-id="${esc(it.id)}">+ بند فرعي</button>`:''}
       ${soCanEditItem(it)?`<button class="ghost" data-so="catedit" data-id="${esc(it.id)}">تعديل</button><span class="filebtn"><button type="button" class="ghost">${it.photo?'تغيير الصورة':'صورة'}</button><input type="file" accept="image/*" data-sophoto="${esc(it.id)}" aria-label="صورة ${esc(it.name)}"></span>`:''}
@@ -2037,6 +2038,48 @@ async function soPhoto(id,file){
   catch(e){SO.catMsg={t:'تعذّر رفع الصورة'+(e&&e.code==='too_large'?': الصورة كبيرة جدًا.':'.')}}
   SO.openCat=true;render();
 }
+/* ---------- merge two items written twice (owner only) ---------- */
+function soMergeCands(it){return soItems().filter(x=>x.id!==it.id&&(!!x.parent)===(!!it.parent)).sort((a,b)=>soLabel(a.id).localeCompare(soLabel(b.id),'ar'))}
+function soMergePick(it,isSub){const c=soMergeCands(it);if(!c.length)return '';
+  return `<div class="so-merge"><select id="so_mg" aria-label="دمج مع"><option value="">دمج مع صنف تاني…</option>${c.map(x=>`<option value="${esc(x.id)}">${esc(soLabel(x.id))}${x.unit?' ('+esc(x.unit)+')':''}</option>`).join('')}</select><button class="ghost" type="button" data-so="merge" data-id="${esc(it.id)}">دمج</button></div>`}
+function soMovesOf(id){const all=(SO.d&&SO.d.moves)||[];return {ins:all.filter(m=>m.kind==='in'&&(m.data||{}).item===id),counts:all.filter(m=>m.kind==='count'&&((m.data||{}).lines||{})[id]!=null)}}
+function soMergeErr(src,dst){
+  if(!src||!dst||src.id===dst.id)return 'اختار صنف تاني.';
+  if((!!src.parent)!==(!!dst.parent))return 'الدمج بيكون بين بندين رئيسيين أو بندين فرعيين.';
+  if(!src.parent){const sS=soSubs(src.id).length,dS=soSubs(dst.id).length;
+    if(sS&&!dS&&soUsed(dst.id))return '«'+dst.name+'» عليه حركات مباشرة، فمينفعش ينقل له بنود فرعية.';
+    if(!sS&&soUsed(src.id)&&dS)return '«'+src.name+'» عليه حركات مباشرة و«'+dst.name+'» له بنود فرعية. ادمج على البند الفرعي المناسب بدل كده.'}
+  return '';
+}
+function soMergeAsk(src,dst){
+  const ids=[src.id,...soSubs(src.id).map(x=>x.id)];let nI=0,nC=0;for(const id of ids){const m=soMovesOf(id);nI+=m.ins.length;nC+=m.counts.length}
+  let t='دمج «'+soLabel(src.id)+'» في «'+soLabel(dst.id)+'»؟\n\nكل حركاته في كل المواقع ('+nI+' توريد و'+nC+' جرد) هتتنقل على «'+soLabel(dst.id)+'» بتواريخها، ولو الاتنين في نفس الجرد الكميتين هيتجمعوا.\nبعدها «'+src.name+'» يتمسح من القائمة.\n\nالدمج مالوش تراجع.';
+  if(!confirm(t))return false;
+  const su=(src.unit||'').trim(),du=(dst.unit||'').trim();
+  if(su&&du&&soNorm(su)!==soNorm(du)&&!confirm('تنبيه: الوحدة مختلفة!\n«'+src.name+'» بالـ'+su+' و«'+dst.name+'» بالـ'+du+'.\nالكميات هتتجمع زي ما هي من غير تحويل. متأكد؟'))return false;
+  return true;
+}
+function soMergeQueue(src,dst){
+  const m=soMovesOf(src.id);
+  for(const x of m.ins)soQueue('store_moves','put',x.id,{...soClean(x),data:{...x.data,item:dst.id}});
+  for(const x of m.counts){const L={...(x.data.lines||{})},a=L[src.id],b=L[dst.id];delete L[src.id];
+    L[dst.id]=b==null||b===''?a:(a==null||a===''?b:r2(+a + +b));
+    soQueue('store_moves','put',x.id,{...soClean(x),data:{...x.data,lines:L}});
+    x.data={...x.data,lines:L}}               /* keep local copy in step for nested merges */
+  for(const s of soSubs(src.id)){const t=soSubs(dst.id).find(y=>soNorm(y.name)===soNorm(s.name));
+    if(t)soMergeQueue(s,t);else soQueue('store_items','put',s.id,{...soClean(s),parent:dst.id})}
+  soQueue('store_items','put',src.id,{...soClean(src),deleted:true});
+}
+async function soMerge(srcId,dstId){
+  const src=soItem(srcId),dst=soItem(dstId);if(!APPU.owner||!src||!dst)return;
+  const e=soMergeErr(src,dst);if(e){SO.catMsg={t:e};SO.openCat=true;render();return}
+  if(!navigator.onLine||!SB){SO.catMsg={t:'الدمج محتاج اتصال بالإنترنت.'};render();return}
+  if(!soMergeAsk(src,dst))return;
+  soMergeQueue(src,dst);await soFlush();
+  const left=soQ().length;SO.cat={add:null,edit:null};SO.openCat=true;
+  SO.catMsg=left?{t:'اتدمج جزء، وفيه '+left+' حركة لسه ما اترفعتش. هتترفع لوحدها لما الاتصال يرجع.'}:{ok:1,t:'تم دمج «'+src.name+'» في «'+dst.name+'».'};
+  render();
+}
 function soDup(name,parent,skip){const n=soNorm(name);return soItems().some(i=>(i.parent||'')===(parent||'')&&i.id!==skip&&soNorm(i.name)===n)}
 async function soAddItem(name,unit,parent){
   name=String(name||'').trim();unit=String(unit||'').trim();
@@ -2071,12 +2114,15 @@ document.addEventListener('click',async ev=>{
   if(a==='subsave'){const A=SO.cat.add;if(!A)return;const n=$('#so_sn'),u=$('#so_su');A.name=n?n.value:A.name;A.unit=u?u.value:A.unit;
     const p=soItem(A.parent);if(p&&soUsed(p.id)&&!soSubs(p.id).length){SO.catMsg={t:'«'+p.name+'» عليه حركات مباشرة، فمينفعش يبقى له بنود فرعية. أضف الفرعي كبند رئيسي جديد.'};render();return}
     if(await soAddItem(A.name,A.unit,A.parent))SO.cat.add=null;render();return}
+  if(a==='merge'){const sel=$('#so_mg');if(!sel||!sel.value){SO.catMsg={t:'اختار الصنف اللي هيتدمج فيه.'};SO.openCat=true;render();return}await soMerge(id,sel.value);return}
   if(a==='catcancel'){SO.cat={add:null,edit:null};render();return}
   if(a==='catedit'){const it=soItem(id);if(!it)return;SO.cat={add:null,edit:{id,name:it.name,unit:it.unit||''}};SO.openCat=true;render();const n=$('#so_en');if(n)n.focus();return}
   if(a==='catsave'){const E=SO.cat.edit,it=E&&soItem(E.id);if(!it)return;const n=$('#so_en'),u=$('#so_eu');const name=(n?n.value:E.name).trim(),unit=(u?u.value:E.unit).trim();
     if(!name){SO.catMsg={t:'اكتب اسم الخامة.'};render();return}
     if(it.parent&&!unit){SO.catMsg={t:'البند الفرعي محتاج وحدة.'};render();return}
-    if(soDup(name,it.parent,it.id)){SO.catMsg={t:'الاسم ده موجود بالفعل.'};render();return}
+    if(soDup(name,it.parent,it.id)){const d=soItems().find(i=>(i.parent||'')===(it.parent||'')&&i.id!==it.id&&soNorm(i.name)===soNorm(name));
+      if(APPU.owner&&d){await soMerge(it.id,d.id);return}
+      SO.catMsg={t:'الاسم ده موجود بالفعل. لو الاتنين نفس الصنف اطلب من المدير يدمجهم.'};render();return}
     const ok=await soPut('store_items',{...soClean(it),name,unit});SO.cat.edit=null;SO.catMsg={ok:1,t:'تم الحفظ'+(ok?'.':' على هذا الجهاز.')};render();return}
   if(a==='catdel'){const it=soItem(id);if(!it||!APPU.owner)return;if(!confirm('حذف «'+it.name+'» من قائمة الخامات؟'))return;const ok=await soPut('store_items',{...soClean(it),deleted:true});SO.catMsg={ok,t:ok?'تم الحذف.':'تعذّر الحذف.'};render();return}
   if(a==='print'&&site){SO.printing={site,rep:{...SO.rep}};printReport('store');return}
