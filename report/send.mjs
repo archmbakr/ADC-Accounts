@@ -1,10 +1,11 @@
-// ADC حسابات المواقع — تقرير التعديلات اليومي (يعمل على GitHub Actions)
+// ADC حسابات المواقع — التقرير الأسبوعي + النسخة الاحتياطية اليومية + تذكير الشيكات (يعمل على GitHub Actions)
 // يقرأ البيانات من Supabase، ويرسل لكل مستخدم تعديلات مواقعه، وللمدير تعديلات كل المواقع،
 // مع ملف Excel وملف PDF. لا يرسل شيئًا إذا لم توجد تعديلات.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
+import zlib from 'node:zlib';
 import { buildXlsx, buildHtml } from './statement.mjs';
 import { storeReport, storeHtml } from './store.mjs';
 
@@ -13,8 +14,11 @@ const KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const FORCE = String(process.env.FORCE) === 'true';
 const DRY = !!process.env.DRY_RUN;            // يكتب الملفات في مجلد out بدل الإرسال
 const MOCK = process.env.MOCK_DATA || '';      // للاختبار المحلي فقط
-const TZ = 'Africa/Cairo', HOUR = 22, REMIND_HOUR = 9, WEEKDAY = 4; // الخميس
-const MODE = process.env.MODE || 'weekly';     // weekly = تقرير أسبوعي بالبريد · remind = تذكير الشيكات
+const TZ = 'Africa/Cairo', HOUR = 22, REMIND_HOUR = 9, WEEKDAY = 4, BACKUP_HOUR = 23; // الخميس · النسخة اليومية 11 بالليل
+const MODE = process.env.MODE || 'weekly';     // weekly = تقرير أسبوعي · remind = تذكير الشيكات · backup = نسخة احتياطية يومية (أو عند الطلب من التطبيق)
+const BACKUP_REPO = process.env.BACKUP_REPO || '';       // مستودع GitHub خاص للنسخ (اختياري)، مثال: archmbakr/ADC-Backups
+const BACKUP_TOKEN = process.env.BACKUP_TOKEN || '';
+const KEEP_REPORTS = 12;                                 // نسخ التقارير المحفوظة على Supabase لكل حساب
 const CUR = 'ج.م';
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 
@@ -45,9 +49,14 @@ async function sbGet(q) {
   }
   return out;
 }
-async function sbGetSoft(q) {
-  const r = await fetch(`${SB_URL}/rest/v1/${q}`, { headers: headers() });
-  return r.ok ? r.json() : [];
+async function sbGetSoft(q) {                     // كل الصفوف (صفحات 1000)، ولو الجدول مش موجود يرجّع []
+  const out = [];
+  for (let off = 0; ; off += 1000) {
+    const r = await fetch(`${SB_URL}/rest/v1/${q}${q.includes('?') ? '&' : '?'}offset=${off}&limit=1000`, { headers: headers() });
+    if (!r.ok) return out;
+    const j = await r.json(); if (!Array.isArray(j)) return out; out.push(...j); if (j.length < 1000) break;
+  }
+  return out;
 }
 async function sbPut(pathKey, data) {
   const r = await fetch(`${SB_URL}/rest/v1/docs?on_conflict=path`, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify({ path: pathKey, data }) });
@@ -57,8 +66,8 @@ async function loadAll() {
   if (MOCK) return JSON.parse(fs.readFileSync(MOCK, 'utf8'));
   const [docs, members, owners] = await Promise.all([sbGet('docs?select=path,data&order=path'), sbGet('members?select=*'), sbGet('app_owner?select=email')]);
   const soft = async q => { try { const r = await sbGetSoft(q); return Array.isArray(r) ? r : []; } catch { return []; } };
-  const T = ['custody', 'certs', 'cert_boq', 'site_access', 'cert_ret', 'store_moves', 'store_items', 'store_sites', 'store_access'];
-  const got = await Promise.all(T.map(t => soft(t + '?select=*&limit=100000')));
+  const T = ['custody', 'certs', 'cert_boq', 'site_access', 'cert_ret', 'store_moves', 'store_items', 'store_sites', 'store_access', 'app_settings'];
+  const got = await Promise.all(T.map(t => soft(t + '?select=*&order=' + (t === 'site_access' ? 'engineer,site_id' : t === 'cert_ret' ? 'owner_key,contractor' : t === 'store_sites' ? 'site_id' : t === 'store_access' ? 'person,site_id' : t === 'app_settings' ? 'key' : 'id'))));
   return { docs, members, owners, ...Object.fromEntries(T.map((t, i) => [t, got[i]])) };
 }
 
@@ -145,6 +154,21 @@ async function upload(key, buf, type) {
   const r = await fetch(`${SB_URL}/storage/v1/object/reports/${key}`, { method: 'POST', headers: { ...headers(), 'Content-Type': type, 'x-upsert': 'true' }, body: buf });
   if (!r.ok) log('تعذّر حفظ نسخة الكشف للتطبيق: ' + r.status);
 }
+/* نحتفظ بآخر KEEP_REPORTS نسخة بس من كشوف كل حساب على Supabase (النسخ كلها بتوصل على الإيميل) */
+async function pruneReports(folder) {
+  if (MOCK || DRY) return;
+  try {
+    const r = await fetch(`${SB_URL}/storage/v1/object/list/reports`, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: folder + '/', limit: 1000, offset: 0, sortBy: { column: 'name', order: 'desc' } }) });
+    if (!r.ok) return;
+    const files = (await r.json()).map(f => f.name).filter(n => /^\d{4}-\d\d-\d\d_\d\d-\d\d/.test(n));
+    const stamps = [...new Set(files.map(n => n.slice(0, 16)))].sort().reverse();
+    const old = new Set(stamps.slice(KEEP_REPORTS));
+    const del = files.filter(n => old.has(n.slice(0, 16))).map(n => folder + '/' + n);
+    if (!del.length) return;
+    const d = await fetch(`${SB_URL}/storage/v1/object/reports`, { method: 'DELETE', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: del }) });
+    log(d.ok ? 'اتمسح ' + del.length + ' ملف تقرير قديم.' : 'تعذّر مسح التقارير القديمة: ' + d.status);
+  } catch (e) { log('تعذّر مسح التقارير القديمة.'); }
+}
 /* ---------- تذكير الشيكات الآجلة (إشعار على الهاتف قبل الاستحقاق بيوم) ---------- */
 async function sbDel(pathKey) {
   if (MOCK || DRY) return;
@@ -204,6 +228,74 @@ async function remind(now, c) {
   log('تم. عدد الإشعارات المرسلة: ' + sent);
 }
 
+/* ---------- النسخ الاحتياطي ---------- */
+function makeBak(G, uid, at, source) {           // نسخة بنفس صيغة «استرجاع من ملف» في التطبيق
+  const g = G.get(uid) || {}, root = G.get('') || {}, L = k => g[k] || [];
+  const shared = k => uid ? [...(root[k] || []), ...L(k)] : L(k);
+  return Buffer.from(JSON.stringify({ app: 'ADC-site-accounts', version: 2, exportedAt: at, source, account: uid || 'owner', sites: L('sites'), expenses: L('expenses'), deposits: L('deposits'), counts: L('counts'), log: L('log'), contractors: shared('contractors'), items: shared('items') }));
+}
+function makeDump(A, at) {                        // قاعدة البيانات كاملة (كل الجداول) — للاسترجاع الكامل بأداة الاسترجاع
+  return Buffer.from(JSON.stringify({ app: 'ADC-db-dump', version: 2, exportedAt: at,
+    docs: A.docs.filter(d => !/(^|\/)push\//.test(d.path)), members: A.members, owners: A.owners || [],
+    custody: A.custody || [], certs: A.certs || [], cert_boq: A.cert_boq || [], site_access: A.site_access || [], cert_ret: A.cert_ret || [],
+    store_moves: A.store_moves || [], store_items: A.store_items || [], store_sites: A.store_sites || [], store_access: A.store_access || [], app_settings: A.app_settings || [] }));
+}
+async function gh(method, url, body, token) {
+  const r = await fetch('https://api.github.com' + url, { method, headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'adc-backup', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  let j = null; try { j = await r.json(); } catch { }
+  return { ok: r.ok, status: r.status, j };
+}
+async function toRepo(name, gz) {                 // نسخة تانية في مستودع GitHub خاص
+  if (!BACKUP_REPO || !BACKUP_TOKEN || MOCK || DRY) return false;
+  const p = 'backups/' + name.slice(0, 4) + '/' + name.slice(5, 7) + '/' + name;
+  const r = await gh('PUT', `/repos/${BACKUP_REPO}/contents/${encodeURI(p)}`, { message: 'نسخة احتياطية ' + name, content: gz.toString('base64') }, BACKUP_TOKEN);
+  if (!r.ok) log('تعذّر حفظ النسخة في مستودع GitHub الخاص: ' + r.status);
+  return r.ok;
+}
+async function keepAlive() {                      // GitHub بيوقف المواعيد لو المستودع ماحصلش فيه تغيير 60 يوم
+  const tok = process.env.GITHUB_TOKEN, repo = process.env.GITHUB_REPOSITORY;
+  if (!tok || !repo || MOCK || DRY) return;
+  try {
+    const c = await gh('GET', `/repos/${repo}/commits?per_page=1`, null, tok);
+    const last = c.ok && c.j && c.j[0] ? Date.parse(c.j[0].commit.committer.date) : Date.now();
+    if (Date.now() - last < 40 * 864e5) return;
+    const f = await gh('GET', `/repos/${repo}/contents/keepalive.txt`, null, tok);
+    const r = await gh('PUT', `/repos/${repo}/contents/keepalive.txt`, { message: 'keepalive', content: Buffer.from('آخر تشغيل: ' + new Date().toISOString() + '\n').toString('base64'), ...(f.ok && f.j && f.j.sha ? { sha: f.j.sha } : {}) }, tok);
+    log(r.ok ? 'تم تنشيط المستودع.' : 'تعذّر تنشيط المستودع: ' + r.status);
+  } catch { }
+}
+async function backup(now, c) {
+  const sys = MOCK ? (JSON.parse(fs.readFileSync(MOCK, 'utf8')).docs || []).filter(d => /^sys\/backup/.test(d.path))
+    : await sbGet('docs?select=path,data&path=in.(sys/backup,sys/backup_req)');
+  const state = ((sys.find(d => d.path === 'sys/backup') || {}).data) || {}, req = ((sys.find(d => d.path === 'sys/backup_req') || {}).data) || {};
+  const nightly = c.h >= BACKUP_HOUR && state.day !== c.day, asked = !!req.at && req.at > (state.reqDone || 0);
+  if (!FORCE && !nightly && !asked) { log('مافيش نسخة مطلوبة دلوقتي (' + c.hm + ' بتوقيت القاهرة).'); return keepAlive(); }
+  const A = await loadAll(), at = now.getTime(), stamp = c.day + '_' + c.hm.replace(':', '-');
+  const G = group(A.docs.filter(d => !d.path.startsWith('sys/')));
+  const dump = makeDump(A, at), gz = zlib.gzipSync(dump, { level: 9 });
+  const live = A.docs.filter(d => !d.path.startsWith('sys/') && !(d.data && d.data.deleted));
+  const n = re => live.filter(d => re.test(d.path)).length;
+  const sum = re => live.filter(d => re.test(d.path)).reduce((a, d) => a + num(d.data && d.data.amount), 0);
+  const rows = [['المواقع', n(/(^|\/)sites\/[^/]+$/)], ['المصروفات', n(/(^|\/)expenses\/[^/]+$/), sum(/(^|\/)expenses\/[^/]+$/)], ['الإيداعات', n(/(^|\/)deposits\/[^/]+$/), sum(/(^|\/)deposits\/[^/]+$/)],
+    ['المقاولين والموردين', n(/^contractors\//)], ['حركات العهد', (A.custody || []).length], ['المستخلصات', (A.certs || []).length], ['حركات المخزن', (A.store_moves || []).filter(m => !m.deleted).length], ['المستخدمين', (A.members || []).length]];
+  const big = dump.length > 12 * 1024 * 1024;
+  const files = [big ? { filename: 'ADC-قاعدة-البيانات-كاملة-' + stamp + '.json.gz', content: gz } : { filename: 'ADC-قاعدة-البيانات-كاملة-' + stamp + '.json', content: dump },
+    { filename: 'ADC-نسخة-احتياطية-' + stamp + '.json', content: makeBak(G, '', at, 'daily-backup') }];
+  const repo = await toRepo(stamp + '.json.gz', gz);
+  const why = asked && !nightly ? 'نسخة احتياطية (طلبتها من التطبيق)' : 'النسخة الاحتياطية اليومية';
+  const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;color:#111;line-height:1.7">
+  <h2 style="margin:0 0 6px">${esc(why)}</h2><p style="margin:0 0 10px;color:#444">بتاريخ <b dir="ltr">${esc(c.day + ' ' + c.hm)}</b> بتوقيت القاهرة</p>
+  <table style="border-collapse:collapse;margin:6px 0 12px">${rows.map(r => `<tr><td style="border:1px solid #ccc;padding:4px 10px">${esc(r[0])}</td><td style="border:1px solid #ccc;padding:4px 10px;text-align:left" dir="ltr"><b>${fmt(r[1])}</b></td><td style="border:1px solid #ccc;padding:4px 10px;text-align:left" dir="ltr">${r[2] == null ? '' : fmt(r[2]) + ' ' + CUR}</td></tr>`).join('')}</table>
+  <p>المرفقات:<br>• <b>قاعدة البيانات كاملة</b>: كل الجداول (الحسابات والعهد والمستخلصات والمخزن والمستخدمين)، وده اللي بيترجّع منه كل حاجة لو حصلت مشكلة كبيرة.<br>• <b>نسخة احتياطية</b>: حسابات مواقعك، ينفع ترجّعها من التطبيق: «الإعدادات» ← «استرجاع من ملف».</p>
+  ${repo ? '<p>واتحفظت كمان نسخة في مستودع GitHub الخاص.</p>' : ''}
+  <p style="color:#777;font-size:12px">الصور (الإيصالات والخامات) مش جوه النسخة؛ دي محفوظة على Supabase. رسالة آلية من تطبيق ADC حسابات المواقع.</p></div>`;
+  let sent = 0;
+  for (const o of A.owners || []) if (o.email) { await send(o.email, why + ' — ' + c.day, html, files); sent++; }
+  if (!MOCK && !DRY) await sbPut('sys/backup', { day: nightly ? c.day : (state.day || ''), at, reqDone: asked ? req.at : (state.reqDone || 0), size: dump.length, repo, sent });
+  await keepAlive();
+  log('تم. نسخ اتبعتت: ' + sent + (repo ? ' + مستودع GitHub' : ''));
+}
+
 /* ---------- التشغيل ---------- */
 (async () => {
   if (!MOCK && (!SB_URL || !KEY)) die('بيانات Supabase غير موجودة في الإعدادات (Secrets).');
@@ -211,6 +303,7 @@ async function remind(now, c) {
   const now = new Date(), c = cairo(now);
   let start, end, day = c.day;
   if (MODE === 'remind') return remind(now, c);
+  if (MODE === 'backup') return backup(now, c);
   const WEEK = 7 * 864e5;
   if (FORCE) { end = now.getTime(); start = end - WEEK; }
   else {
@@ -218,7 +311,7 @@ async function remind(now, c) {
     if (wd !== WEEKDAY || c.h < HOUR) { log('ليس وقت التقرير الأسبوعي (' + c.hm + ' بتوقيت القاهرة).'); return; }
     end = cairoInstant(c.y, c.m, c.d, HOUR); start = end - WEEK;
   }
-  const { docs, members, owners, custody = [], certs = [], cert_boq = [], site_access = [], cert_ret = [], store_moves = [], store_items = [], store_sites = [], store_access = [] } = await loadAll();
+  const { docs, members, owners, custody = [], certs = [], cert_boq = [], site_access = [], cert_ret = [], store_moves = [], store_items = [], store_sites = [], store_access = [], app_settings = [] } = await loadAll();
   const state = docs.find(d => d.path === 'sys/report');
   if (!FORCE && state && state.data && state.data.day === day) { log('تقرير اليوم أُرسل بالفعل.'); return; }
 
@@ -230,19 +323,17 @@ async function remind(now, c) {
   const lastModOf = data => { let t = 0; for (const k of ['sites', 'expenses', 'deposits', 'counts']) for (const x of data[k]) t = Math.max(t, x.updated || 0, x.created || 0); for (const l of data.log) t = Math.max(t, l.at || 0); return t; };
   const stampOf = t => { const z = cairo(new Date(t)); return z.day + '_' + z.hm.replace(':', '-'); };
   const merge = (uids, tag) => {
-    const out = { sites: [], expenses: [], deposits: [], counts: [], log: [], custody };
+    const kinds = new Map(); for (const g of G.values()) for (const c of g.contractors || []) if (c.name) kinds.set(String(c.name).trim(), c.kind || '');
+    const out = { sites: [], expenses: [], deposits: [], counts: [], log: [], custody, kinds };
     for (const uid of uids) { const g = G.get(uid); if (!g) continue; const nm = tag ? uname(uid) : '';
       out.sites.push(...g.sites.map(s => ({ ...s, owner: nm }))); for (const k of ['expenses', 'deposits', 'counts', 'log']) out[k].push(...g[k]); }
     return out;
   };
   const sub = 'من ' + cairo(new Date(start)).day + ' إلى ' + cairo(new Date(end)).day + ' (بتوقيت القاهرة)';
   let sent = 0;
-  const bakOf = (uid, at) => {                       // نسخة احتياطية بنفس صيغة «استرجاع من ملف» في التطبيق
-    const g = G.get(uid) || {}, root = G.get('') || {}, L = k => g[k] || [];
-    const shared = k => uid ? [...(root[k] || []), ...L(k)] : L(k);
-    return Buffer.from(JSON.stringify({ app: 'ADC-site-accounts', version: 2, exportedAt: at, source: 'weekly-report', account: uid || 'owner', sites: L('sites'), expenses: L('expenses'), deposits: L('deposits'), counts: L('counts'), log: L('log'), contractors: shared('contractors'), items: shared('items') }));
-  };
-  const dumpOf = at => Buffer.from(JSON.stringify({ app: 'ADC-db-dump', version: 1, exportedAt: at, docs: docs.filter(d => !/(^|\/)push\//.test(d.path)), members, custody, certs, cert_boq, site_access, cert_ret, store_moves, store_items, store_sites, store_access }));
+  const ALL = { docs, members, owners, custody, certs, cert_boq, site_access, cert_ret, store_moves, store_items, store_sites, store_access, app_settings };
+  const bakOf = (uid, at) => makeBak(G, uid, at, 'weekly-report');
+  const dumpOf = at => makeDump(ALL, at);
   /* مخزن الموقع: لصاحب الموقع مواقعه، وللمدير كل المواقع */
   const addDay = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
   const wkFrom = addDay(cairo(new Date(start)).day, 1);
@@ -253,7 +344,7 @@ async function remind(now, c) {
     return storeReport({ sites, moves: store_moves, items: store_items, from: wkFrom, to: today, since: start, until: end,
       siteName: s => (siteNm.get(s.site_id) || s.site_name || '') + (all && s.site_owner ? ' (' + uname(s.site_owner) + ')' : '') });
   };
-  const deliver = async (to, folder, who, data, extra = [], st = null) => {
+  const deliver = async (to, folder, who, data, extra = [], st = null, always = false) => {
     const week = data.log.filter(inWeek).sort((a, b) => a.at - b.at);
     const lm = lastModOf(data), lastMod = lm ? stampOf(lm) : stampNow.replace(' ', '_').replace(':', '-');
     const title = 'كشف حساب كامل' + (who ? ' — ' + who : '');
@@ -265,23 +356,26 @@ async function remind(now, c) {
     await upload(`${folder}/${lastMod}.pdf`, pdf, 'application/pdf');
     const more = extra.map(x => ({ filename: x.name(lastMod), content: x.buf }));
     for (const x of extra) await upload(`${folder}/${lastMod}${x.suffix}`, x.buf, 'application/json');
-    if (!week.length && !(st && st.changed)) return; // لا تعديلات هذا الأسبوع: لا يُرسل بريد
+    await pruneReports(folder);
+    const quiet = !week.length && !(st && st.changed);
+    if (quiet && !always) return;                    // صاحب الموقع: لا تعديلات = لا بريد. المدير: البريد يوصل كل أسبوع
+    if (quiet) st = null;
     if (st) more.push({ filename: 'ADC-تقرير-المخزن-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'تقرير المخزن الأسبوعي' + (who ? ' — ' + who : ''), sub: 'من ' + wkFrom + ' إلى ' + today, sections: st.sections, logo: logoUri() })) });
-    await send(to, `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod, st), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }, ...more]);
+    await send(to, quiet ? `${title} — لا توجد تعديلات هذا الأسبوع` : `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod, st), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }, ...more]);
     sent++;
   };
   const storeWeek = store_moves.some(m => { const t = Date.parse(m.updated_at || m.created_at || 0); return t > start && t <= end; });
   const anyWeek = [...G.values()].some(g => g.log.some(inWeek)) || storeWeek;
-  if (!anyWeek) log('لا توجد تعديلات هذا الأسبوع، لن يُرسل شيء.');
-  else {
-    for (const [uid] of G) {
+  if (!anyWeek) log('لا توجد تعديلات هذا الأسبوع: هيتبعت للمدير بس (كشف + نسخة احتياطية).');
+  {
+    if (anyWeek) for (const [uid] of G) {
       if (!uid) continue;
       const m = mem.get(uid);
       if (m && m.approved && m.email && (!m.role || m.role === 'user')) await deliver(m.email, uid, '', merge([uid], false), [{ suffix: '.json', buf: bakOf(uid, end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' }], storeFor(uid, false));
     }
     for (const o of owners) if (o.email) await deliver(o.email, 'owner', 'كل المواقع', merge([...G.keys()], true), [
       { suffix: '.json', buf: bakOf('', end), name: lm => 'ADC-نسخة-احتياطية-' + lm + '.json' },
-      { suffix: '-db.json', buf: dumpOf(end), name: lm => 'ADC-قاعدة-البيانات-كاملة-' + lm + '.json' }], storeFor('', true));
+      { suffix: '-db.json', buf: dumpOf(end), name: lm => 'ADC-قاعدة-البيانات-كاملة-' + lm + '.json' }], anyWeek ? storeFor('', true) : null, true);
   }
   if (!FORCE && !MOCK) await sbPut('sys/report', { day, at: Date.now(), sent });
   log('تم. عدد الرسائل المرسلة: ' + sent);

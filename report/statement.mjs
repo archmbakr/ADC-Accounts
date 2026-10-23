@@ -39,6 +39,17 @@ export function computeSites(data, today) {
 }
 const siteLabel = s => s.name + (s.owner ? ' (' + s.owner + ')' : '');
 
+/* مقاول باطن أو مورد (من قائمة المقاولين) */
+const KINDL = { contractor: 'مقاول باطن', supplier: 'مورد', '': 'بدون مقاول' };
+function kindOf(data, name) { const n = String(name || '').trim(); if (!n) return ''; return data.kinds && data.kinds.get(n) === 'supplier' ? 'supplier' : 'contractor'; }
+function splitT(data, exps) {
+  if (!exps.length) return '';
+  const g = { contractor: new Map(), supplier: new Map(), '': new Map() };
+  for (const e of exps) { const n = String(e.contractor || '').trim(), m = g[kindOf(data, n)]; m.set(n || '—', (m.get(n || '—') || 0) + num(e.amount)); }
+  const gs = ['contractor', 'supplier', ''].map(k => ({ k, rows: [...g[k].entries()].sort((a, b) => b[1] - a[1]) })).filter(x => x.rows.length);
+  const tot = l => l.reduce((a, x) => a + x[1], 0);
+  return `<h3 style="font-size:11.5px;margin:8px 0 4px">توزيع المصروف حسب المقاول والمورد</h3><table style="width:auto;min-width:50%"><tbody>${gs.map(x => `<tr><td colspan="2" class="tl b" style="background:#f2f2f2">${KINDL[x.k]}</td></tr>${x.rows.map(([n, v]) => `<tr><td class="tl">${esc(n)}</td><td class="n">${fmt(v)}</td></tr>`).join('')}<tr><td class="tl b">إجمالي ${x.k === 'supplier' ? 'الموردين' : x.k === '' ? 'بدون مقاول' : 'مقاولين الباطن'}</td><td class="n b">${fmt(tot(x.rows))}</td></tr>`).join('')}</tbody><tfoot><tr><td>الإجمالي</td><td class="n">${fmt(gs.reduce((a, x) => a + tot(x.rows), 0))}</td></tr></tfoot></table>`;
+}
 export function buildXlsx({ title, data, week, today, stampNow, lastMod }) {
   const sites = computeSites(data, today), names = new Map(data.sites.map(s => [s.id, siteLabel(s)]));
   const nm = id => names.get(id) || '';
@@ -59,8 +70,8 @@ export function buildXlsx({ title, data, week, today, stampNow, lastMod }) {
   H(jr, ['التاريخ', 'الموقع', 'النوع', 'وارد', 'منصرف', 'البيان', 'البند', 'المقاول', 'ملاحظات', 'طريقة الدفع', 'الرصيد', 'المسجل']);
   { let run = 0, ti = 0, to = 0; for (const r of rows) { const v = num(r.amount); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; } jr.rows.push([r.date || '', nm(r.siteId), r.k === 'dep' ? 'إيداع' : 'مصروف', r.k === 'dep' ? v : '', r.k === 'exp' ? v : '', r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''), r.item || '', r.contractor || '', r.remarks || '', mlabel(r, today), run, r.by || '']); } T(jr, ['', '', 'الإجمالي', ti, to, '', '', '', '', '', run]); }
   const ex = sh('المصروفات', [13, 26, 12, 18, 22, 22, 22, 26, 14, 17]);
-  H(ex, ['المبلغ', 'البيان', 'التاريخ', 'البند', 'المقاول', 'ملاحظات', 'طريقة الدفع', 'الموقع', 'المسجل', 'وقت التسجيل']);
-  const el = data.expenses.slice().sort(byDate); for (const r of el) ex.rows.push([num(r.amount), r.notes || '', r.date || '', r.item || '', r.contractor || '', r.remarks || '', mlabel(r, today), nm(r.siteId), r.by || '', dt(r.created)]); T(ex, [sum(el), 'الإجمالي']);
+  H(ex, ['المبلغ', 'البيان', 'التاريخ', 'البند', 'المقاول', 'ملاحظات', 'طريقة الدفع', 'الموقع', 'المسجل', 'وقت التسجيل', 'مقاول / مورد']); ex.widths.push(13);
+  const el = data.expenses.slice().sort(byDate); for (const r of el) ex.rows.push([num(r.amount), r.notes || '', r.date || '', r.item || '', r.contractor || '', r.remarks || '', mlabel(r, today), nm(r.siteId), r.by || '', dt(r.created), r.contractor ? KINDL[kindOf(data, r.contractor)] : '']); T(ex, [sum(el), 'الإجمالي']);
   const dp = sh('الإيداعات', [13, 28, 12, 22, 24, 26, 14, 17]);
   H(dp, ['المبلغ', 'البيان', 'التاريخ', 'أُودع في', 'ملاحظات', 'الموقع', 'المسجل', 'وقت التسجيل']);
   const dl = data.deposits.slice().sort(byDate); for (const r of dl) dp.rows.push([num(r.amount), r.notes || 'إيداع من المالك', r.date || '', mlabel(r, today), r.remarks || '', nm(r.siteId), r.by || '', dt(r.created)]); T(dp, [sum(dl), 'الإجمالي']);
@@ -87,7 +98,7 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
     let run = 0, ti = 0, to = 0;
     const tr = rows.map(r => { const v = num(r.amount); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; }
       return `<tr><td class="n">${esc(r.date || '')}</td><td class="n in">${r.k === 'dep' ? fmt(v) : ''}</td><td class="n">${r.k === 'exp' ? fmt(v) : ''}</td><td class="tl">${esc(r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''))}</td><td>${esc(r.item || '')}</td><td class="tl">${esc(r.contractor || '')}</td><td class="d">${esc(mlabel(r, today))}</td><td class="n b${neg(run)}">${fmt(run)}</td></tr>`; }).join('');
-    return `<section class="site"><h2>كشف حساب: ${esc(siteLabel(s))}</h2><table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>طريقة الدفع</th><th>الرصيد</th></tr></thead><tbody>${tr || '<tr><td colspan="8">لا توجد حركات</td></tr>'}</tbody><tfoot><tr><td>الإجمالي</td><td class="n">${fmt(ti)}</td><td class="n">${fmt(to)}</td><td colspan="4"></td><td class="n">${fmt(run)}</td></tr></tfoot></table></section>`;
+    return `<section class="site"><h2>كشف حساب: ${esc(siteLabel(s))}</h2><table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>طريقة الدفع</th><th>الرصيد</th></tr></thead><tbody>${tr || '<tr><td colspan="8">لا توجد حركات</td></tr>'}</tbody><tfoot><tr><td>الإجمالي</td><td class="n">${fmt(ti)}</td><td class="n">${fmt(to)}</td><td colspan="4"></td><td class="n">${fmt(run)}</td></tr></tfoot></table>${splitT(data, rows.filter(r => r.k === 'exp'))}</section>`;
   };
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
   @page{size:A4 landscape;margin:12mm 10mm}*{box-sizing:border-box}
@@ -104,5 +115,5 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   <div class="hd"><div><h1>${esc(title)}</h1></div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
   <p class="sub">${esc(sub)} · المبالغ بالجنيه المصري</p>
   <h2>ملخص المواقع</h2>${sumT}${wkT}${sites.map(stmt).join('')}
-  <p class="foot">ADC Construction · حسابات المواقع · كشف آلي</p></body></html>`;
+  <p class="foot">ADC CONSTRUCTION</p></body></html>`;
 }
