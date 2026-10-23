@@ -1,0 +1,41 @@
+name: daily-backup
+# نسخة احتياطية كاملة كل يوم الساعة 11 بالليل (بتوقيت القاهرة) على إيميل المديرين،
+# وكمان لما المدير يدوس «ابعت نسخة دلوقتي» في التطبيق (بيوصل خلال ربع ساعة تقريبًا).
+# كل ربع ساعة بيبص بسرعة: لو مافيش حاجة مطلوبة بيقفل في ثواني.
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send a backup now (test)'
+        type: boolean
+        default: true
+permissions:
+  contents: write          # علشان يفضل المستودع «نشيط» وGitHub ما يوقفش المواعيد
+concurrency: daily-backup
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install mailer
+        working-directory: report
+        run: npm install --no-save --no-audit --no-fund nodemailer@6 > /dev/null
+      - name: Backup
+        working-directory: report
+        env:
+          MODE: backup
+          SUPABASE_URL: https://ifsupnuwtkyfyughcudi.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          BACKUP_REPO: archmbakr/ADC-Backups
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+        run: node send.mjs
