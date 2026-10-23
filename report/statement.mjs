@@ -97,8 +97,8 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
     const rows = [...data.deposits.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'dep' })), ...data.expenses.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'exp' }))].sort(byDate);
     let run = 0, ti = 0, to = 0;
     const tr = rows.map(r => { const v = num(r.amount); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; }
-      return `<tr><td class="n">${esc(r.date || '')}</td><td class="n in">${r.k === 'dep' ? fmt(v) : ''}</td><td class="n">${r.k === 'exp' ? fmt(v) : ''}</td><td class="tl">${esc(r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''))}</td><td>${esc(r.item || '')}</td><td class="tl">${esc(r.contractor || '')}</td><td class="d">${esc(mlabel(r, today))}</td><td class="n b${neg(run)}">${fmt(run)}</td></tr>`; }).join('');
-    return `<section class="site"><h2>كشف حساب: ${esc(siteLabel(s))}</h2><table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>طريقة الدفع</th><th>الرصيد</th></tr></thead><tbody>${tr || '<tr><td colspan="8">لا توجد حركات</td></tr>'}</tbody><tfoot><tr><td>الإجمالي</td><td class="n">${fmt(ti)}</td><td class="n">${fmt(to)}</td><td colspan="4"></td><td class="n">${fmt(run)}</td></tr></tfoot></table>${splitT(data, rows.filter(r => r.k === 'exp'))}</section>`;
+      return `<tr><td class="n">${esc(r.date || '')}</td><td class="n in">${r.k === 'dep' ? fmt(v) : ''}</td><td class="n">${r.k === 'exp' ? fmt(v) : ''}</td><td class="tl">${esc(r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''))}</td><td>${esc(r.item || '')}</td><td class="tl">${esc(r.contractor || '')}</td><td>${esc(METHOD[meth(r)])}</td><td class="n b bal${neg(run)}">${fmt(run)}</td></tr>`; }).join('');
+    return `<section class="site"><h2>كشف حساب: ${esc(siteLabel(s))}</h2><table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>طريقة الدفع</th><th class="bal">الرصيد</th></tr></thead><tbody>${tr || '<tr><td colspan="8">لا توجد حركات</td></tr>'}</tbody><tfoot><tr><td>الإجمالي</td><td class="n">${fmt(ti)}</td><td class="n">${fmt(to)}</td><td colspan="4"></td><td class="n">${fmt(run)}</td></tr></tfoot></table>${splitT(data, rows.filter(r => r.k === 'exp'))}</section>`;
   };
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
   @page{size:A4 landscape;margin:12mm 10mm}*{box-sizing:border-box}
@@ -107,7 +107,7 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   h1{margin:0;font-size:18px}h2{font-size:13px;margin:14px 0 5px;padding:4px 8px;background:#e9ecef;border-radius:4px}.sub{margin:0 0 8px;color:#333}
   table{width:100%;border-collapse:collapse;margin-bottom:6px}thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-inside:avoid}
   th,td{border:1px solid #999;padding:3px 5px;text-align:center;vertical-align:top}th{background:#1d5c86;color:#fff;font-size:10px}
-  td.tl{text-align:right}td.d{font-size:9.5px}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}td.in{color:#185c2e}.neg{color:#b3261e}
+  td.tl{text-align:right}td.d{font-size:9.5px}th.bal{width:11%}td.bal{font-size:12px}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}td.in{color:#185c2e}.neg{color:#b3261e}
   tr.bad td{background:#f6dcdc}tfoot td{background:#eee;font-weight:bold}
   .a{padding:1px 6px;border-radius:8px;font-size:9.5px}.a-add{background:#dcefe0}.a-edit{background:#fff1cc}.a-delete{background:#f6dcdc}
   section.site{page-break-before:always}.foot{margin-top:12px;font-size:9px;color:#666}
