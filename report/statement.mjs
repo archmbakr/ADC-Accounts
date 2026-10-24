@@ -19,7 +19,9 @@ const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.create
 export function computeSites(data, today) {
   return data.sites.map(s => {
     const e = data.expenses.filter(x => x.siteId === s.id), d = data.deposits.filter(x => x.siteId === s.id);
-    const ec = sum(e.filter(x => meth(x) === 'cash')), ed = sum(e.filter(x => notDue(x, today))), eu = sum(e.filter(x => x.method === 'custody')), eb = sum(e) - ec - ed - eu;
+    const isCu = x => x.method === 'custody' || !!x.custodyId, en = e.filter(x => !isCu(x));
+    const ec = sum(en.filter(x => meth(x) === 'cash')), ed = sum(en.filter(x => notDue(x, today))), eu = sum(e.filter(isCu)), eb = sum(en) - ec - ed;
+    const byMeth = {}; for (const x of e) { const k = meth(x); byMeth[k] = (byMeth[k] || 0) + num(x.amount); }
     const cu = (data.custody || []).filter(r => r.site_id === s.id && r.kind !== 'claim');
     const iC = cu.filter(r => r.kind === 'issue' && (r.data || {}).source !== 'bank').reduce((a, r) => a + num(r.data.amount), 0), iB = cu.filter(r => r.kind === 'issue' && (r.data || {}).source === 'bank').reduce((a, r) => a + num(r.data.amount), 0), rt = cu.filter(r => r.kind === 'return').reduce((a, r) => a + num(r.data.amount), 0);
     const dc = sum(d.filter(x => meth(x) === 'cash')), dd = sum(d.filter(x => notDue(x, today))), db = sum(d) - dc - dd;
@@ -27,17 +29,22 @@ export function computeSites(data, today) {
     let rc = { st: 'none' };
     if (cs[0]) {
       const c = cs[0], dt = c.date || '';
-      const e2 = e.filter(x => (x.date || '') <= dt), d2 = d.filter(x => (x.date || '') <= dt);
+      const e2 = en.filter(x => (x.date || '') <= dt), d2 = d.filter(x => (x.date || '') <= dt);
       const ec2 = sum(e2.filter(x => meth(x) === 'cash')), dc2 = sum(d2.filter(x => meth(x) === 'cash'));
       const ed2 = sum(e2.filter(x => notDue(x, dt))), dd2 = sum(d2.filter(x => notDue(x, dt)));
-      const bookCash = dc2 - ec2, bookBank = (sum(d2) - dc2 - dd2) - (sum(e2) - ec2 - ed2);
+      const cuAt = cu.filter(r => ((r.data || {}).date || '') <= dt).reduce((a, r) => a + (r.kind === 'issue' ? 1 : -1) * num(r.data.amount), 0) - sum(e.filter(x => isCu(x) && (x.date || '') <= dt));
+      const bookCash = dc2 - ec2, bookBank = (sum(d2) - dc2 - dd2) - (sum(e2) - ec2 - ed2) - cuAt;
       const diff = (num(c.cash) + num(c.bank)) - (bookCash + bookBank);
       rc = { st: Math.abs(diff) < 0.005 ? 'ok' : diff < 0 ? 'short' : 'over', date: dt, actual: num(c.cash) + num(c.bank), diff };
     }
-    return { id: s.id, name: s.name || '', owner: s.owner || '', dep: dc + db + dd, exp: ec + eb + ed + eu, cash: dc - ec - iC + rt, bank: db - eb - iB, defer: dd - ed, cust: iC + iB - rt - eu, total: dc + db + dd - ec - eb - ed - eu, rc };
+    return { id: s.id, name: s.name || '', owner: s.owner || '', dep: dc + db + dd, exp: ec + eb + ed + eu, cash: dc - ec - iC + rt, bank: db - eb - iB, defer: dd - ed, cust: iC + iB - rt - eu, total: dc + db + dd - ec - eb - ed - eu, rc, byMeth, fromCust: sum(e.filter(x => x.custodyId)) };
   }).sort((a, b) => (a.owner || '').localeCompare(b.owner || '', 'ar') || a.name.localeCompare(b.name, 'ar'));
 }
 const siteLabel = s => s.name + (s.owner ? ' (' + s.owner + ')' : '');
+const MO = [['cash', 'نقدي'], ['transfer', 'تحويلات'], ['bank', 'بنك'], ['deferred', 'شيكات'], ['custody', 'من العهدة']];
+const bm = (s, k) => (s.byMeth || {})[k] || 0;
+const methText = s => MO.filter(([k]) => Math.abs(bm(s, k)) > 0.004).map(([k, l]) => l + ' ' + fmt(bm(s, k))).join(' · ') + (s.fromCust > 0.004 ? ' · منها من العهد ' + fmt(s.fromCust) : '');
+const addMeth = l => { const o = { byMeth: {}, fromCust: 0 }; for (const s of l) { for (const [k] of MO) o.byMeth[k] = bm(o, k) + bm(s, k); o.fromCust += s.fromCust || 0; } return o; };
 
 /* مقاول باطن أو مورد (من قائمة المقاولين) */
 const KINDL = { contractor: 'مقاول باطن', supplier: 'مورد', '': 'بدون مقاول' };
@@ -59,9 +66,10 @@ export function buildXlsx({ title, data, week, today, stampNow, lastMod }) {
   const dt = t => t ? new Date(t).toLocaleString('sv-SE', { timeZone: 'Africa/Cairo' }).slice(0, 16) : '';
   const s1 = { name: 'الملخص', rows: [], styles: {}, widths: [30, 14, 14, 14, 13, 13, 14, 13, 14, 14], freeze: 0 };
   s1.rows.push([title]); s1.styles[0] = 3; s1.rows.push(['آخر تعديل: ' + lastMod + ' · تاريخ الكشف: ' + stampNow]); s1.rows.push([]);
-  H(s1, ['الموقع', 'الإيداعات', 'المصروفات', 'الرصيد الدفتري', 'نقدي', 'بنك وتحويلات', 'شيكات لم تُستحق', 'آخر جرد', 'الموجود فعلًا', 'الحالة']);
-  for (const s of sites) s1.rows.push([siteLabel(s), s.dep, s.exp, s.total, s.cash, s.bank, s.defer, s.rc.date || '', s.rc.st === 'none' ? '' : s.rc.actual, ST[s.rc.st] + (s.rc.st === 'short' || s.rc.st === 'over' ? ' ' + fmt(Math.abs(s.rc.diff)) : '')]);
-  if (sites.length > 1) T(s1, ['الإجمالي', ...['dep', 'exp', 'total', 'cash', 'bank', 'defer'].map(k => sites.reduce((a, s) => a + s[k], 0))]);
+  H(s1, ['الموقع', 'الإيداعات', 'المصروفات', 'الرصيد الدفتري', 'المنصرف نقدي', 'المنصرف تحويلات', 'المنصرف بنك', 'المنصرف شيكات', 'منها من العهد', 'آخر جرد', 'الموجود فعلًا', 'الحالة']);
+  const mv = s => [bm(s, 'cash'), bm(s, 'transfer'), bm(s, 'bank'), bm(s, 'deferred') + bm(s, 'custody'), s.fromCust || 0];
+  for (const s of sites) s1.rows.push([siteLabel(s), s.dep, s.exp, s.total, ...mv(s), s.rc.date || '', s.rc.st === 'none' ? '' : s.rc.actual, ST[s.rc.st] + (s.rc.st === 'short' || s.rc.st === 'over' ? ' ' + fmt(Math.abs(s.rc.diff)) : '')]);
+  if (sites.length > 1) T(s1, ['الإجمالي', ...['dep', 'exp', 'total'].map(k => sites.reduce((a, s) => a + s[k], 0)), ...mv(addMeth(sites))]);
   const wk = sh('تعديلات الأسبوع', [17, 9, 9, 26, 13, 12, 50, 14]);
   H(wk, ['التاريخ والوقت', 'العملية', 'النوع', 'الموقع', 'المبلغ', 'تاريخ الحركة', 'التفاصيل', 'بواسطة']);
   for (const l of week) wk.rows.push([dt(l.at), ACT[l.action] || l.action || '', KIND[l.kind] || l.kind || '', l.siteName || '', l.amount == null ? '' : num(l.amount), l.date || '', l.details || '', l.by || '']);
@@ -76,8 +84,8 @@ export function buildXlsx({ title, data, week, today, stampNow, lastMod }) {
   H(dp, ['المبلغ', 'البيان', 'التاريخ', 'أُودع في', 'ملاحظات', 'الموقع', 'المسجل', 'وقت التسجيل']);
   const dl = data.deposits.slice().sort(byDate); for (const r of dl) dp.rows.push([num(r.amount), r.notes || 'إيداع من المالك', r.date || '', mlabel(r, today), r.remarks || '', nm(r.siteId), r.by || '', dt(r.created)]); T(dp, [sum(dl), 'الإجمالي']);
   const ct = sh('الجرد', [26, 12, 14, 14, 24, 17]);
-  H(ct, ['الموقع', 'تاريخ الجرد', 'نقدي موجود', 'في البنك', 'ملاحظات', 'وقت التسجيل']);
-  for (const c of data.counts.slice().sort(byDate)) ct.rows.push([nm(c.siteId), c.date || '', num(c.cash), num(c.bank), c.notes || '', dt(c.created)]);
+  H(ct, ['الموقع', 'تاريخ الجرد', 'الموجود فعلًا (نقدي + بنك)', 'ملاحظات', 'وقت التسجيل']);
+  for (const c of data.counts.slice().sort(byDate)) ct.rows.push([nm(c.siteId), c.date || '', num(c.cash) + num(c.bank), c.notes || '', dt(c.created)]);
   const lg = sh('سجل التعديلات', [17, 9, 9, 24, 13, 12, 50, 14]);
   H(lg, ['التاريخ والوقت', 'العملية', 'النوع', 'الموقع', 'المبلغ', 'تاريخ الحركة', 'التفاصيل', 'بواسطة']);
   for (const l of data.log.slice().sort((a, b) => (b.at || 0) - (a.at || 0))) lg.rows.push([dt(l.at), ACT[l.action] || l.action || '', KIND[l.kind] || l.kind || '', l.siteName || '', l.amount == null ? '' : num(l.amount), l.date || '', l.details || '', l.by || '']);
@@ -88,9 +96,9 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   const sites = computeSites(data, today);
   const dt = t => new Date(t).toLocaleString('sv-SE', { timeZone: 'Africa/Cairo' }).slice(0, 16);
   const neg = v => v < -0.004 ? ' neg' : '';
-  const sumT = `<table><thead><tr><th>الموقع</th><th>الإيداعات</th><th>المصروفات</th><th>الرصيد الدفتري</th><th>نقدي</th><th>بنك وتحويلات</th><th>شيكات لم تُستحق</th><th>آخر جرد</th><th>الحالة</th></tr></thead><tbody>
-  ${sites.map(s => `<tr class="${s.rc.st === 'short' ? 'bad' : ''}"><td class="tl">${esc(siteLabel(s))}</td><td class="n">${fmt(s.dep)}</td><td class="n">${fmt(s.exp)}</td><td class="n b${neg(s.total)}">${fmt(s.total)}</td><td class="n${neg(s.cash)}">${fmt(s.cash)}</td><td class="n${neg(s.bank)}">${fmt(s.bank)}</td><td class="n">${s.defer ? fmt(s.defer) : '—'}</td><td>${esc(s.rc.date || '—')}</td><td>${ST[s.rc.st]}${s.rc.st === 'short' || s.rc.st === 'over' ? ' ' + fmt(Math.abs(s.rc.diff)) : ''}</td></tr>`).join('')}
-  </tbody>${sites.length > 1 ? `<tfoot><tr><td>الإجمالي</td>${['dep', 'exp', 'total', 'cash', 'bank', 'defer'].map(k => `<td class="n">${fmt(sites.reduce((a, s) => a + s[k], 0))}</td>`).join('')}<td colspan="2"></td></tr></tfoot>` : ''}</table>`;
+  const sumT = `<table><thead><tr><th>الموقع</th><th>الإيداعات</th><th>المصروفات</th><th>الرصيد الدفتري</th><th>المنصرف حسب طريقة الدفع</th><th>آخر جرد</th><th>الحالة</th></tr></thead><tbody>
+  ${sites.map(s => `<tr class="${s.rc.st === 'short' ? 'bad' : ''}"><td class="tl">${esc(siteLabel(s))}</td><td class="n">${fmt(s.dep)}</td><td class="n">${fmt(s.exp)}</td><td class="n b${neg(s.total)}">${fmt(s.total)}</td><td class="tl d">${esc(methText(s) || '—')}</td><td>${esc(s.rc.date || '—')}</td><td>${ST[s.rc.st]}${s.rc.st === 'short' || s.rc.st === 'over' ? ' ' + fmt(Math.abs(s.rc.diff)) : ''}</td></tr>`).join('')}
+  </tbody>${sites.length > 1 ? `<tfoot><tr><td>الإجمالي</td>${['dep', 'exp', 'total'].map(k => `<td class="n">${fmt(sites.reduce((a, s) => a + s[k], 0))}</td>`).join('')}<td class="tl d">${esc(methText(addMeth(sites)) || '—')}</td><td colspan="2"></td></tr></tfoot>` : ''}</table>`;
   const wkT = week.length ? `<h2>تعديلات الأسبوع (${week.length})</h2><table><thead><tr><th>الوقت</th><th>العملية</th><th>النوع</th><th>الموقع</th><th>المبلغ</th><th>تاريخ الحركة</th><th>التفاصيل</th><th>بواسطة</th></tr></thead><tbody>
   ${week.map(l => `<tr><td class="n">${esc(dt(l.at))}</td><td><span class="a a-${esc(l.action)}">${esc(ACT[l.action] || l.action || '')}</span></td><td>${esc(KIND[l.kind] || l.kind || '')}</td><td class="tl">${esc(l.siteName || '')}</td><td class="n">${l.amount == null ? '' : fmt(l.amount)}</td><td class="n">${esc(l.date || '')}</td><td class="tl d">${esc(l.details || '')}</td><td>${esc(l.by || '')}</td></tr>`).join('')}</tbody></table>` : '<h2>تعديلات الأسبوع</h2><p>لا توجد تعديلات هذا الأسبوع.</p>';
   const stmt = s => {

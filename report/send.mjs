@@ -66,8 +66,9 @@ async function loadAll() {
   if (MOCK) return JSON.parse(fs.readFileSync(MOCK, 'utf8'));
   const [docs, members, owners] = await Promise.all([sbGet('docs?select=path,data&order=path'), sbGet('members?select=*'), sbGet('app_owner?select=email')]);
   const soft = async q => { try { const r = await sbGetSoft(q); return Array.isArray(r) ? r : []; } catch { return []; } };
-  const T = ['custody', 'certs', 'cert_boq', 'site_access', 'cert_ret', 'store_moves', 'store_items', 'store_sites', 'store_access', 'app_settings'];
-  const got = await Promise.all(T.map(t => soft(t + '?select=*&order=' + (t === 'site_access' ? 'engineer,site_id' : t === 'cert_ret' ? 'owner_key,contractor' : t === 'store_sites' ? 'site_id' : t === 'store_access' ? 'person,site_id' : t === 'app_settings' ? 'key' : 'id'))));
+  const T = ['custody', 'certs', 'cert_boq', 'site_access', 'cert_ret', 'store_moves', 'store_items', 'store_sites', 'store_access', 'app_settings', 'acct_sites', 'private_items', 'audit_log'];
+  const ORD = { site_access: 'engineer,site_id', cert_ret: 'owner_key,contractor', store_sites: 'site_id', store_access: 'person,site_id', app_settings: 'key', acct_sites: 'acct,site_id', private_items: 'key' };
+  const got = await Promise.all(T.map(t => soft(t + '?select=*&order=' + (ORD[t] || 'id'))));
   return { docs, members, owners, ...Object.fromEntries(T.map((t, i) => [t, got[i]])) };
 }
 
@@ -238,7 +239,8 @@ function makeDump(A, at) {                        // قاعدة البيانات
   return Buffer.from(JSON.stringify({ app: 'ADC-db-dump', version: 2, exportedAt: at,
     docs: A.docs.filter(d => !/(^|\/)push\//.test(d.path)), members: A.members, owners: A.owners || [],
     custody: A.custody || [], certs: A.certs || [], cert_boq: A.cert_boq || [], site_access: A.site_access || [], cert_ret: A.cert_ret || [],
-    store_moves: A.store_moves || [], store_items: A.store_items || [], store_sites: A.store_sites || [], store_access: A.store_access || [], app_settings: A.app_settings || [] }));
+    store_moves: A.store_moves || [], store_items: A.store_items || [], store_sites: A.store_sites || [], store_access: A.store_access || [], app_settings: A.app_settings || [],
+    acct_sites: A.acct_sites || [], private_items: A.private_items || [], audit_log: A.audit_log || [] }));
 }
 async function gh(method, url, body, token) {
   const r = await fetch('https://api.github.com' + url, { method, headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'adc-backup', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
