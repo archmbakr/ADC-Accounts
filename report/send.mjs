@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import zlib from 'node:zlib';
 import { buildXlsx, buildHtml } from './statement.mjs';
 import { storeReport, storeHtml } from './store.mjs';
+import { RS, setStyle } from './style.mjs';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const KEY = process.env.SUPABASE_SERVICE_KEY || '';
@@ -110,7 +111,7 @@ function totals(list) {
 }
 
 /* ---------- PDF (HTML يُطبع عبر Chrome) ---------- */
-function logoUri() { try { return 'data:image/png;base64,' + fs.readFileSync(path.join(HERE, 'logo.png')).toString('base64'); } catch { return ''; } }
+function logoUri() { if (RS.logo) return RS.logo; try { return 'data:image/png;base64,' + fs.readFileSync(path.join(HERE, 'logo.png')).toString('base64'); } catch { return ''; } }
 function chromeBin() {
   for (const c of [process.env.CHROME_BIN, 'google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].filter(Boolean)) {
     try { execFileSync(c, ['--version'], { stdio: 'ignore' }); return c; } catch { }
@@ -314,6 +315,7 @@ async function backup(now, c) {
     end = cairoInstant(c.y, c.m, c.d, HOUR); start = end - WEEK;
   }
   const { docs, members, owners, custody = [], certs = [], cert_boq = [], site_access = [], cert_ret = [], store_moves = [], store_items = [], store_sites = [], store_access = [], app_settings = [] } = await loadAll();
+  try { const r = app_settings.find(x => x.key === 'report_style'); if (r && r.value) setStyle(typeof r.value === 'string' ? JSON.parse(r.value) : r.value); } catch (e) { log('شكل التقارير: ' + e.message); }
   const state = docs.find(d => d.path === 'sys/report');
   if (!FORCE && state && state.data && state.data.day === day) { log('تقرير اليوم أُرسل بالفعل.'); return; }
 

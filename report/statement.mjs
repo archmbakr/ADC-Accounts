@@ -1,5 +1,6 @@
 // الكشف الكامل: ملف Excel وصفحة HTML (تُطبع PDF) لمجموعة مواقع
 import { XLSX_W } from './xlsx.mjs';
+import { RS, thCss, fontPx } from './style.mjs';
 
 export const CUR = 'ج.م';
 const METHOD = { cash: 'نقدي', bank: 'بنك', transfer: 'تحويل', deferred: 'آجل (شيك)', custody: 'من العهدة' };
@@ -114,14 +115,14 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:8px}.hd img{height:46px}
   h1{margin:0;font-size:18px}h2{font-size:13px;margin:14px 0 5px;padding:4px 8px;background:#e9ecef;border-radius:4px}.sub{margin:0 0 8px;color:#333}
   table{width:100%;border-collapse:collapse;margin-bottom:6px}thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-inside:avoid}
-  th,td{border:1px solid #999;padding:3px 5px;text-align:center;vertical-align:top}th{background:#1d5c86;color:#fff;font-size:10px}
+  th,td{border:1px solid #999;padding:3px 5px;text-align:center;vertical-align:top}th{${thCss('background:#1d5c86;color:#fff')};font-size:${fontPx(10)}px}
   td.tl{text-align:right}td.d{font-size:9.5px}th.bal{width:11%}td.bal{font-size:12px}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}td.in{color:#185c2e}.neg{color:#b3261e}
   tr.bad td{background:#f6dcdc}tfoot td{background:#eee;font-weight:bold}
   .a{padding:1px 6px;border-radius:8px;font-size:9.5px}.a-add{background:#dcefe0}.a-edit{background:#fff1cc}.a-delete{background:#f6dcdc}
   section.site{page-break-before:always}.foot{margin-top:12px;font-size:9px;color:#666}
   </style></head><body>
-  <div class="hd"><div><h1>${esc(title)}</h1></div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
+  <div class="hd"><div><h1>${esc(title)}</h1>${RS.sub ? `<div style="font-size:10px;color:#555">${esc(RS.sub)}</div>` : ''}</div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
   <p class="sub">${esc(sub)} · المبالغ بالجنيه المصري</p>
   <h2>ملخص المواقع</h2>${sumT}${wkT}${sites.map(stmt).join('')}
-  <p class="foot">ADC CONSTRUCTION</p></body></html>`;
+  <p class="foot">${esc(RS.footer || '')}</p></body></html>`;
 }

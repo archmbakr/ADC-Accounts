@@ -1,3 +1,4 @@
+import { RS, thCss, fontPx } from './style.mjs';
 // ADC حسابات المواقع — تقرير المخزن الأسبوعي (نفس حساب التطبيق: المنصرف يُحسب من الجرد)
 const num = v => (+v || 0);
 const r2 = v => Math.round(num(v) * 100) / 100;
@@ -25,6 +26,27 @@ function calc(moves, from, to) {
   return R;
 }
 
+
+/* توريدات الأسبوع متجمعة بالفاتورة (نفس التطبيق: الخصم مكتوب على كل سطر من الفاتورة idisc) */
+const nrm = v => String(v || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+const invKey = m => { const d = m.data || {}; return d.bon ? 'b:' + d.bon : 'x:' + (m.date || '') + '|' + nrm(d.supplier) + '|' + nrm(d.inv); };
+function invTable(ins, label, unit) {
+  const g = new Map();
+  for (const m of ins) { const d = m.data || {}, k = invKey(m); let x = g.get(k);
+    if (!x) g.set(k, x = { date: m.date, sup: d.supplier || '', inv: d.inv || '', by: d.by || '', lines: [], gross: 0, disc: 0, priced: false });
+    x.lines.push(m); x.gross += num(d.price) * num(d.qty); if (num(d.price)) x.priced = true; if (num(d.idisc) > x.disc) x.disc = num(d.idisc); if (!x.inv && d.inv) x.inv = d.inv; }
+  const invs = [...g.values()].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const pr = invs.some(x => x.priced), cols = pr ? 6 : 4; let G = 0, D = 0;
+  const body = invs.map(x => { x.gross = r2(x.gross); G += x.gross; D += x.disc;
+    const head = `<tr class="inv"><td colspan="${cols}" class="tl"><b>${x.inv ? 'فاتورة رقم ' + esc(x.inv) : 'بدون رقم فاتورة'}</b> · المورد: <b>${esc(x.sup || '—')}</b> · تاريخ التوريد: <b>${esc(x.date)}</b>${x.by ? ' · سجّله: ' + esc(x.by) : ''}</td></tr>`;
+    const ls = x.lines.map(m => { const d = m.data || {}, v = num(d.price) * num(d.qty); return `<tr><td class="tl">${esc(label(d.item))}</td><td class="n">${fmt(d.qty)}</td><td>${esc(unit(d.item))}</td>${pr ? `<td class="n">${num(d.price) ? fmt(d.price) : ''}</td><td class="n">${v ? fmt(v) : ''}</td>` : ''}<td class="tl">${esc(String(d.notes || '').replace(/^فاتورة رقم [^—]*(— )?/, ''))}</td></tr>`; }).join('');
+    const foot = !pr ? '' : x.disc ? `<tr class="sm"><td colspan="4" class="tl">إجمالي الأصناف</td><td class="n">${fmt(x.gross)}</td><td></td></tr><tr class="sm"><td colspan="4" class="tl">الخصم</td><td class="n">${fmt(x.disc)}</td><td></td></tr><tr class="net"><td colspan="4" class="tl">صافي الفاتورة</td><td class="n">${fmt(x.gross - x.disc)}</td><td></td></tr>`
+      : `<tr class="net"><td colspan="4" class="tl">صافي الفاتورة</td><td class="n">${fmt(x.gross)}</td><td></td></tr>`;
+    return head + ls + foot; }).join('');
+  const n = invs.length, nl = n === 1 ? 'فاتورة واحدة' : n === 2 ? 'فاتورتين' : n + ' فواتير';
+  const tot = !pr ? '' : `<tr class="tot"><td colspan="4" class="tl">صافي توريدات الأسبوع (${nl}${D ? ' · خصومات ' + fmt(D) : ''})</td><td class="n">${fmt(G - D)}</td><td></td></tr>`;
+  return `<h3>توريدات الأسبوع (${nl})</h3><table><thead><tr><th>الخامة</th><th>الكمية</th><th>الوحدة</th>${pr ? '<th>السعر</th><th>القيمة</th>' : ''}<th>ملاحظات</th></tr></thead><tbody>${body}${tot}</tbody></table>`;
+}
 /* one section per site that has the store switched on; returns null when there is nothing to show */
 export function storeReport({ sites, moves, items, from, to, since, until, siteName }) {
   const live = items.filter(i => !i.deleted), byId = new Map(items.map(i => [i.id, i]));
@@ -57,7 +79,7 @@ export function storeReport({ sites, moves, items, from, to, since, until, siteN
     ${groups.map(g => (g.subs ? `<tr class="grp"><td colspan="7" class="tl">${esc(g.name)}</td></tr>` : '') + g.rows.map(x => `<tr${x.r.bal < 0 ? ' class="bad"' : ''}><td class="tl">${esc(x.it.name)}</td><td>${esc(x.it.unit || '')}</td><td class="n">${fmt(x.r.open)}</td><td class="n">${fmt(x.r.inQ)}</td><td class="n">${fmt(x.r.out)}</td><td class="n b">${fmt(x.r.bal)}</td><td>${x.r.last ? esc(x.r.last.date) : '—'}</td></tr>`).join('')).join('')}
     </tbody></table>
     ${low.length ? `<p class="warn">رصيد بالسالب (يحتاج جرد أو مراجعة): ${low.map(x => esc(x.it.name)).join('، ')}</p>` : ''}
-    ${ins.length ? `<h3>توريدات الأسبوع (${ins.length})</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الكمية</th><th>الوحدة</th><th>المورد</th><th>ملاحظات</th><th>سجّله</th></tr></thead><tbody>${ins.map(m => { const d = m.data || {}; return `<tr><td class="n">${esc(m.date)}</td><td class="tl">${esc(label(d.item))}</td><td class="n">${fmt(d.qty)}</td><td>${esc(unit(d.item))}</td><td class="tl">${esc(d.supplier || '')}</td><td class="tl">${esc(d.notes || '')}</td><td>${esc(d.by || '')}</td></tr>`; }).join('')}</tbody></table>` : '<p>لا توجد توريدات هذا الأسبوع.</p>'}
+    ${ins.length ? invTable(ins, label, unit) : '<p>لا توجد توريدات هذا الأسبوع.</p>'}
     ${counts.length ? `<h3>جرد الأسبوع</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الوحدة</th><th>الرصيد الدفتري</th><th>الموجود فعلًا</th><th>المنصرف</th></tr></thead><tbody>${counts.map(c => `<tr><td class="n">${esc(c.date)}</td><td class="tl">${esc(label(c.id))}</td><td>${esc(unit(c.id))}</td><td class="n">${fmt(c.book)}</td><td class="n b">${fmt(c.actual)}</td><td class="n">${c.adj ? 'رصيد افتتاحي' : fmt(c.out)}</td></tr>`).join('')}</tbody></table>` : '<p>لم يتم جرد هذا الأسبوع.</p>'}
     </section>`);
   }
@@ -72,13 +94,13 @@ export function storeHtml({ title, sub, sections, logo }) {
   .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:8px}.hd img{height:46px}
   h1{margin:0;font-size:18px}h2{font-size:13px;margin:14px 0 5px;padding:4px 8px;background:#e6e6e6;border-radius:4px}h3{font-size:11.5px;margin:10px 0 4px}.sub{margin:0 0 8px;color:#333}
   table{width:100%;border-collapse:collapse;margin-bottom:6px}thead{display:table-header-group}tr{page-break-inside:avoid}
-  th,td{border:1px solid #999;padding:3px 5px;text-align:center;vertical-align:top}th{background:#e6e6e6;font-size:10px}
-  td.tl{text-align:right}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}tr.grp td{background:#f2f2f2;font-weight:bold}tr.bad td{background:#f6dcdc}
+  th,td{border:1px solid #999;padding:3px 5px;text-align:center;vertical-align:top}th{${thCss('background:#e6e6e6')};font-size:${fontPx(10)}px}
+  td.tl{text-align:right}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}tr.grp td{background:#f2f2f2;font-weight:bold}tr.bad td{background:#f6dcdc}tr.inv td{background:#eef3f8;border-top:2px solid #555}tr.sm td{color:#444}tr.net td{font-weight:bold}tr.tot td{font-weight:bold;background:#f2f2f2;border-top:2px solid #111}
   .warn{color:#b3261e;font-weight:bold}section.st+section.st{page-break-before:always}.foot{margin-top:12px;font-size:9px;color:#666}
   </style></head><body>
-  <div class="hd"><div><h1>${esc(title)}</h1></div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
+  <div class="hd"><div><h1>${esc(title)}</h1>${RS.sub ? `<div style="font-size:10px;color:#555">${esc(RS.sub)}</div>` : ''}</div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
   <p class="sub">${esc(sub)}</p>
   ${sections}
   <p class="sub">المنصرف يُحسب عند كل جرد: الرصيد قبله + ما ورد − الموجود فعلًا. الرصيد الحالي = آخر جرد + ما ورد بعده.</p>
-  <p class="foot">ADC CONSTRUCTION</p></body></html>`;
+  <p class="foot">${esc(RS.footer || '')}</p></body></html>`;
 }
