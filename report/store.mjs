@@ -30,15 +30,23 @@ function calc(moves, from, to) {
 /* توريدات الأسبوع متجمعة بالفاتورة (نفس التطبيق: الخصم مكتوب على كل سطر من الفاتورة idisc) */
 const nrm = v => String(v || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 const invKey = m => { const d = m.data || {}; return d.bon ? 'b:' + d.bon : 'x:' + (m.date || '') + '|' + nrm(d.supplier) + '|' + nrm(d.inv); };
-function invTable(ins, label, unit) {
+/* الرقم الداخلي: «فاتورة <بند التوريد> رقم (N)» بترتيب تاريخ التوريد في الموقع (نفس التطبيق) */
+function invNos(moves) {
+  const g = new Map();
+  for (const m of moves) { if (m.deleted || m.kind !== 'in') continue; const d = m.data || {}, k = invKey(m); let x = g.get(k); if (!x) g.set(k, x = { k, date: m.date || '', sitem: '', at: ts(m) }); if (!x.sitem && d.sitem) x.sitem = d.sitem; }
+  const by = new Map(); for (const x of g.values()) { if (!x.sitem) continue; const s = nrm(x.sitem); if (!by.has(s)) by.set(s, []); by.get(s).push(x); }
+  const out = new Map(); for (const L of by.values()) { L.sort((a, b) => a.date.localeCompare(b.date) || a.at - b.at); L.forEach((x, i) => out.set(x.k, i + 1)); }
+  return out;
+}
+function invTable(ins, label, unit, nos = new Map()) {
   const g = new Map();
   for (const m of ins) { const d = m.data || {}, k = invKey(m); let x = g.get(k);
-    if (!x) g.set(k, x = { date: m.date, sup: d.supplier || '', inv: d.inv || '', by: d.by || '', lines: [], gross: 0, disc: 0, priced: false });
-    x.lines.push(m); x.gross += num(d.price) * num(d.qty); if (num(d.price)) x.priced = true; if (num(d.idisc) > x.disc) x.disc = num(d.idisc); if (!x.inv && d.inv) x.inv = d.inv; }
+    if (!x) g.set(k, x = { k, date: m.date, sup: d.supplier || '', inv: d.inv || '', sitem: d.sitem || '', by: d.by || '', lines: [], gross: 0, disc: 0, priced: false });
+    x.lines.push(m); x.gross += num(d.price) * num(d.qty); if (num(d.price)) x.priced = true; if (num(d.idisc) > x.disc) x.disc = num(d.idisc); if (!x.inv && d.inv) x.inv = d.inv; if (!x.sitem && d.sitem) x.sitem = d.sitem; }
   const invs = [...g.values()].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const pr = invs.some(x => x.priced), cols = pr ? 6 : 4; let G = 0, D = 0;
   const body = invs.map(x => { x.gross = r2(x.gross); G += x.gross; D += x.disc;
-    const head = `<tr class="inv"><td colspan="${cols}" class="tl"><b>${x.inv ? 'فاتورة رقم ' + esc(x.inv) : 'بدون رقم فاتورة'}</b> · المورد: <b>${esc(x.sup || '—')}</b> · تاريخ التوريد: <b>${esc(x.date)}</b>${x.by ? ' · سجّله: ' + esc(x.by) : ''}</td></tr>`;
+    const head = `<tr class="inv"><td colspan="${cols}" class="tl"><b>${x.sitem && nos.get(x.k) ? 'فاتورة ' + esc(x.sitem) + ' رقم ( ' + nos.get(x.k) + ' )' : x.inv ? 'فاتورة رقم ' + esc(x.inv) : 'بدون رقم فاتورة'}</b>${x.sitem && nos.get(x.k) && x.inv ? ' · فاتورة المورد ' + esc(x.inv) : ''} · المورد: <b>${esc(x.sup || '—')}</b> · تاريخ التوريد: <b>${esc(x.date)}</b>${x.by ? ' · سجّله: ' + esc(x.by) : ''}</td></tr>`;
     const ls = x.lines.map(m => { const d = m.data || {}, v = num(d.price) * num(d.qty); return `<tr><td class="tl">${esc(label(d.item))}</td><td class="n">${fmt(d.qty)}</td><td>${esc(unit(d.item))}</td>${pr ? `<td class="n">${num(d.price) ? fmt(d.price) : ''}</td><td class="n">${v ? fmt(v) : ''}</td>` : ''}<td class="tl">${esc(String(d.notes || '').replace(/^فاتورة رقم [^—]*(— )?/, ''))}</td></tr>`; }).join('');
     const foot = !pr ? '' : x.disc ? `<tr class="sm"><td colspan="4" class="tl">إجمالي الأصناف</td><td class="n">${fmt(x.gross)}</td><td></td></tr><tr class="sm"><td colspan="4" class="tl">الخصم</td><td class="n">${fmt(x.disc)}</td><td></td></tr><tr class="net"><td colspan="4" class="tl">صافي الفاتورة</td><td class="n">${fmt(x.gross - x.disc)}</td><td></td></tr>`
       : `<tr class="net"><td colspan="4" class="tl">صافي الفاتورة</td><td class="n">${fmt(x.gross)}</td><td></td></tr>`;
@@ -79,7 +87,7 @@ export function storeReport({ sites, moves, items, from, to, since, until, siteN
     ${groups.map(g => (g.subs ? `<tr class="grp"><td colspan="7" class="tl">${esc(g.name)}</td></tr>` : '') + g.rows.map(x => `<tr${x.r.bal < 0 ? ' class="bad"' : ''}><td class="tl">${esc(x.it.name)}</td><td>${esc(x.it.unit || '')}</td><td class="n">${fmt(x.r.open)}</td><td class="n">${fmt(x.r.inQ)}</td><td class="n">${fmt(x.r.out)}</td><td class="n b">${fmt(x.r.bal)}</td><td>${x.r.last ? esc(x.r.last.date) : '—'}</td></tr>`).join('')).join('')}
     </tbody></table>
     ${low.length ? `<p class="warn">رصيد بالسالب (يحتاج جرد أو مراجعة): ${low.map(x => esc(x.it.name)).join('، ')}</p>` : ''}
-    ${ins.length ? invTable(ins, label, unit) : '<p>لا توجد توريدات هذا الأسبوع.</p>'}
+    ${ins.length ? invTable(ins, label, unit, invNos(ms)) : '<p>لا توجد توريدات هذا الأسبوع.</p>'}
     ${counts.length ? `<h3>جرد الأسبوع</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الوحدة</th><th>الرصيد الدفتري</th><th>الموجود فعلًا</th><th>المنصرف</th></tr></thead><tbody>${counts.map(c => `<tr><td class="n">${esc(c.date)}</td><td class="tl">${esc(label(c.id))}</td><td>${esc(unit(c.id))}</td><td class="n">${fmt(c.book)}</td><td class="n b">${fmt(c.actual)}</td><td class="n">${c.adj ? 'رصيد افتتاحي' : fmt(c.out)}</td></tr>`).join('')}</tbody></table>` : '<p>لم يتم جرد هذا الأسبوع.</p>'}
     </section>`);
   }
