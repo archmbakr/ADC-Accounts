@@ -100,7 +100,7 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   const sumT = `<table><thead><tr><th>الموقع</th><th>الإيداعات</th><th>المصروفات</th><th>الرصيد الدفتري</th><th>المنصرف حسب طريقة الدفع</th><th>آخر جرد</th><th>الحالة</th></tr></thead><tbody>
   ${sites.map(s => `<tr class="${s.rc.st === 'short' ? 'bad' : ''}"><td class="tl">${esc(siteLabel(s))}</td><td class="n">${fmt(s.dep)}</td><td class="n">${fmt(s.exp)}</td><td class="n b${neg(s.total)}">${fmt(s.total)}</td><td class="tl d">${esc(methText(s) || '—')}</td><td>${esc(s.rc.date || '—')}</td><td>${ST[s.rc.st]}${s.rc.st === 'short' || s.rc.st === 'over' ? ' ' + fmt(Math.abs(s.rc.diff)) : ''}</td></tr>`).join('')}
   </tbody>${sites.length > 1 ? `<tfoot><tr><td>الإجمالي</td>${['dep', 'exp', 'total'].map(k => `<td class="n">${fmt(sites.reduce((a, s) => a + s[k], 0))}</td>`).join('')}<td class="tl d">${esc(methText(addMeth(sites)) || '—')}</td><td colspan="2"></td></tr></tfoot>` : ''}</table>`;
-  const wkT = week.length ? `<h2>تعديلات الأسبوع (${week.length})</h2><table><thead><tr><th>الوقت</th><th>العملية</th><th>النوع</th><th>الموقع</th><th>المبلغ</th><th>تاريخ الحركة</th><th>التفاصيل</th><th>بواسطة</th></tr></thead><tbody>
+  const wkT = week.length ? `<h2 class="pb">تعديلات الأسبوع (${week.length})</h2><table><thead><tr><th>الوقت</th><th>العملية</th><th>النوع</th><th>الموقع</th><th>المبلغ</th><th>تاريخ الحركة</th><th>التفاصيل</th><th>بواسطة</th></tr></thead><tbody>
   ${week.map(l => `<tr><td class="n">${esc(dt(l.at))}</td><td><span class="a a-${esc(l.action)}">${esc(ACT[l.action] || l.action || '')}</span></td><td>${esc(KIND[l.kind] || l.kind || '')}</td><td class="tl">${esc(l.siteName || '')}</td><td class="n">${l.amount == null ? '' : fmt(l.amount)}</td><td class="n">${esc(l.date || '')}</td><td class="tl d">${esc(l.details || '')}</td><td>${esc(l.by || '')}</td></tr>`).join('')}</tbody></table>` : '<h2>تعديلات الأسبوع</h2><p>لا توجد تعديلات هذا الأسبوع.</p>';
   const stmt = s => {
     const rows = [...data.deposits.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'dep' })), ...data.expenses.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'exp' }))].sort(byDate);
@@ -119,7 +119,7 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   td.tl{text-align:right}td.d{font-size:9.5px}th.bal{width:11%}td.bal{font-size:12px}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}td.in{color:#185c2e}.neg{color:#b3261e}
   tr.bad td{background:#f6dcdc}tfoot td{background:#eee;font-weight:bold}
   .a{padding:1px 6px;border-radius:8px;font-size:9.5px}.a-add{background:#dcefe0}.a-edit{background:#fff1cc}.a-delete{background:#f6dcdc}
-  section.site{page-break-before:always}.foot{margin-top:12px;font-size:9px;color:#666}
+  section.site{page-break-before:always}h2,h3{page-break-after:avoid;break-after:avoid}h3,h2.pb{page-break-before:always;break-before:page}h2+table,h3+table{page-break-before:avoid}.foot{margin-top:12px;font-size:9px;color:#666}
   </style></head><body>
   <div class="hd"><div><h1>${esc(title)}</h1>${RS.sub ? `<div style="font-size:10px;color:#555">${esc(RS.sub)}</div>` : ''}</div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
   <p class="sub">${esc(sub)} · المبالغ بالجنيه المصري</p>

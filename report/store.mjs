@@ -96,7 +96,7 @@ export function storeHtml({ title, sub, sections, logo }) {
   table{width:100%;border-collapse:collapse;margin-bottom:6px}thead{display:table-header-group}tr{page-break-inside:avoid}
   th,td{border:1px solid #999;padding:3px 5px;text-align:center;vertical-align:top}th{${thCss('background:#e6e6e6')};font-size:${fontPx(10)}px}
   td.tl{text-align:right}td.n{direction:ltr;white-space:nowrap}td.b{font-weight:bold}tr.grp td{background:#f2f2f2;font-weight:bold}tr.bad td{background:#f6dcdc}tr.inv td{background:#eef3f8;border-top:2px solid #555}tr.sm td{color:#444}tr.net td{font-weight:bold}tr.tot td{font-weight:bold;background:#f2f2f2;border-top:2px solid #111}
-  .warn{color:#b3261e;font-weight:bold}section.st+section.st{page-break-before:always}.foot{margin-top:12px;font-size:9px;color:#666}
+  .warn{color:#b3261e;font-weight:bold}section.st+section.st{page-break-before:always}h2,h3{page-break-after:avoid;break-after:avoid}h3{page-break-before:always;break-before:page}h3+table{page-break-before:avoid}.foot{margin-top:12px;font-size:9px;color:#666}
   </style></head><body>
   <div class="hd"><div><h1>${esc(title)}</h1>${RS.sub ? `<div style="font-size:10px;color:#555">${esc(RS.sub)}</div>` : ''}</div>${logo ? `<img src="${logo}" alt="ADC">` : ''}</div>
   <p class="sub">${esc(sub)}</p>
