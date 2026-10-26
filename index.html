@@ -385,6 +385,7 @@ th.pk,td.pk{width:34px;text-align:center}
 .sp-prev table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:13px}.sp-prev th,.sp-prev td{border:1px solid var(--line);padding:6px 7px;text-align:center}.sp-prev th{background:var(--sunk)}.sp-prev td.tl{text-align:right}.sp-prev td.n,.sp-prev td.d{direction:ltr;white-space:nowrap}.sp-prev td.b{font-weight:700}.sp-prev tfoot td{background:var(--sunk);font-weight:700}
 .sp-prev h3{font-size:15px;margin:14px 0 6px}.sp-prev .in{color:#2e7d4f}.sp-prev tr.pay td{background:rgba(46,125,79,.07)}.sp-prev tr.warn-row td{background:rgba(217,130,43,.12)}.sp-prev tr.tot td{font-weight:700;background:var(--sunk)}.warn-box{border:1px solid #e0b252;background:rgba(217,130,43,.1);padding:8px 10px;border-radius:8px;font-size:13px;margin:8px 0}
 .so-nop{padding:8px 12px;border-radius:10px;background:var(--sunk);font-size:14px}
+.del-req{display:inline-block;padding:2px 8px;margin-inline-end:6px;border-radius:6px;background:#fdecea;color:#8a1c12;font-size:12px;font-weight:600}tr.del-row td{background:#fdecea!important}
 </style>
 
 <div class="wrap">
@@ -1731,7 +1732,12 @@ function ctListHTML(rows){
   return `<div class="tbl-wrap"><table><thead><tr><th>رقم</th><th>الموقع</th><th>المقاول</th><th>البند</th><th>التاريخ</th><th class="num">الأعمال حتى تاريخه</th><th class="num">صافي المستخلص</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${rows.map(c=>{const k=ctCalc(c),d=c.data||{},ap=ctCanApprove(c),mine=appIsEngineer();
     const acts=[`<button class="ghost" data-ct="print" data-id="${esc(c.id)}">طباعة</button>`];
-    if(c.status!=='approved'&&(ap||(mine&&!isLocked((c.data||{}).date))))acts.push(`<button class="ghost" data-ct="edit" data-id="${esc(c.id)}">تعديل</button>`,`<button class="ghost" data-ct="del" data-id="${esc(c.id)}">حذف</button>`);
+    if(c.status!=='approved'&&(ap||(mine&&!isLocked((c.data||{}).date))))acts.push(`<button class="ghost" data-ct="edit" data-id="${esc(c.id)}">تعديل</button>`);
+    /* الحذف: المدير وصاحب الموقع على طول، ومهندس المكتب الفني بطلب يوافق عليه المدير */
+    if(d.delReq&&APPU.owner)acts.unshift(`<span class="del-req">🗑️ طلب حذف من ${esc(d.delReq.by||'')}</span>`,`<button class="danger" data-ct="delok" data-id="${esc(c.id)}">موافق على الحذف</button>`,`<button class="ghost" data-ct="delno" data-id="${esc(c.id)}">رفض الحذف</button>`);
+    else if(d.delReq)acts.push(`<span class="del-req">🗑️ مستني موافقة المدير على الحذف</span>`,...(mine?[`<button class="ghost" data-ct="delno" data-id="${esc(c.id)}">إلغاء الطلب</button>`]:[]));
+    else if(ap&&(c.status!=='approved'||APPU.owner))acts.push(`<button class="ghost" data-ct="del" data-id="${esc(c.id)}">حذف</button>`);
+    else if(mine&&c.status!=='approved'&&!isLocked((c.data||{}).date))acts.push(`<button class="ghost" data-ct="delreq" data-id="${esc(c.id)}">طلب حذف</button>`);
     if(ap&&c.status==='submitted')acts.unshift(`<button class="primary" data-ct="approve" data-id="${esc(c.id)}">اعتماد</button>`);
     if(ap&&c.status==='draft'&&d.overReq&&k.overBlocked)acts.unshift(`<button class="primary" data-ct="overok" data-id="${esc(c.id)}">موافق على الزيادة</button>`,`<button class="ghost" data-ct="overno" data-id="${esc(c.id)}">رجّعه للمهندس</button>`);
     if(ap&&c.status!=='draft')acts.push(`<button class="ghost" data-ct="reopen" data-id="${esc(c.id)}">فتح للتعديل</button>`);
@@ -1870,7 +1876,10 @@ document.addEventListener('click',async ev=>{
   if(a==='bqsave'){ctBoqSave();return}
   if(a==='bqtpl'){try{const raw=atob(CT_BOQ_TPL),u=Uint8Array.from(raw,ch=>ch.charCodeAt(0));const s=CT.boqSel,nm=['نموذج بنود التعاقد',s.con,s.item].filter(Boolean).join(' - ');await saveFile(safeName(nm)+'.xlsx',new Blob([u],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تنزيل النموذج: '+((e&&e.message)||e),1)}return}
   if(a==='edit'&&c){const d=c.data||{};CT.form={id:c.id,site:c.site_id,con:c.contractor,item:d.item||'',no:c.no,date:d.date,lines:JSON.parse(JSON.stringify(d.lines||{})),deds:JSON.parse(JSON.stringify(d.deds||[])),notes:d.notes||'',final:!!d.final};CT.msg=null;render();const x=$('#ctFormCard');if(x)x.scrollIntoView({block:'start'});return}
-  if(a==='del'&&c){if(!confirm('حذف المستخلص رقم '+c.no+'؟'))return;if(!(CT.srv||[]).some(x=>x.id===c.id)){appLs(LS_CTQ,ctQ().filter(x=>x.id!==c.id));CT.rows=ctMerged()}else{ctQueue({op:'del',id:c.id});await ctFlush()}render();return}
+  if(a==='delreq'&&c){if(!confirm('حذف المستخلص رقم '+c.no+' محتاج موافقة المدير. تبعت طلب حذف؟'))return;if(await ctSave({...c,data:{...c.data,delReq:{by:myBy(),byId:APPU.me&&APPU.me.id,at:Date.now()}}})){CT.msg={ok:1,t:'اتبعت طلب الحذف للمدير.'};render()}return}
+  if(a==='delno'&&c){const d={...c.data};delete d.delReq;if(await ctSave({...c,data:d})){CT.msg={ok:1,t:APPU.owner?'اترفض طلب الحذف.':'اتلغى طلب الحذف.'};render()}return}
+  if(a==='delok'&&c&&APPU.owner){if(!confirm('حذف المستخلص رقم '+c.no+' ('+c.contractor+')؟'))return;ctQueue({op:'del',id:c.id});await ctFlush();CT.msg={ok:1,t:'المستخلص اتحذف.'};render();return}
+  if(a==='del'&&c){if(!ctCanApprove(c))return;if(!confirm('حذف المستخلص رقم '+c.no+'؟'))return;if(!(CT.srv||[]).some(x=>x.id===c.id)){appLs(LS_CTQ,ctQ().filter(x=>x.id!==c.id));CT.rows=ctMerged()}else{ctQueue({op:'del',id:c.id});await ctFlush()}render();return}
   if(a==='overok'&&c&&ctCanApprove(c)){const k=ctCalc(c);const d={...c.data,overOk:{tots:ctOverTots(k),by:myBy(),at:Date.now()}};delete d.overReq;delete d.overRej;
     if(await ctSave({...c,status:'submitted',data:d})){CT.msg={ok:1,t:'تمت الموافقة على الزيادة، والمستخلص رقم '+c.no+' اتبعت للاعتماد.'};render()}return}
   if(a==='overno'&&c&&ctCanApprove(c)){const d={...c.data,overRej:{by:myBy(),at:Date.now()}};delete d.overReq;if(await ctSave({...c,status:'draft',data:d})){CT.msg={ok:1,t:'المستخلص رقم '+c.no+' رجع للمهندس يراجع الكميات.'};render()}return}
@@ -2125,7 +2134,7 @@ function soMovesHTML(site){
   const live=all.filter(m=>!m.deleted&&hit(m)),del=all.filter(m=>m.deleted),list=live.slice(0,SO.lim);
   const invs=new Map(soInvoices(live).map(x=>[x.k,x])),nos=soInvNos(site.id);
   const seenB=new Set(),bonHead=m=>{if(m.kind!=='in')return '';const k=soInvKey(m),x=invs.get(k);if(!x||seenB.has(k))return '';seenB.add(k);const all=soInvLines(m),canAll=all.every(soCanEdit),ph=soInvPhoto(all);
-    return `<tr class="ct-sec"><td colspan="5">${canAll?`<button type="button" class="ghost inv-ed" data-so="invedit" data-id="${esc(m.id)}">تعديل الفاتورة</button>`:''}${ph?`<button type="button" class="ghost inv-ed rcpt" data-receipt="${esc(ph.id)}" data-rtype="${esc(ph.type)}">📎 نسخة الفاتورة</button>`:''}<b>${esc(soInvTitle(x,nos.get(x.k)))}</b>${x.sitem&&nos.get(x.k)&&x.inv?' · فاتورة المورد '+esc(x.inv):''} · ${esc(x.date)}${x.sup?' — '+esc(x.sup):''} · ${x.lines.length===2?'خامتين':x.lines.length+' '+(x.lines.length>2?'خامات':'خامة')}${x.gross?' · القيمة '+fmt(x.gross):''}${x.disc?' · خصم '+fmt(x.disc)+' · الصافي '+fmt(x.net):''}${x.gross?' '+CUR:''}</td></tr>`};
+    return `<tr class="ct-sec${soDelReq(all)?' del-row':''}"><td colspan="5">${soDelBtns(m,all,canAll)}${canAll?`<button type="button" class="ghost inv-ed" data-so="invedit" data-id="${esc(m.id)}">تعديل الفاتورة</button>`:''}${ph?`<button type="button" class="ghost inv-ed rcpt" data-receipt="${esc(ph.id)}" data-rtype="${esc(ph.type)}">📎 نسخة الفاتورة</button>`:''}<b>${esc(soInvTitle(x,nos.get(x.k)))}</b>${x.sitem&&nos.get(x.k)&&x.inv?' · فاتورة المورد '+esc(x.inv):''} · ${esc(x.date)}${x.sup?' — '+esc(x.sup):''} · ${x.lines.length===2?'خامتين':x.lines.length+' '+(x.lines.length>2?'خامات':'خامة')}${x.gross?' · القيمة '+fmt(x.gross):''}${x.disc?' · خصم '+fmt(x.disc)+' · الصافي '+fmt(x.net):''}${x.gross?' '+CUR:''}</td></tr>`};
   const rej=(appLs(LS_SOREJ)||[]).filter(o=>o.row&&o.row.site_id===site.id);
   const rejH=rej.length?`<div class="card due-card"><div class="sec-h">تعديلات ماتحفظتش (${rej.length})</div><p class="note">السيرفر رفض التعديلات دي: إما عدّى ${SO_EDIT_H} ساعة على تسجيل التوريد، أو خلصت تعديلات اليوم. هي محفوظة هنا على جهازك. ابعتها للمدير أو صاحب الموقع يعدّلها، وبعدين امسحها من هنا.</p>
     <div class="tbl-wrap"><table><tbody>${rej.map(o=>`<tr><td class="date">${esc(o.row.date||'')}</td><td>${o.row.deleted?'<b class="neg">حذف</b> ':''}${soMoveText(o.row)}</td><td class="acts"><button class="ghost" data-so="rejdel" data-id="${esc(o.qid)}">امسح</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
@@ -2193,6 +2202,17 @@ function soBook(siteId,itemId,date,skipId){const r=soCalc(soSiteMoves(siteId).fi
 /* the invoice total in the supply form: this form's lines + (when editing one line) the rest of its invoice */
 /* all live lines of the invoice this supply belongs to */
 function soInvLines(m){const k=soInvKey(m);return ((SO.d&&SO.d.moves)||[]).filter(o=>!o.deleted&&o.kind==='in'&&o.site_id===m.site_id&&soInvKey(o)===k)}
+/* حذف الفاتورة كلها: المدير وصاحب الموقع على طول، والباقي بطلب يوافق عليه المدير */
+const soDelReq=lines=>{const m=(lines||[]).find(o=>(o.data||{}).delReq);return m?m.data.delReq:null};
+async function soInvDelAll(lines){for(const o of lines){const d={...(o.data||{})};delete d.delReq;soQueue('store_moves','put',o.id,{...soClean(o),deleted:true,data:d})}await soFlush()}
+async function soInvReq(lines,on){for(const o of lines){const d={...(o.data||{})};if(on)d.delReq={by:myBy()||(APPU.me&&APPU.me.name)||'',byId:soMe(),at:Date.now()};else delete d.delReq;soQueue('store_moves','put',o.id,{...soClean(o),data:d})}await soFlush()}
+function soDelBtns(m,all,canAll){
+  const appr=soCanAppr(m.site_id),rq=soDelReq(all),id=esc(m.id);
+  if(rq&&APPU.owner)return `<span class="del-req">🗑️ طلب حذف من ${esc(rq.by||'')}</span><button type="button" class="danger inv-ed" data-so="invdelok" data-id="${id}">موافق على الحذف</button><button type="button" class="ghost inv-ed" data-so="invdelno" data-id="${id}">رفض</button>`;
+  if(rq)return `<span class="del-req">🗑️ مستني موافقة المدير على الحذف</span>${rq.byId===soMe()?`<button type="button" class="ghost inv-ed" data-so="invdelno" data-id="${id}">إلغاء الطلب</button>`:''}`;
+  if(appr)return `<button type="button" class="ghost inv-ed" data-so="invdel" data-id="${id}">حذف الفاتورة</button>`;
+  return canAll?`<button type="button" class="ghost inv-ed" data-so="invreq" data-id="${id}">طلب حذف الفاتورة</button>`:'';
+}
 function soFormGross(f){
   let g=0;for(const r of (f.rows||[]))if(r&&+r.price>0&&+r.qty>0)g+=(+r.price)*(+r.qty);
   if(f.id){const m=(SO.d.moves||[]).find(x=>x.id===f.id);if(m){const k=soInvKey(m);for(const o of (SO.d.moves||[]))if(o.id!==m.id&&!o.deleted&&o.kind==='in'&&o.site_id===m.site_id&&soInvKey(o)===k){const d=o.data||{};g+=(+d.price||0)*(+d.qty||0)}}}
@@ -2468,7 +2488,15 @@ document.addEventListener('click',async ev=>{
   if(a==='edit'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;const d=m.data||{};
     SO.form=m.kind==='in'?{id:m.id,kind:'in',date:m.date,rows:[{txt:soItem(d.item)?soPickText(d.item):'',qty:d.qty,price:+d.price?d.price:''}],supplier:d.supplier||'',notes:d.notes||'',inv:d.inv||'',disc:+d.idisc?d.idisc:'',net:''}:{id:m.id,kind:'count',date:m.date,lines:{...(d.lines||{})},extra:[],notes:d.notes||''};
     SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
-  if(a==='del'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;if(!confirm('حذف '+(m.kind==='in'?'التوريد':'الجرد')+' بتاريخ '+m.date+'؟'))return;
+  if(a==='invdel'||a==='invdelok'||a==='invreq'||a==='invdelno'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m)return;const L=soInvLines(m),tot=r2(L.reduce((t,o)=>t+(+(o.data||{}).price||0)*(+(o.data||{}).qty||0),0));
+    const what=L.length+(L.length===1?' صنف':' أصناف')+(tot?' بقيمة '+fmt(tot)+' '+CUR:'');
+    if(a==='invdel'||a==='invdelok'){if(!(soCanAppr(m.site_id)||APPU.owner))return;if(!confirm('حذف الفاتورة كلها ('+what+')؟ هتروح المحذوفات وتقدر ترجّعها.'))return;await soInvDelAll(L);SO.msg={ok:1,t:'الفاتورة اتحذفت ('+what+') واتنقلت للمحذوفات.'}}
+    else if(a==='invreq'){if(!L.every(soCanEdit))return;if(!confirm('حذف الفاتورة كلها محتاج موافقة المدير. تبعت طلب حذف ('+what+')؟'))return;await soInvReq(L,true);SO.msg={ok:1,t:'اتبعت طلب الحذف للمدير.'}}
+    else{await soInvReq(L,false);SO.msg={ok:1,t:APPU.owner?'اترفض طلب الحذف.':'اتلغى طلب الحذف.'}}
+    render();return}
+  if(a==='del'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m||!soCanEdit(m))return;
+    if(m.kind==='in'&&!soCanAppr(m.site_id)&&!APPU.owner&&soInvLines(m).filter(o=>o.id!==m.id).length===0){if(!confirm('ده آخر صنف في الفاتورة، يعني حذف الفاتورة كلها، ودي محتاجة موافقة المدير. تبعت طلب حذف؟'))return;await soInvReq(soInvLines(m),true);SO.msg={ok:1,t:'اتبعت طلب الحذف للمدير.'};render();return}
+    if(!confirm('حذف '+(m.kind==='in'?'التوريد':'الجرد')+' بتاريخ '+m.date+'؟'))return;
     await soPut('store_moves',{...soClean(m),deleted:true});SO.msg={ok:1,t:'اتنقل للمحذوفات.'};render();return}
   if(a==='restore'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m)return;await soPut('store_moves',{...soClean(m),deleted:false});render();return}
   if(a==='purge'){if(!confirm('حذف نهائي؟ مش هينفع ترجّعه.'))return;soQueue('store_moves','del',id,null);await soFlush();render();return}
@@ -3295,6 +3323,7 @@ function waitList(siteId){
   const me=APPU.me&&APPU.me.id,out=[];
   if(typeof CT!=='undefined'&&CT.loaded)for(const c of CT.rows||[]){
     if(c.site_id!==siteId||!ctCanApprove(c))continue;const d=c.data||{};
+    if(d.delReq&&APPU.owner)out.push({t:'طلب حذف مستخلص رقم '+c.no+' — '+c.contractor+' (من '+(d.delReq.by||'')+')',go:'__certs'});
     if(c.status==='draft'&&d.overReq&&ctCalc(c).overBlocked)out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': زيادة فوق '+CT_OVER+'% محتاجة موافقة',go:'__certs'});
     else if(c.status==='submitted')out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': مستني الاعتماد',go:'__certs'});
     if(c.edit_req)out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': طلب تعديل',go:'__certs'});
@@ -3304,18 +3333,32 @@ function waitList(siteId){
     const by=new Map();for(const r of cl){const n=(r.data||{}).engName||'مهندس';const x=by.get(n)||{n:0,a:0};x.n++;x.a+=+(r.data||{}).amount||0;by.set(n,x)}
     for(const [n,x] of by)out.push({t:'مصروفات عهدة '+n+': '+x.n+' تحت المراجعة ('+fmt(x.a)+')',go:'__custody'});
   }
+  if(APPU.owner)for(const x of waitStoreDel(siteId))out.push(x);
   for(const c of S.conflicts||[]){const r=c.mine||{};if((r.siteId||(c.col==='sites'?c.id:''))===siteId)out.push({t:'تعارض في تعديل '+(KIND[c.col]||'حركة')+(r.amount!=null?' '+fmt(amt(r)):''),go:''})}
+  return out;
+}
+function waitStoreDel(siteId){
+  if(typeof SO==='undefined'||!SO.d)return [];const seen=new Set(),out=[];
+  for(const m of SO.d.moves||[]){if(m.site_id!==siteId||m.deleted||m.kind!=='in'||!(m.data||{}).delReq)continue;const k=soInvKey(m);if(seen.has(k))continue;seen.add(k);
+    const d=m.data;out.push({t:'طلب حذف '+(d.inv?'فاتورة المورد '+d.inv:'فاتورة '+m.date)+(d.supplier?' — '+d.supplier:'')+' (من '+(d.delReq.by||'')+')',sogo:siteId})}
+  return out;
+}
+/* تنبيهات المدير: طلبات الحذف في كل المواقع */
+function delNotices(){
+  if(!APP||!APPU.owner)return [];const out=[];
+  for(const s of S.sites){for(const x of waitStoreDel(s.id))out.push(`<div class="xbar"><span>${esc(x.t)} — ${esc(s.name)}</span><button class="primary" data-sogo="${esc(s.id)}">افتح المخزن</button></div>`)}
+  if(typeof CT!=='undefined')for(const c of CT.rows||[])if((c.data||{}).delReq)out.push(`<div class="xbar"><span>طلب حذف مستخلص رقم ${c.no} — ${esc(c.contractor)} (من ${esc(c.data.delReq.by||'')}) — ${esc(siteNameOf(c.site_id))}</span><button class="primary" data-site="__certs">افتح المستخلصات</button></div>`);
   return out;
 }
 function waitBadge(siteId){const n=waitList(siteId).length;return n?`<span class="wait-b" title="مستنياك ${n}">${n}</span>`:''}
 function waitCard(siteId){
   const L=waitList(siteId);if(!L.length)return '';
-  return `<div class="card wait-card"><b>مستنياك في الموقع ده (${L.length}):</b><ul>${L.map(x=>`<li>${x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)}</button>`:esc(x.t)}</li>`).join('')}</ul></div>`;
+  return `<div class="card wait-card"><b>مستنياك في الموقع ده (${L.length}):</b><ul>${L.map(x=>`<li>${x.sogo?`<button type="button" class="linkish" data-sogo="${esc(x.sogo)}">${esc(x.t)}</button>`:x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)}</button>`:esc(x.t)}</li>`).join('')}</ul></div>`;
 }
 
 
 /* ===================== الكشوف المختصرة (مورد · موقع · دفعات) ===================== */
-const SP={type:'site',mode:'now',site:'',owner:'',name:'',party:'con',from:'',to:'',alias:{},aliasMsg:null};
+const SP={type:'site',mode:'now',site:'',owner:'',name:'',item:'',party:'con',from:'',to:'',alias:{},aliasMsg:null};
 /* دمج أسماء الموردين: app_settings «name_alias» = {الاسم المكتوب (مطبّع): الاسم في القائمة} */
 function spAliasFrom(rows){const x=(rows||[]).find(z=>z.key==='name_alias');try{SP.alias=x&&x.value?JSON.parse(x.value):{}}catch(e){SP.alias={}}}
 const spN=v=>{const n=soNorm(v);const a=SP.alias[n];return a?soNorm(a):n};
@@ -3341,8 +3384,10 @@ const spSum=a=>r2(a.reduce((t,e)=>t+amt(e),0));
 /* ---------- (أ) كشف مورد ---------- */
 function spSupplier(){
   const sites=spScope(),ids=new Set(sites.map(s=>s.id)),to=spTo(),nm=SP.name;if(!nm)return null;
-  const invs=spInvoices(ids).filter(x=>spN(x.sup)===spN(nm));
-  const pays=S.exp.filter(e=>ids.has(e.siteId)&&(e.date||'')<=to&&spN(e.contractor)===spN(nm));
+  const it=SP.item,itN=soNorm(it),okIt=v=>!it||soNorm(v)===itN;
+  const invAll=spInvoices(ids).filter(x=>spN(x.sup)===spN(nm)),payAll=S.exp.filter(e=>ids.has(e.siteId)&&(e.date||'')<=to&&spN(e.contractor)===spN(nm));
+  const invs=invAll.filter(x=>okIt(x.sitem)),pays=payAll.filter(e=>okIt(e.item));
+  const otherPays=it?payAll.filter(e=>!okIt(e.item)):[],noItemInv=it?invAll.filter(x=>!x.sitem):[];
   const rows=[...invs.map(x=>({d:x.date,k:'inv',x})),...pays.map(e=>({d:e.date||'',k:'pay',e}))].sort((a,b)=>a.d.localeCompare(b.d)||(a.k==='inv'?-1:1));
   let run=0;const NOS={};const tr=rows.map(r=>{
     if(r.k==='inv'){const x=r.x;const no=(NOS[x.site]||(NOS[x.site]=soInvNos(x.site))).get(x.k),lab=(x.sitem&&no?esc(soInvTitle(x,no))+(x.inv?' · فاتورة المورد '+esc(x.inv):''):x.inv?'فاتورة رقم '+esc(x.inv):'بون')+(x.disc?' (خصم '+money0(x.disc)+')':'');
@@ -3357,7 +3402,8 @@ function spSupplier(){
   ${bad.length?`<p class="warn-box">⚠ <b>تحتاج مراجعة:</b> ${bad.map(x=>(x.inv?'فاتورة رقم '+esc(x.inv):'بون')+' ('+esc(x.date)+') فيها '+x.bad+' '+(x.bad===1?'صنف':'أصناف')+' من غير سعر').join('، ')}. الفواتير دي مش محسوبة في الإجمالي لحين مراجعتها.</p>`:''}
   ${noInv.length?`<p class="warn-box">⚠ فيه دفعات للمورد ده في ${noInv.map(s=>esc(s.name)).join('، ')} ومافيش فواتير مخزن ليه في نفس الموقع.</p>`:''}
   <p class="note">الفواتير من «توريدات المخزن» (الصافي بعد الخصم)، والدفعات من المصروفات المسجّلة باسم المورد.${spScopeNote(sites)}</p>`;
-  return {title:'كشف حساب مختصر — مورد: '+spShow(nm),sub:spScopeTxt(sites)+' · حتى '+to,body};
+  const extra=(otherPays.length?`<p class="warn-box">ℹ️ فيه ${otherPays.length} ${otherPays.length===1?'دفعة':'دفعات'} للمورد ده (${money0(spSum(otherPays))}) على بنود تانية مش ظاهرة في الكشف ده: ${[...new Set(otherPays.map(e=>esc(e.item||'من غير بند')))].join('، ')}.</p>`:'')+(noItemInv.length?`<p class="warn-box">ℹ️ فيه ${noItemInv.length} ${noItemInv.length===1?'فاتورة':'فواتير'} قديمة للمورد ده من غير «بند توريد» مش ظاهرة هنا. اختار «كل البنود» عشان تشوفها، أو حط لها البند من «تعديل الفاتورة».</p>`:'');
+  return {title:'كشف حساب مختصر — مورد: '+spShow(nm)+(it?' — '+it:''),sub:spScopeTxt(sites)+' · حتى '+to,body:body+extra};
 }
 const money0=v=>fmt(v).replace(/[⁦⁩]/g,'');
 function spScopeTxt(sites){return sites.length===1?'موقع: '+sites[0].name:(S.isManager?'مواقع '+spOwnerName(spOwnerKey(sites[0])):'كل مواقعك')+' ('+sites.length+')'}
@@ -3439,6 +3485,13 @@ function spPayments(){
   <p class="note">${own?'الدفعات من «إيداعات المالك».':'الدفعات من المصروفات المسجّلة باسم '+(conKind(SP.name)==='supplier'?'المورد':'المقاول')+'.'}${spScopeNote(sites)}</p>`;
   return {title:own?'كشف دفعات المالك — '+(multi?spScopeTxt(sites):sites[0].name):'كشف دفعات — '+(conKind(SP.name)==='supplier'?'مورد':'مقاول')+': '+spShow(SP.name),sub:(own||!multi?'':spScopeTxt(sites)+' · ')+(!own&&!multi?'موقع: '+sites[0].name+' · ':'')+(from?'من '+from+' ':'من البداية ')+'إلى '+to,body};
 }
+/* بنود التوريد اللي ليها فواتير أو دفعات للمورد المختار */
+function spSupItems(){
+  const sites=spScope(),ids=new Set(sites.map(s=>s.id)),m=new Map(),add=v=>{v=String(v||'').trim();if(v&&!m.has(soNorm(v)))m.set(soNorm(v),v)};
+  for(const x of spInvoices(ids))if(spN(x.sup)===spN(SP.name))add(x.sitem);
+  for(const e of S.exp)if(ids.has(e.siteId)&&spN(e.contractor)===spN(SP.name))add(e.item);
+  return [...m.values()].sort((a,b)=>a.localeCompare(b,'ar'));
+}
 function spDoc(){return SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():spSite()}
 
 /* ---------- الصفحة ---------- */
@@ -3462,6 +3515,7 @@ function spRenderPage(){
     ${SP.type==='site'?`<div class="f fw"><label>الشكل</label><div class="seg">${[['now','الموقف الحالي'],['debts','بالمديونيات']].map(([v,t])=>`<button type="button" data-sp="mode" data-v="${v}" aria-selected="${SP.mode===v}">${t}</button>`).join('')}</div></div>`:''}
     ${SP.type==='pay'?`<div class="f c2"><label for="sp_party">دفعات لمين</label><select id="sp_party">${opt('con','مقاول أو مورد',SP.party)}${opt('owner','المالك (الإيداعات)',SP.party)}</select></div>`:''}
     ${SP.type==='sup'||(SP.type==='pay'&&SP.party!=='owner')?`<div class="f c2"><label for="sp_name">${SP.type==='sup'?'المورد':'الاسم'}</label><select id="sp_name">${opt('','اختر…',SP.name)}${names.map(n=>opt(n,n,SP.name)).join('')}</select></div>`:''}
+    ${SP.type==='sup'&&SP.name?(()=>{const L=spSupItems();if(SP.item&&!L.some(n=>soNorm(n)===soNorm(SP.item)))SP.item='';return `<div class="f c2"><label for="sp_item">البند</label><select id="sp_item">${opt('','كل البنود',SP.item)}${L.map(n=>opt(n,n,SP.item)).join('')}</select></div>`})():''}
     ${SP.type==='pay'?`<div class="f c1"><label for="sp_from">من تاريخ</label><input id="sp_from" type="date" value="${esc(SP.from)}"></div>`:''}
     <div class="f c1"><label for="sp_to">حتى تاريخ</label><input id="sp_to" type="date" value="${esc(SP.to||today())}"></div>
     <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}</div>
@@ -3469,10 +3523,10 @@ function spRenderPage(){
   ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>`:'<div class="card blank" style="padding:24px"><p>اختار الاسم علشان الكشف يظهر.</p></div>'}
   ${spAliasCard()}`;
   const on=(id,k,re)=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SP[k]=e.value;if(re)re();render()}};
-  on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name');on('sp_party','party',()=>{SP.name=''});on('sp_from','from');on('sp_to','to');
+  on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_party','party',()=>{SP.name=''});on('sp_from','from');on('sp_to','to');
 }
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-sp]');if(!b)return;const a=b.dataset.sp;
-  if(a==='type'){SP.type=b.dataset.v;SP.name='';render()}else if(a==='mode'){SP.mode=b.dataset.v;render()}
+  if(a==='type'){SP.type=b.dataset.v;SP.name='';SP.item='';render()}else if(a==='mode'){SP.mode=b.dataset.v;render()}
   else if(a==='alias'){spAliasSave(b.dataset.from,(document.getElementById('spa_'+b.dataset.i)||{}).value||'')}
   else if(a==='unalias'){spAliasSave(b.dataset.from,'')}});
 
@@ -5708,6 +5762,7 @@ function uiNotices(){
   const out=[];const bar=excelBar();
   if(bar&&!bar.includes('xbar ok'))out.push(bar);
   if(APP&&typeof quNotices==='function')out.push(...quNotices());
+  if(APP&&typeof delNotices==='function')out.push(...delNotices());
   if(NT.repNew)out.push(`<div class="xbar"><span>يوجد كشف أسبوعي جديد.</span><button class="primary" data-site="__settings">احفظه من الإعدادات</button></div>`);
   return out;
 }
