@@ -401,6 +401,21 @@ th.pk,td.pk{width:34px;text-align:center}
 .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px}
 button.chip{border:1px solid var(--line);cursor:pointer;font:inherit;font-size:12.5px;padding:3px 10px}
 .chip.on{background:var(--accent);color:var(--on-accent)}
+.g-card{border:1px solid var(--line);border-radius:8px;margin-top:8px;overflow:hidden}
+.g-card .gh{display:flex;align-items:center;gap:8px;background:var(--accent-soft);padding:8px 10px;font-weight:700;cursor:pointer;flex-wrap:wrap}
+.g-card .gh .cnt{font-weight:400;font-size:12px;color:var(--muted)}
+.g-card .gh .acts{margin-inline-start:auto;display:flex;gap:6px}
+.g-card .gi{display:flex;align-items:center;gap:8px;padding:6px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.g-card .gi .nm{flex:1;min-width:140px}
+.g-card .gi select{width:auto;min-width:170px}
+.g-free .gh{background:var(--sunk);color:var(--muted)}
+tr.grp-h td{background:var(--accent-soft);font-weight:700}
+tr.grp-free td{background:var(--sunk);font-weight:700;color:var(--muted)}
+tr.grp-i td:first-child{padding-inline-start:26px}
+tr.sub-t td{font-weight:700;border-top:1px solid var(--line)}
+.hl:not(tr){outline:3px solid #d9822b;outline-offset:-2px;background:#fff6e0 !important}
+tr.hl td{background:#fff6e0 !important;border-top:2px solid #d9822b;border-bottom:2px solid #d9822b}
+.backbar{display:flex;align-items:center;gap:8px;background:#fff6e0;border:1px solid #e0b252;border-radius:8px;padding:6px 10px;margin-bottom:8px;flex-wrap:wrap}
 .pend-sup{display:inline-block;background:#fff3d6;border:1px solid #e0b252;color:#8a5a00;font-size:12px;padding:0 8px;border-radius:10px;font-weight:400}
 .del-req{display:inline-block;padding:2px 8px;margin-inline-end:6px;border-radius:6px;background:#fdecea;color:#8a1c12;font-size:12px;font-weight:600}tr.del-row td{background:#fdecea!important}
 </style>
@@ -1204,7 +1219,7 @@ function custDraftCard(drafts,forAcct){
   return [...g.values()].map(L=>{L.sort((a,b)=>(a.data.date||'').localeCompare(b.data.date||''));const r0=L[0],d0=r0.data||{},tot=r2(L.reduce((a,r)=>a+(+r.data.amount||0),0));
     const sm=custSummary(custMerged().filter(r=>r.engineer===r0.engineer&&r.site_id===r0.site_id))[0]||{left:0,pending:0},after=r2(sm.left-sm.pending-tot);
     const back=L.find(r=>(r.data||{}).back),bad=L.filter(r=>custNeedInv(r.data.item,r.data.amount)&&!r.data.receipt);
-    return `<div class="card cu-draft"><div class="sec-h">مسودة التصفية — ${esc(d0.siteName||siteNameOf(r0.site_id))}${forAcct?' — عهدة '+esc(d0.engName||''):''} · لسه ماتبعتتش (${L.length} ${L.length===1?'مصروف':'مصروفات'} · ${fmt(tot)} ${CUR})</div>
+    return `<div class="card cu-draft${CU.hl&&CU.hl===r0.engineer+'|'+r0.site_id?' hl':''}" id="cud_${esc(r0.engineer+'_'+r0.site_id)}"><div class="sec-h">مسودة التصفية — ${esc(d0.siteName||siteNameOf(r0.site_id))}${forAcct?' — عهدة '+esc(d0.engName||''):''} · لسه ماتبعتتش (${L.length} ${L.length===1?'مصروف':'مصروفات'} · ${fmt(tot)} ${CUR})</div>
     <p class="note">المصروفات دي ظاهرة ${forAcct?'ليك إنت':'ليك إنت بس'}. عدّل أو امسح براحتك، ولما تخلص اضغط «إرسال التصفية».</p>
     ${back?`<p class="msg err">التصفية رجعت من ${esc(back.data.back.by||'صاحب الموقع')}${back.data.back.reason?': '+esc(back.data.back.reason):''}. راجعها وابعتها تاني.</p>`:''}
     <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th class="num">المبلغ</th><th>الفاتورة</th><th></th></tr></thead><tbody>
@@ -1293,7 +1308,7 @@ function appRenderCustody(){
 /* تصفية متبعتة مرة واحدة: صاحب الموقع يعتمدها كلها أو يرفض بند منها أو يرجّعها */
 function custBatchCard(b,L){
   const r0=L[0],d0=r0.data||{},tot=r2(L.reduce((a,r)=>a+(+r.data.amount||0),0)),sm=custSummary(custMerged().filter(r=>r.engineer===r0.engineer&&r.site_id===r0.site_id))[0]||{issued:0,left:0};
-  return `<div class="card due-card cu-batch"><div class="sec-h">تصفية عهدة ${esc(d0.engName||'')} — ${esc(d0.siteName||siteNameOf(r0.site_id))} (اتبعتت ${esc(d0.sentAt?new Date(d0.sentAt).toLocaleDateString('en-CA'):'')}${d0.byAcct?' · سجّلها '+esc(d0.byAcct):''})</div>
+  return `<div class="card due-card cu-batch${CU.hl&&(CU.hl===r0.engineer+'|'+r0.site_id)?' hl':''}" id="cub_${esc(r0.engineer+'_'+r0.site_id)}"><div class="sec-h">تصفية عهدة ${esc(d0.engName||'')} — ${esc(d0.siteName||siteNameOf(r0.site_id))} (اتبعتت ${esc(d0.sentAt?new Date(d0.sentAt).toLocaleDateString('en-CA'):'')}${d0.byAcct?' · سجّلها '+esc(d0.byAcct):''})</div>
   <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th>اتدفع</th><th class="num">المبلغ</th><th>الفاتورة</th><th></th></tr></thead><tbody>
   ${L.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${esc(d.item||'')}</td><td>${esc(d.notes||'')}${d.contractor?`<span class="note"> · ${esc(d.contractor)}</span>`:''}${d.remarks?`<span class="note"> · ${esc(d.remarks)}</span>`:''}</td><td>${esc(METHOD[d.method]||'نقدي')}</td><td class="num">${fmt(d.amount)}</td><td>${custReceiptBtn(d)||'—'}</td>
     <td class="acts">${CU.rejecting===r.id?`<input id="cu_rej" placeholder="سبب الرفض" maxlength="120"><button class="danger" data-cu="rejyes" data-id="${esc(r.id)}">رفض</button><button data-cu="rejno">إلغاء</button>`:`<button class="ghost" data-cu="reject" data-id="${esc(r.id)}">رفض البند</button>`}</td></tr>`}).join('')}
@@ -1346,7 +1361,7 @@ function appRenderCustAcct(){
   const F=CU.acct||(CU.acct={site:'',eng:''});if(!sites.has(F.site))F.site=sites.size?[...sites.keys()][0]:'';
   const cur=sites.get(F.site),engs=cur?[...cur.engs.values()]:[];if(!engs.some(e=>e.id===F.eng))F.eng=engs[0]?engs[0].id:'';
   const mine=rows.filter(r=>r.kind==='claim'&&(r.created_by===me.id||(r.data||{}).byAcctId===me.id));
-  const m=CU.claimMsg,its=regNames('items'),cons=regNames('contractors');
+  const m=CU.claimMsg,its=F.site&&typeof siteItems==='function'?siteItems(F.site).map(name=>({name})):regNames('items'),cons=regNames('contractors');
   $('#pane').innerHTML=`<div class="pane-h"><h2>تصفية العهد</h2></div>${custNeedSql()}
   ${[...sites.values()].map(st=>{const L=custOpen(st.id);return L.length?`<div class="card"><div class="sec-h">${esc(st.name)}</div><div class="tbl-wrap"><table><thead><tr><th>المهندس</th><th class="num">اتصرفله</th><th class="num">اتصفّى</th><th class="num">تحت المراجعة</th><th class="num">الباقي معاه</th></tr></thead><tbody>${L.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="num">${fmt(s.issued)}</td><td class="num">${fmt(s.approved)}</td><td class="num">${s.pending?fmt(s.pending):'—'}</td><td class="num strong">${fmt(s.left)}</td></tr>`).join('')}</tbody></table></div></div>`:''}).join('')}
   ${custDraftCard(rows.filter(r=>r.kind==='claim'&&r.status==='draft'&&custIsMine(r)),true)}
@@ -1401,8 +1416,10 @@ function appRenderEngineer(){
   if(isTechR(r))tabs.push(['stmts','الكشوف']);
   if(r==='store'||soHasAccess())tabs.push(['store','المخزن']);
   const tab=tabs.some(t=>t[0]===CT.tab)?CT.tab:(tabs[0]||['store'])[0];
+  if(typeof engNotices==='function'&&tab!=='stmts'){}
   if(tab==='stmts'){if(!CT.loaded||!SO.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';Promise.all([CT.loaded?0:ctLoad(),SO.loaded?0:soLoad()]).then(()=>render())}else spRenderPage()}
   else if(tab==='certs')ctRenderEngineer();else if(tab==='store')soRenderPage();else appRenderCustEng();
+  if(typeof engNotices==='function'){const en=engNotices();if(en)$('#pane').insertAdjacentHTML('afterbegin',en)}
   if(tabs.length>1)$('#pane').insertAdjacentHTML('afterbegin',`<div class="seg eng-tabs" role="tablist">${tabs.map(([v,t])=>`<button role="tab" data-ct="tab" data-v="${v}" aria-selected="${tab===v}">${t}</button>`).join('')}</div>`);
 }
 function appRenderCustEng(){
@@ -1410,7 +1427,7 @@ function appRenderCustEng(){
   const me=APPU.me||{},rows=custMerged().filter(r=>r.engineer===me.id),s=custSummary(rows)[0]||{issued:0,returned:0,approved:0,pending:0,left:0,avail:0};
   const sites=new Map();for(const r of rows.filter(r=>r.kind==='issue'))sites.set(r.site_id,{id:r.site_id,name:(r.data||{}).siteName||'',manager:r.manager});
   const m=CU.claimMsg;
-  const its=regNames('items'),cons=regNames('contractors');
+  const enS=CU.enSite&&sites.has(CU.enSite)?CU.enSite:([...sites.keys()][0]||''),its=enS&&typeof siteItems==='function'?siteItems(enS).map(name=>({name})):regNames('items'),cons=regNames('contractors');
   $('#pane').innerHTML=`<div class="pane-h"><h2>عهدتي</h2><div class="actions"><button class="ghost" data-cu="eng-settings">${CU.engSettings?'إخفاء الإعدادات':'الإعدادات'}</button></div></div>${custNeedSql()}
   ${CU.engSettings?appSecurityCard():''}
   <div class="stats">
@@ -1596,7 +1613,7 @@ function ctFormCert(f){
 }
 function ctFormHTML(){
   const f=CT.form;if(!f)return '';
-  const sites=ctSitesForForm(),cons=regNames('contractors'),its=regNames('items');
+  const sites=ctSitesForForm(),cons=f.site&&typeof regsFor==='function'?regsFor(f.site).map(x=>({name:x.name})):regNames('contractors'),its=f.site&&typeof siteItems==='function'?siteItems(f.site).map(name=>({name})):regNames('items');
   const ready=f.site&&f.con&&f.item,c=ready?ctFormCert(f):null,k=c?ctCalc(c):null;
   const codes=k?ctCodes(k.lines):{};
   const site=sites.find(x=>x.id===f.site)||null;
@@ -1781,7 +1798,7 @@ function ctListHTML(rows){
     if(ap&&c.status!=='draft')acts.push(`<button class="ghost" data-ct="reopen" data-id="${esc(c.id)}">فتح للتعديل</button>`);
     if(ap&&c.edit_req)acts.push(`<button class="ghost" data-ct="noreq" data-id="${esc(c.id)}">رفض طلب التعديل</button>`);
     if(mine&&!ap&&c.status==='approved'&&!c.edit_req)acts.push(`<button class="ghost" data-ct="req" data-id="${esc(c.id)}">طلب تعديل</button>`);
-    return `<tr><td><b>${c.no}</b>${d.final?'<span class="pend">ختامي</span>':''}</td><td>${esc(d.siteName||siteNameOf(c.site_id))}</td><td>${esc(c.contractor)}</td><td>${esc(d.item||'')||'—'}</td><td class="date">${esc(d.date||'')}</td><td class="num plain">${fmt(k.works)}</td><td class="num">${k.net==null?'—':fmt(k.net)}</td><td>${ST_L[c.status]||''}${c.status==='draft'&&d.overReq&&k.overBlocked?'<span class="pill pill-neg">زيادة فوق '+CT_OVER+'% — محتاج موافقة صاحب الموقع</span>':''}${c.status==='draft'&&d.overRej?'<span class="note"> · المدير رجّعه يراجع الكميات</span>':''}${c.edit_req?'<span class="pend">مطلوب تعديله</span>':''}${c._local?'<span class="pend">على الجهاز</span>':''}</td><td class="acts">${acts.join('')}</td></tr>`}).join('')}
+    return `<tr id="ctr_${esc(c.id)}"${CT.hl===c.id?' class="hl"':''}><td><b>${c.no}</b>${d.final?'<span class="pend">ختامي</span>':''}</td><td>${esc(d.siteName||siteNameOf(c.site_id))}</td><td>${esc(c.contractor)}</td><td>${esc(d.item||'')||'—'}</td><td class="date">${esc(d.date||'')}</td><td class="num plain">${fmt(k.works)}</td><td class="num">${k.net==null?'—':fmt(k.net)}</td><td>${ST_L[c.status]||''}${c.status==='draft'&&d.overReq&&k.overBlocked?'<span class="pill pill-neg">زيادة فوق '+CT_OVER+'% — محتاج موافقة صاحب الموقع</span>':''}${c.status==='draft'&&d.overRej?'<span class="note"> · المدير رجّعه يراجع الكميات</span>':''}${c.edit_req?'<span class="pend">مطلوب تعديله</span>':''}${c._local?'<span class="pend">على الجهاز</span>':''}</td><td class="acts">${acts.join('')}</td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 const ctSort=l=>l.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||b.no-a.no);
@@ -1925,7 +1942,7 @@ document.addEventListener('click',async ev=>{
     if(k0.overBlocked&&!ctCanApprove(c)){CT.msg={t:'المستخلص ده فيه بنود زادت عن التعاقد بأكتر من '+CT_OVER+'% ومحتاج موافقة صاحب الموقع الأول.'};render();return}
     const ov=k0.overBlocked?{overOk:{tots:ctOverTots(k0),by:myBy(),at:Date.now()}}:{};
     if(await ctSave({...c,status:'approved',edit_req:false,data:{...c.data,...ov,prev_paid:paid,boq:lines,approvedBy:myBy(),approvedAt:Date.now()}})){CT.msg={ok:1,t:'تم اعتماد المستخلص رقم '+c.no+'. السابق صرفه: '+fmtPlain(paid)+' '+CUR+'.'};render()}return}
-  if(a==='reopen'&&c){const d={...c.data};delete d.prev_paid;delete d.boq;delete d.approvedBy;delete d.approvedAt;if(await ctSave({...c,status:'draft',edit_req:false,data:d})){CT.msg={ok:1,t:'تم فتح المستخلص للتعديل.'};render()}return}
+  if(a==='reopen'&&c){const d={...c.data,reopenedAt:Date.now()};delete d.prev_paid;delete d.boq;delete d.approvedBy;delete d.approvedAt;if(await ctSave({...c,status:'draft',edit_req:false,data:d})){CT.msg={ok:1,t:'تم فتح المستخلص للتعديل.'};render()}return}
   if(a==='noreq'&&c){if(await ctSave({...c,edit_req:false})){CT.msg={ok:1,t:'تم رفض طلب التعديل.'};render()}return}
   if(a==='req'&&c){if(await ctSave({...c,edit_req:true})){CT.msg={ok:1,t:'تم إرسال طلب التعديل.'};render()}return}
   if(a==='print'&&c){CT.printing=c;printReport('cert');return}
@@ -2072,7 +2089,16 @@ function soInvNos(siteId){
   return out;
 }
 const soInvTitle=(x,no)=>x.sitem&&no?'فاتورة '+x.sitem+' رقم ( '+no+' )':(x.inv?'فاتورة رقم '+x.inv:'بون');
-const soSitemList=()=>{const L=(typeof regNames==='function'?regNames('items'):[]).map(x=>x.name);return [...L.filter(n=>/توريد/.test(n)),...L.filter(n=>!/توريد/.test(n))]};
+/* بنود الموقع (قائمة صاحب الموقع + قائمة المدير): المهندس وأمين المخزن بياخدوها من السيرفر */
+function siteItems(siteId){
+  const own=siteId?regOwnerOf(siteId):undefined,me=soMe(),loc=()=>(typeof regNames==='function'?regNames('items'):[]).map(x=>x.name);
+  if(!siteId||OFF||APPU.owner||(own&&own===me&&!appIsEngineer()))return loc();
+  const k='i:'+siteId,c=SO.regs[k];if(!c||Date.now()-(c.at||0)>120e3)itemsLoad(siteId);
+  const L=new Set([...(c?c.list:[]),...loc()]);return [...L].sort((a,b)=>a.localeCompare(b,'ar'));
+}
+async function itemsLoad(siteId){const k='i:'+siteId;if(!SB||REGL.has(k)||!navigator.onLine)return;REGL.add(k);
+  try{const r=await SB.rpc('site_items',{site:siteId});if(!r.error){const prev=JSON.stringify((SO.regs[k]||{}).list||[]);SO.regs[k]={at:Date.now(),list:(r.data||[]).map(x=>String(x.name||x||'').trim()).filter(Boolean)};appLs('adc_regs_v1',SO.regs);if(JSON.stringify(SO.regs[k].list)!==prev)try{render()}catch(e){}}}catch(e){}finally{setTimeout(()=>REGL.delete(k),5000)}}
+const soSitemList=siteId=>{const L=siteItems(siteId);return [...L.filter(n=>/توريد/.test(n)),...L.filter(n=>!/توريد/.test(n))]};
 function soHasAccess(){return !!(SO.d&&(SO.d.sites.length||SO.d.access.some(a=>a.person===soMe())))}
 const soCanAppr=siteId=>soIsAppr()&&ctMySites().some(s=>s.id===siteId);
 const soTs=m=>m.created_at?Date.parse(m.created_at):((m.data||{}).at||0);
@@ -2257,7 +2283,7 @@ function soMovesHTML(site){
   const live=all.filter(m=>!m.deleted&&hit(m)),del=all.filter(m=>m.deleted),list=live.slice(0,SO.lim);
   const invs=new Map(soInvoices(live).map(x=>[x.k,x])),nos=soInvNos(site.id);
   const seenB=new Set(),bonHead=m=>{if(m.kind!=='in')return '';const k=soInvKey(m),x=invs.get(k);if(!x||seenB.has(k))return '';seenB.add(k);const all=soInvLines(m),canAll=all.every(soCanEdit),ph=soInvPhoto(all);
-    return `<tr class="ct-sec${soDelReq(all)?' del-row':''}"><td colspan="5">${soDelBtns(m,all,canAll)}${canAll?`<button type="button" class="ghost inv-ed" data-so="invedit" data-id="${esc(m.id)}">تعديل الفاتورة</button>`:''}${ph?`<button type="button" class="ghost inv-ed rcpt" data-receipt="${esc(ph.id)}" data-rtype="${esc(ph.type)}">📎 نسخة الفاتورة</button>`:''}<b>${esc(soInvTitle(x,nos.get(x.k)))}</b>${x.sitem&&nos.get(x.k)&&x.inv?' · فاتورة المورد '+esc(x.inv):''} · ${esc(x.date)}${x.sup?' — '+esc(x.sup):''}${all.some(o=>(o.data||{}).supPend)?' <span class="pend-sup">⏳ المورد مستني التسجيل</span>':''} · ${x.lines.length===2?'خامتين':x.lines.length+' '+(x.lines.length>2?'خامات':'خامة')}${x.gross?' · القيمة '+fmt(x.gross):''}${x.disc?' · خصم '+fmt(x.disc)+' · الصافي '+fmt(x.net):''}${x.gross?' '+CUR:''}</td></tr>`};
+    return `<tr class="ct-sec${soDelReq(all)?' del-row':''}${SO.focus&&SO.focus.key===k?' hl':''}" id="inv_${esc(m.id)}"><td colspan="5">${soDelBtns(m,all,canAll)}${canAll?`<button type="button" class="ghost inv-ed" data-so="invedit" data-id="${esc(m.id)}">تعديل الفاتورة</button>`:''}${ph?`<button type="button" class="ghost inv-ed rcpt" data-receipt="${esc(ph.id)}" data-rtype="${esc(ph.type)}">📎 نسخة الفاتورة</button>`:''}<b>${esc(soInvTitle(x,nos.get(x.k)))}</b>${x.sitem&&nos.get(x.k)&&x.inv?' · فاتورة المورد '+esc(x.inv):''} · ${esc(x.date)}${x.sup?' — '+esc(x.sup):''}${all.some(o=>(o.data||{}).supPend)?' <span class="pend-sup">⏳ المورد مستني التسجيل</span>':''} · ${x.lines.length===2?'خامتين':x.lines.length+' '+(x.lines.length>2?'خامات':'خامة')}${x.gross?' · القيمة '+fmt(x.gross):''}${x.disc?' · خصم '+fmt(x.disc)+' · الصافي '+fmt(x.net):''}${x.gross?' '+CUR:''}</td></tr>`};
   const rej=(appLs(LS_SOREJ)||[]).filter(o=>o.row&&o.row.site_id===site.id);
   const rejH=rej.length?`<div class="card due-card"><div class="sec-h">تعديلات ماتحفظتش (${rej.length})</div><p class="note">السيرفر رفض التعديلات دي: إما عدّى وقت التعديل المسموح على تسجيل التوريد، أو خلصت تعديلات اليوم. هي محفوظة هنا على جهازك. ابعتها للمدير أو صاحب الموقع يعدّلها، وبعدين امسحها من هنا.</p>
     <div class="tbl-wrap"><table><tbody>${rej.map(o=>`<tr><td class="date">${esc(o.row.date||'')}</td><td>${o.row.deleted?'<b class="neg">حذف</b> ':''}${soMoveText(o.row)}</td><td class="acts"><button class="ghost" data-so="rejdel" data-id="${esc(o.qid)}">امسح</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
@@ -2374,7 +2400,7 @@ async function soUpPick(){
 }
 function soRetFields(site,f){
   const invs=soInvoices((SO.d.moves||[]).filter(m=>m.site_id===site.id&&!m.deleted&&m.kind==='in')).filter(x=>x.inv).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList().map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
+  return `<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
   <div class="f c1"><label for="so_inv">رقم المرتجع / إشعار المورد (اختياري)</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}"></div>
   <div class="f c1"><label for="so_ref">على فاتورة المورد رقم (اختياري)</label><input id="so_ref" maxlength="40" list="so_refs" value="${esc(f.ref||'')}"><datalist id="so_refs">${invs.slice(0,80).map(x=>`<option value="${esc(x.inv)}">${esc(x.date+' — '+(x.sup||''))}</option>`).join('')}</datalist></div>`;
 }
@@ -2385,14 +2411,14 @@ function soFormHTML(site){
     <form id="soForm" class="entry" novalidate>
       <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}" ${lockMin()}></div>${lockNote()}
       ${soSupField(site,f)}
-      <div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList().map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
+      <div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
       <div class="f c1"><label for="so_inv">رقم الإشعار (اختياري)</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}"></div>
       <div class="f c1"><label for="so_amt">المبلغ <b class="neg">*</b></label><input id="so_amt" type="number" inputmode="decimal" min="0" step="any" value="${esc(f.amount??'')}"></div>
       <div class="f fw"><label for="so_notes">السبب (اختياري)</label><input id="so_notes" maxlength="200" value="${esc(f.notes||'')}" placeholder="مثال: خصم كمية"></div>
       <div class="form-foot"><button class="primary" type="submit">حفظ الإشعار</button><button type="button" data-so="cancel">إلغاء</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
     </form></div>`;
   if(soIsInv(f.kind)){const isR=f.kind==='ret',rows=f.rows&&f.rows.length?f.rows:[{txt:'',qty:''}];
-    const line=(r,i)=>{const id=soPickId(r.txt),u=id?soUnit(id):'';return `<tr><td><input id="so_li_${i}" data-sol="${i}" list="so_items" value="${esc(r.txt||'')}" placeholder="اكتب أول حرفين من الخامة" autocomplete="off" aria-label="الخامة ${i+1}"></td><td><input id="so_lq_${i}" class="ct-in" data-solq="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.qty??''}" aria-label="الكمية ${i+1}"></td><td id="so_lu_${i}">${esc(u)}</td><td><input id="so_lp_${i}" class="ct-in" data-solp="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.price??''}" aria-label="سعر الوحدة ${i+1}"></td>${f.id?'':`<td class="acts">${rows.length>1?`<button type="button" class="ghost" data-so="rmline" data-i="${i}" aria-label="حذف السطر">×</button>`:''}</td>`}</tr>`};
+    const line=(r,i)=>{const id=soPickId(r.txt),u=id?soUnit(id):'';return `<tr${f.hlNoPrice&&String(r.txt||'').trim()&&!(+r.price>0)?' class="hl"':''}><td><input id="so_li_${i}" data-sol="${i}" list="so_items" value="${esc(r.txt||'')}" placeholder="اكتب أول حرفين من الخامة" autocomplete="off" aria-label="الخامة ${i+1}"></td><td><input id="so_lq_${i}" class="ct-in" data-solq="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.qty??''}" aria-label="الكمية ${i+1}"></td><td id="so_lu_${i}">${esc(u)}</td><td><input id="so_lp_${i}" class="ct-in" data-solp="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.price??''}" aria-label="سعر الوحدة ${i+1}"></td>${f.id?'':`<td class="acts">${rows.length>1?`<button type="button" class="ghost" data-so="rmline" data-i="${i}" aria-label="حذف السطر">×</button>`:''}</td>`}</tr>`};
     return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${isR?(f.id||f.inv0?'تعديل مرتجع':'مرتجع للمورد'):f.inv0?'تعديل فاتورة':f.id?'تعديل توريد':'بون توريد'} — ${esc(site.name)}</div>${isR?'<div class="ret-h">المرتجع بيتخصم من رصيد الخامات في المخزن ومن حساب المورد.</div>':''}
     <form id="soForm" class="entry" novalidate>
       <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}" ${lockMin()}></div>${lockNote()}
@@ -2400,7 +2426,7 @@ function soFormHTML(site){
       <div class="fw tbl-wrap"><table class="ct-lines so-bon"><thead><tr><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th><th class="num">سعر الوحدة</th>${f.id?'':'<th></th>'}</tr></thead><tbody>${rows.map(line).join('')}</tbody></table>
       <datalist id="so_items">${soPickList(site.id).map(x=>`<option value="${esc(x.t)}">`).join('')}</datalist></div>
       ${f.id?'':'<div class="fw"><button type="button" class="ghost" data-so="addline">+ خامة</button></div>'}
-      ${isR?soRetFields(site,f):f.id?`<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList().map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="f c1"><label for="so_inv">رقم الفاتورة (اختياري)</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}"></div>`:`<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList().map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="f c1"><label for="so_inv">رقم فاتورة المورد</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}" placeholder="مكتوب على الفاتورة"></div>${soNoPreview(site,f)}`}
+      ${isR?soRetFields(site,f):f.id?`<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="f c1"><label for="so_inv">رقم الفاتورة (اختياري)</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}"></div>`:`<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="f c1"><label for="so_inv">رقم فاتورة المورد</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}" placeholder="مكتوب على الفاتورة"></div>${soNoPreview(site,f)}`}
       ${isR?'':`<div class="f c1"><label for="so_disc">الخصم (اختياري)</label><input id="so_disc" type="number" inputmode="decimal" min="0" step="any" value="${esc(f.disc??'')}"></div>
       <div class="f c1"><label for="so_net">أو صافي الفاتورة</label><input id="so_net" type="number" inputmode="decimal" min="0" step="any" value="${esc(f.net??'')}" placeholder="زي ما مكتوب على الفاتورة"></div>`}
       <p class="note fw" id="so_tot">${soFormTot(f)}</p>
@@ -2734,7 +2760,7 @@ function soInvTable(site,moves){
   const invs=soInvoices(moves).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.at-b.at);
   const pr=invs.some(x=>x.priced),cols=pr?6:4;let G=0,D=0;
   const body=invs.map(x=>{const f=full.get(x.k),whole=!f||f.lines.length===x.lines.length,disc=whole?x.disc:0;G+=x.gross;D+=disc;
-    const head=`<tr class="inv"><td colspan="${cols}" class="tl"><span class="ib">${x.sitem&&nos.get(x.k)?esc(soInvTitle(x,nos.get(x.k))):x.inv?'فاتورة رقم '+esc(x.inv):'بدون رقم فاتورة'}</span>${x.sitem&&nos.get(x.k)&&x.inv?' فاتورة المورد: <b>'+esc(x.inv)+'</b> ·':''} المورد: <b>${esc(x.sup||'—')}</b> · تاريخ التوريد: <b class="d">${esc(x.date)}</b>${x.by?' · سجّله: '+esc(x.by):''}${soInvPhoto(x.lines)?' · <small>مرفق نسخة من الفاتورة</small>':''}${!whole&&x.disc?' · <small>على الفاتورة كلها خصم '+money(x.disc)+'</small>':''}</td></tr>`;
+    const head=`<tr class="inv"><td colspan="${cols}" class="tl"><span class="ib">${x.sitem&&nos.get(x.k)?esc(soInvTitle(x,nos.get(x.k))):x.inv?'فاتورة رقم '+esc(x.inv):'بدون رقم فاتورة'}</span>${x.sitem&&nos.get(x.k)&&x.inv?' فاتورة المورد: <b>'+esc(x.inv)+'</b> ·':''} المورد: <b>${esc(x.sup||'—')}</b>${x.sitem&&typeof igOf==='function'&&igOf(x.sitem,igPfOfSite(site.id))?' · البند العام: <b>'+esc(igOf(x.sitem,igPfOfSite(site.id)))+'</b>':''} · تاريخ التوريد: <b class="d">${esc(x.date)}</b>${x.by?' · سجّله: '+esc(x.by):''}${soInvPhoto(x.lines)?' · <small>مرفق نسخة من الفاتورة</small>':''}${!whole&&x.disc?' · <small>على الفاتورة كلها خصم '+money(x.disc)+'</small>':''}</td></tr>`;
     const ls=x.lines.map(m=>{const d=m.data||{},v=(+d.price||0)*(+d.qty||0),it=soItem(d.item)||{};return `<tr>${td(esc(soLabel(d.item)),'tl')}${td(money(d.qty),'n')}${td(esc(it.unit||''))}${pr?td(+d.price?money(d.price):'','n')+td(v?money(r2(v)):'','n'):''}${td(esc(String(d.notes||'').replace(/^فاتورة رقم [^—]*(— )?/,'')),'tl')}</tr>`}).join('');
     const foot=!pr?'':disc?`<tr class="st"><td colspan="4" class="tl">إجمالي الأصناف</td>${td(money(x.gross),'n')}<td></td></tr><tr class="ds"><td colspan="4" class="tl">الخصم</td>${td(money(disc),'n')}<td></td></tr><tr class="net"><td colspan="4" class="tl">صافي الفاتورة</td>${td(money(r2(x.gross-disc)),'n')}<td></td></tr>`
       :`<tr class="net"><td colspan="4" class="tl">صافي الفاتورة${x.lines.length>1?' ('+x.lines.length+' أصناف)':''}</td>${td(money(x.gross),'n')}<td></td></tr>`;
@@ -3028,7 +3054,7 @@ function soImpHTML(site){
     ${L.map(x=>`<tr${x.st==='err'?' class="bad"':''}><td>${esc(x.where)}</td><td class="date">${esc(x.d||String(x.date??''))}</td><td>${esc(x.label||x.cat||x.item||'')}</td><td class="num plain">${x.q>0?fmt(x.q):esc(String(x.qty??''))}</td><td>${esc(x.u||x.unit||'')}</td><td class="num plain">${x.p?fmt(x.p):''}</td><td>${esc(x.sup||'')}${x.newSup?' <span class="pill-none">🆕</span>':''}</td><td>${tag(x)}</td></tr>`).join('')}
     </tbody></table></div>
     ${dups.length?`<label class="chk"><input type="checkbox" id="soImpDup" ${I.keepDup?'checked':''}> سجّل السطور المكررة برضه</label>`:''}
-    ${L.length&&use.some(x=>!x.sitem)?`<div class="row" style="align-items:center;gap:8px;margin:8px 0"><label for="soImpSitem"><b>بند التوريد</b> للفواتير اللي مش مكتوب فيها البند:</label><select id="soImpSitem"><option value="">اختر البند</option>${soSitemList().map(n=>`<option ${soNorm(n)===soNorm(I.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
+    ${L.length&&use.some(x=>!x.sitem)?`<div class="row" style="align-items:center;gap:8px;margin:8px 0"><label for="soImpSitem"><b>بند التوريد</b> للفواتير اللي مش مكتوب فيها البند:</label><select id="soImpSitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(I.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
     <div class="form-foot">${errs.length?'<span class="msg err">صلّح الأخطاء في الملف وارفعه تاني. مفيش حاجة اتسجلت.</span>':`<button class="primary" type="button" data-so="impsave" ${canSave?'':'disabled'}>حفظ ${use.length} توريد (${invs} ${invs===1?'فاتورة':'فواتير'})</button>${anyNew&&!I.okNew?'<span class="note">علّم على «موافق» الأول.</span>':''}`}</div>`
     :'<p class="note">نزّل النموذج: كل تاب فيه فاتورة، وفوق كل فاتورة البند الرئيسي والمورد والتاريخ، والقوائم من قائمة الخامات اللي في الأبلكيشن. بعد ما تملاه اختار الملف. مفيش حاجة بتتسجل غير لما تراجع وتدوس «حفظ».</p>'}
   </div>`;
@@ -3505,38 +3531,39 @@ function waitList(siteId){
   const me=APPU.me&&APPU.me.id,out=[];
   if(typeof CT!=='undefined'&&CT.loaded)for(const c of CT.rows||[]){
     if(c.site_id!==siteId||!ctCanApprove(c))continue;const d=c.data||{};
-    if(d.delReq&&APPU.owner)out.push({t:'طلب حذف مستخلص رقم '+c.no+' — '+c.contractor+' (من '+(d.delReq.by||'')+')',go:'__certs'});
-    if(c.status==='draft'&&d.overReq&&ctCalc(c).overBlocked)out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': زيادة فوق '+CT_OVER+'% محتاجة موافقة',go:'__certs'});
-    else if(c.status==='submitted')out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': مستني الاعتماد',go:'__certs'});
-    if(c.edit_req)out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': طلب تعديل',go:'__certs'});
+    const nv={k:'cert',id:c.id,label:'مستخلص رقم '+c.no+' — '+c.contractor};
+    if(d.delReq&&APPU.owner)out.push({t:'طلب حذف مستخلص رقم '+c.no+' — '+c.contractor+' (من '+(d.delReq.by||'')+')',nav:nv});
+    if(c.status==='draft'&&d.overReq&&ctCalc(c).overBlocked)out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': زيادة فوق '+CT_OVER+'% محتاجة موافقة',nav:nv});
+    else if(c.status==='submitted')out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': مستني الاعتماد',nav:nv});
+    if(c.edit_req)out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+': طلب تعديل',nav:nv});
   }
   if(typeof CU!=='undefined'&&CU.loaded){
     const cl=custMerged().filter(r=>r.site_id===siteId&&r.kind==='claim'&&r.status==='pending'&&(APPU.owner||(r.manager===me&&myRole()==='user'&&!isAcct())));
-    const by=new Map();for(const r of cl){const n=(r.data||{}).engName||'مهندس';const x=by.get(n)||{n:0,a:0};x.n++;x.a+=+(r.data||{}).amount||0;by.set(n,x)}
-    for(const [n,x] of by)out.push({t:'مصروفات عهدة '+n+': '+x.n+' تحت المراجعة ('+fmt(x.a)+')',go:'__custody'});
+    const by=new Map();for(const r of cl){const n=(r.data||{}).engName||'مهندس';const x=by.get(n)||{n:0,a:0,eng:r.engineer};x.n++;x.a+=+(r.data||{}).amount||0;by.set(n,x)}
+    for(const [n,x] of by)out.push({t:'مصروفات عهدة '+n+': '+x.n+' تحت المراجعة ('+fmt(x.a)+')',nav:{k:'cust',id:x.eng+'|'+siteId,label:'تصفية عهدة '+n}});
   }
   if(APPU.owner)for(const x of waitStoreDel(siteId))out.push(x);
-  if(prCan(siteId)){const G=prGroups().filter(x=>x.sites.has(siteId));for(const x of G)out.push({t:'«'+x.name+'»: '+prWhat(x)+' باسم مش في القائمة — سجّله أو اربطه',go:'__pendregs'});for(const x of noPriceInv(siteId))out.push(x)}
-  for(const c of S.conflicts||[]){const r=c.mine||{};if((r.siteId||(c.col==='sites'?c.id:''))===siteId)out.push({t:'تعارض في تعديل '+(KIND[c.col]||'حركة')+(r.amount!=null?' '+fmt(amt(r)):''),go:''})}
+  if(prCan(siteId)){const G=prGroups().filter(x=>x.sites.has(siteId));for(const x of G)out.push({t:'«'+x.name+'»: '+prWhat(x)+' باسم مش في القائمة — سجّله أو اربطه',nav:{k:'pend',id:x.k,label:'«'+x.name+'» مستني التسجيل'}});for(const x of noPriceInv(siteId))out.push(x)}
+  for(const c of S.conflicts||[]){const r=c.mine||{};if((r.siteId||(c.col==='sites'?c.id:''))===siteId)out.push({t:'تعارض في تعديل '+(KIND[c.col]||'حركة')+(r.amount!=null?' '+fmt(amt(r)):''),nav:{k:'conf',site:siteId,label:'تعارض في التعديل'}})}
   return out;
 }
 function waitStoreDel(siteId){
   if(typeof SO==='undefined'||!SO.d)return [];const seen=new Set(),out=[];
   for(const m of SO.d.moves||[]){if(m.site_id!==siteId||m.deleted||m.kind!=='in'||!(m.data||{}).delReq)continue;const k=soInvKey(m);if(seen.has(k))continue;seen.add(k);
-    const d=m.data;out.push({t:'طلب حذف '+(d.inv?'فاتورة المورد '+d.inv:'فاتورة '+m.date)+(d.supplier?' — '+d.supplier:'')+' (من '+(d.delReq.by||'')+')',sogo:siteId})}
+    const d=m.data;out.push({t:'طلب حذف '+(d.inv?'فاتورة المورد '+d.inv:'فاتورة '+m.date)+(d.supplier?' — '+d.supplier:'')+' (من '+(d.delReq.by||'')+')',sogo:siteId,nav:{k:'inv',site:siteId,id:m.id,label:'طلب حذف '+(d.inv?'فاتورة المورد '+d.inv:'فاتورة '+m.date)}})}
   return out;
 }
 /* تنبيهات المدير: طلبات الحذف في كل المواقع */
 function delNotices(){
   if(!APP||!APPU.owner)return [];const out=[];
-  for(const s of S.sites){for(const x of waitStoreDel(s.id))out.push(`<div class="xbar"><span>${esc(x.t)} — ${esc(s.name)}</span><button class="primary" data-sogo="${esc(s.id)}">افتح المخزن</button></div>`)}
-  if(typeof CT!=='undefined')for(const c of CT.rows||[])if((c.data||{}).delReq)out.push(`<div class="xbar"><span>طلب حذف مستخلص رقم ${c.no} — ${esc(c.contractor)} (من ${esc(c.data.delReq.by||'')}) — ${esc(siteNameOf(c.site_id))}</span><button class="primary" data-site="__certs">افتح المستخلصات</button></div>`);
+  for(const s of S.sites){for(const x of waitStoreDel(s.id))out.push(`<div class="xbar"><span>${esc(x.t)} — ${esc(s.name)}</span><button class="primary" data-nav="${esc(JSON.stringify(x.nav))}">افتح الفاتورة</button></div>`)}
+  if(typeof CT!=='undefined')for(const c of CT.rows||[])if((c.data||{}).delReq)out.push(`<div class="xbar"><span>طلب حذف مستخلص رقم ${c.no} — ${esc(c.contractor)} (من ${esc(c.data.delReq.by||'')}) — ${esc(siteNameOf(c.site_id))}</span><button class="primary" data-nav="${esc(JSON.stringify({k:'cert',id:c.id,label:'مستخلص رقم '+c.no+' — '+c.contractor}))}">افتح المستخلص</button></div>`);
   return out;
 }
 function waitBadge(siteId){const n=waitList(siteId).length;return n?`<span class="wait-b" title="مستنياك ${n}">${n}</span>`:''}
 function waitCard(siteId){
   const L=waitList(siteId);if(!L.length)return '';
-  return `<div class="card wait-card"><b>مستنياك في الموقع ده (${L.length}):</b><ul>${L.map(x=>`<li>${x.sogo?`<button type="button" class="linkish" data-sogo="${esc(x.sogo)}">${esc(x.t)}</button>`:x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)}</button>`:esc(x.t)}</li>`).join('')}</ul></div>`;
+  return `<div class="card wait-card"><b>مستنياك في الموقع ده (${L.length}):</b><ul>${L.map(x=>`<li>${x.nav?`<button type="button" class="linkish" data-nav="${esc(JSON.stringify(x.nav))}">${esc(x.t)} ←</button>`:x.sogo?`<button type="button" class="linkish" data-sogo="${esc(x.sogo)}">${esc(x.t)}</button>`:x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)}</button>`:esc(x.t)}</li>`).join('')}</ul></div>`;
 }
 
 /* ===================== أسماء مستنية التسجيل (موردين/مقاولين اتكتبوا بإيد) ===================== */
@@ -3557,7 +3584,7 @@ function prRenderPage(){
   ${m?`<div class="card"><p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p></div>`:''}
   <div class="card"><p class="note">الأسماء دي اتكتبت بإيد (مش من القائمة) في فواتير المخزن أو مصروفات العهدة. لحد ما تربطها بمقاول/مورد مسجّل أو تضيفها، مش بتدخل في حساب أي مورد في الكشوف والمديونيات.</p>
   ${G.length?G.map((x,i)=>{const L=regsLocal(x.own||null),sup=L.filter(r=>r.kind==='supplier'),con=L.filter(r=>r.kind!=='supplier');const isSup=x.items.some(it=>it.src==='store'||/توريد/.test(((it.r||{}).data||{}).item||(it.e||{}).item||''));
-    return `<div class="rq"><b>«${esc(x.name)}»</b> <span class="note">— ${esc(prWhat(x))} · ${[...x.sites].map(id=>esc(siteNameOf(id)||(SO.d&&(SO.d.sites||[]).find(s=>s.site_id===id)||{}).site_name||id)).join('، ')}</span>
+    return `<div class="rq${PR.hl===x.k?' hl':''}" id="prq_${i}"><b>«${esc(x.name)}»</b> <span class="note">— ${esc(prWhat(x))} · ${[...x.sites].map(id=>esc(siteNameOf(id)||(SO.d&&(SO.d.sites||[]).find(s=>s.site_id===id)||{}).site_name||id)).join('، ')}</span>
     <div class="row"><span>ده نفس اسم مسجّل (مكتوب غلط):</span><select id="pr_l_${i}"><option value="">اختر…</option>${sup.length?`<optgroup label="موردين">${sup.map(r=>`<option>${esc(r.name)}</option>`).join('')}</optgroup>`:''}${con.length?`<optgroup label="مقاولين باطن">${con.map(r=>`<option>${esc(r.name)}</option>`).join('')}</optgroup>`:''}</select><button type="button" class="ghost" data-pr="link" data-i="${i}">ربط</button></div>
     <div class="row"><span>أو جديد:</span><input id="pr_n_${i}" value="${esc(x.name)}" maxlength="100" style="width:auto;min-width:200px"><select id="pr_k_${i}"><option value="supplier" ${isSup?'selected':''}>مورد</option><option value="contractor" ${isSup?'':'selected'}>مقاول باطن</option></select><button type="button" class="primary" data-pr="add" data-i="${i}">ضيفه للقائمة</button></div></div>`}).join(''):'<p>مافيش أسماء مستنية التسجيل.</p>'}</div>`;
 }
@@ -3584,19 +3611,53 @@ function noPriceInv(siteId){
   if(typeof SO==='undefined'||!SO.d)return [];
   const nos=soInvNos(siteId);
   return soInvoices((SO.d.moves||[]).filter(m=>m.site_id===siteId&&!m.deleted&&m.kind==='in')).map(x=>({x,bad:x.lines.filter(m=>!(+(m.data||{}).price>0)).length})).filter(o=>o.bad)
-    .map(({x,bad})=>({t:(x.sitem&&nos.get(x.k)?soInvTitle(x,nos.get(x.k)):'فاتورة '+x.date)+(x.inv?' · فاتورة المورد '+x.inv:'')+(x.sup?' — '+x.sup:'')+': '+(bad===1?'صنف':bad+' أصناف')+' من غير سعر',sogo:siteId}));
+    .map(({x,bad})=>{const t=(x.sitem&&nos.get(x.k)?soInvTitle(x,nos.get(x.k)):'فاتورة '+x.date)+(x.inv?' · فاتورة المورد '+x.inv:'')+(x.sup?' — '+x.sup:'');return {t:t+': '+(bad===1?'صنف':bad+' أصناف')+' من غير سعر',sogo:siteId,nav:{k:'inv',site:siteId,id:x.lines[0].id,mode:'edit',label:t+' — فيها '+(bad===1?'صنف':bad+' أصناف')+' من غير سعر'}}});
 }
 function prNotices(){
   if(!APP||appIsEngineer()||!APPU.approved)return [];const out=[];
-  const G=prGroups();if(G.length)out.push(`<div class="xbar"><span>${G.length===1?'اسم مورد/مقاول مستني':G.length+' أسماء موردين/مقاولين مستنية'} التسجيل: ${G.slice(0,3).map(x=>'«'+esc(x.name)+'»').join('، ')}${G.length>3?'…':''}</span><button class="primary" data-site="__pendregs">سجّلهم</button></div>`);
+  const G=prGroups();if(G.length)out.push(`<div class="xbar"><span>${G.length===1?'اسم مورد/مقاول مستني':G.length+' أسماء موردين/مقاولين مستنية'} التسجيل: ${G.slice(0,3).map(x=>'«'+esc(x.name)+'»').join('، ')}${G.length>3?'…':''}</span><button class="primary" data-nav="${esc(JSON.stringify({k:'pend',id:G[0].k,label:'أسماء مستنية التسجيل'}))}">سجّلهم</button></div>`);
   let n=0;for(const s of ctMySites())n+=noPriceInv(s.id).length;
-  if(n)out.push(`<div class="xbar"><span>${n===1?'فاتورة مخزن فيها':n+' فواتير مخزن فيها'} أصناف من غير سعر — مش داخلة في حساب المورد لحد ما السعر يتكتب.</span></div>`);
+  if(n){let f=null;for(const s of ctMySites()){const L=noPriceInv(s.id);if(L.length){f=L[0].nav;break}}out.push(`<div class="xbar"><span>${n===1?'فاتورة مخزن فيها':n+' فواتير مخزن فيها'} أصناف من غير سعر — مش داخلة في حساب المورد لحد ما السعر يتكتب.</span>${f?`<button class="primary" data-nav="${esc(JSON.stringify(f))}">افتح${n>1?' أول واحدة':'ها'}</button>`:''}</div>`)}
   return out;
+}
+
+/* ===================== التنبيه بيفتح الحاجة نفسها + زرار رجوع ===================== */
+const navAt=()=>APP&&typeof appIsEngineer==='function'&&appIsEngineer()?'eng:'+(CT.tab||''):S.sel;
+function navClear(){CT.hl=null;if(typeof CU!=='undefined')CU.hl=null;PR.hl=null;if(typeof SO!=='undefined')SO.focus=null}
+function navGo(t){
+  if(!t||!t.k)return;closePops&&closePops();navClear();
+  const from={sel:S.sel,tab:CT.tab};let gone='';
+  if(t.k==='inv'){const m=(SO.d&&SO.d.moves||[]).find(x=>x.id===t.id);if(!m||m.deleted)gone='الفاتورة دي اتحذفت أو مش موجودة.';else{const k=soInvKey(m);S.sel='__store';SO.site=t.site||m.site_id;SO.want=SO.site;SO.tab='moves';SO.form=null;SO.imp=null;SO.mf={date:'',q:''};SO.lim=100000;SO.focus={key:k,id:m.id,mode:t.mode||'row'}}}
+  else if(t.k==='cert'){const c=(CT.rows||[]).find(x=>x.id===t.id);if(!c)gone='المستخلص ده اتحذف أو مش موجود.';else{CT.hl=c.id;CT.form=null;if(appIsEngineer())CT.tab='certs';else S.sel='__certs';if(t.edit)CT.navEdit=c.id}}
+  else if(t.k==='cust'){CU.hl=t.id;if(appIsEngineer())CT.tab='cust';else S.sel='__custody'}
+  else if(t.k==='pend'){PR.hl=t.id;S.sel='__pendregs'}
+  else if(t.k==='conf'){S.sel=t.site}
+  if(gone){flash(gone,1);return}
+  S.back={from,label:t.label||'',at:navAt()};S.justSaved=true;render();
+  setTimeout(()=>{
+    if(t.k==='inv'&&SO.focus&&SO.focus.mode==='edit'){const all=soInvLines((SO.d.moves||[]).find(x=>x.id===SO.focus.id)||{}),ids=new Set(all.map(x=>x.id));const b=[...document.querySelectorAll('[data-so=invedit]')].find(x=>ids.has(x.dataset.id));if(b){b.click();setTimeout(()=>{if(SO.form){SO.form.hlNoPrice=true;render();const r=document.querySelector('#soFormCard tr.hl');if(r)r.scrollIntoView({block:'center'});else{const c=$('#soFormCard');if(c)c.scrollIntoView({block:'start'})}}},50);return}}
+    if(CT.navEdit){const b=document.querySelector(`[data-ct=edit][data-id="${CT.navEdit}"]`);CT.navEdit=null;if(b){b.click();return}}
+    const h=document.querySelector('#pane .hl');if(h)h.scrollIntoView({block:'center'});else window.scrollTo({top:0});
+  },60);
+}
+function backBar(){if(!S.back||S.back.at!==navAt())return '';return `<div class="backbar"><button type="button" class="ghost" data-backgo>→ رجوع</button><span>${esc(S.back.label)}</span></div>`}
+document.addEventListener('click',ev=>{
+  const n=ev.target.closest('[data-nav]');if(n){ev.preventDefault();let t=null;try{t=JSON.parse(n.dataset.nav)}catch(e){}navGo(t);return}
+  if(ev.target.closest('[data-backgo]')){const b=S.back;S.back=null;navClear();if(b){S.sel=b.from.sel;if(b.from.tab!=null)CT.tab=b.from.tab}if(typeof SO!=='undefined'&&SO.form)SO.form=null;S.justSaved=true;render();window.scrollTo({top:0});return}
+});
+/* تنبيهات المهندس والمكتب الفني: التصفية اللي رجعت، والمستخلص اللي اتفتح للتعديل */
+function engNotices(){
+  if(!APP||!appIsEngineer())return '';const me=APPU.me&&APPU.me.id,out=[];
+  if(typeof CU!=='undefined'&&CU.loaded){const g=new Map();for(const r of custMerged())if(r.kind==='claim'&&r.status==='draft'&&(r.data||{}).back&&(r.engineer===me||r.created_by===me)){const k=r.engineer+'|'+r.site_id;if(!g.has(k))g.set(k,r)}
+    for(const [k,r] of g)out.push({t:'التصفية رجعت لك'+((r.data||{}).siteName?' — '+r.data.siteName:'')+((r.data.back||{}).reason?': '+r.data.back.reason:''),nav:{k:'cust',id:k,label:'التصفية اللي رجعت'}})}
+  if(typeof CT!=='undefined'&&CT.loaded&&isTechR(myRole()))for(const c of CT.rows||[])if(c.status==='draft'&&(c.data||{}).reopenedAt&&(c.created_by===me||!c.created_by))out.push({t:'مستخلص رقم '+c.no+' — '+c.contractor+' اتفتح للتعديل',nav:{k:'cert',id:c.id,edit:true,label:'مستخلص رقم '+c.no+' — '+c.contractor}});
+  if(!out.length)return '';
+  return `<div class="card wait-card"><b>محتاج منك (${out.length}):</b><ul>${out.map(x=>`<li><button type="button" class="linkish" data-nav="${esc(JSON.stringify(x.nav))}">${esc(x.t)} ←</button></li>`).join('')}</ul></div>`;
 }
 
 
 /* ===================== الكشوف المختصرة (مورد · موقع · دفعات) ===================== */
-const SP={type:'site',mode:'now',site:'',owner:'',name:'',item:'',party:'con',from:'',to:'',alias:{},aliasMsg:null};
+const SP={type:'site',mode:'now',site:'',owner:'',name:'',item:'',gname:'',party:'con',from:'',to:'',alias:{},aliasMsg:null,xl:null};
 /* دمج أسماء الموردين: app_settings «name_alias» = {الاسم المكتوب (مطبّع): الاسم في القائمة} */
 function spAliasFrom(rows){const x=(rows||[]).find(z=>z.key==='name_alias');try{SP.alias=x&&x.value?JSON.parse(x.value):{}}catch(e){SP.alias={}}}
 const spN=v=>{const n=soNorm(v);const a=SP.alias[n];return a?soNorm(a):n};
@@ -3657,7 +3718,12 @@ function spSupplier(){
   ${noInv.length?`<p class="warn-box">⚠ فيه دفعات للمورد ده في ${noInv.map(s=>esc(s.name)).join('، ')} ومافيش فواتير مخزن ليه في نفس الموقع.</p>`:''}
   <p class="note">الفواتير من «توريدات المخزن» (الصافي بعد الخصم)، والمرتجعات وإشعارات الخصم بتتخصم منها، والدفعات من المصروفات المسجّلة باسم المورد.${spScopeNote(sites)}</p>`;
   const extra=(otherPays.length?`<p class="warn-box">ℹ️ فيه ${otherPays.length} ${otherPays.length===1?'دفعة':'دفعات'} للمورد ده (${money0(spSum(otherPays))}) على بنود تانية مش ظاهرة في الكشف ده: ${[...new Set(otherPays.map(e=>esc(e.item||'من غير بند')))].join('، ')}.</p>`:'')+(noItemInv.length?`<p class="warn-box">ℹ️ فيه ${noItemInv.length} ${noItemInv.length===1?'فاتورة':'فواتير'} قديمة للمورد ده من غير «بند توريد» مش ظاهرة هنا. اختار «كل البنود» عشان تشوفها، أو حط لها البند من «تعديل الفاتورة».</p>`:'');
-  return {title:'كشف حساب مختصر — مورد: '+spShow(nm)+(it?' — '+it:''),sub:spScopeTxt(sites)+' · حتى '+to,body:body+extra};
+  let gsum='';
+  if(igAnyGroups()){const G=new Map(),add=(site,sitem,v,k)=>{const g=igOf(sitem,igPfOfSite(site))||'';let x=G.get(g);if(!x)G.set(g,x={g,inv:0,cr:0,paid:0});x[k]+=v};
+    for(const x of good)add(x.site,x.sitem,x.net,'inv');for(const c of goodCr)add(c.site,c.sitem,c.val,'cr');for(const e of pays)add(e.siteId,e.item,amt(e),'paid');
+    const L=[...G.values()].sort((a,b)=>(a.g===''?1:0)-(b.g===''?1:0)||a.g.localeCompare(b.g,'ar'));
+    if(L.length>1||(L[0]&&L[0].g))gsum=`<h3>حسب البند العام</h3><table style="width:auto;min-width:60%"><thead><tr><th>البند العام</th><th>الفواتير</th><th>مرتجعات وخصومات</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${L.map(x=>`<tr class="${x.g?'':'grp-free'}"><td class="tl">${x.g?esc(x.g):'بنود مش تحت بند عام'}</td><td class="n">${money0(x.inv)}</td><td class="n">${x.cr?'('+money0(x.cr)+')':'—'}</td><td class="n in">${money0(x.paid)}</td><td class="n b">${money0(r2(x.inv-x.cr-x.paid))}</td></tr>`).join('')}</tbody></table>`}
+  return {title:'كشف حساب مختصر — مورد: '+spShow(nm)+(it?' — '+it:''),sub:spScopeTxt(sites)+' · حتى '+to,body:body+gsum+extra};
 }
 const money0=v=>fmt(v).replace(/[⁦⁩]/g,'');
 function spScopeTxt(sites){return sites.length===1?'موقع: '+sites[0].name:(S.isManager?'مواقع '+spOwnerName(spOwnerKey(sites[0])):'كل مواقعك')+' ('+sites.length+')'}
@@ -3677,11 +3743,11 @@ function spSite(){
   const kindOf=n=>!n?'—':(conKind(n)==='supplier'||supN.has(spN(n)))?'مورد':'مقاول باطن';
   const t1=people.map(p=>`<tr><td class="tl">${p.name?esc(p.name):'<i>مصروفات من غير مقاول أو مورد</i>'}</td><td>${kindOf(p.name)}</td><td class="tl">${esc([...p.items.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]).slice(0,2).join('، '))}</td><td class="n b">${money0(p.v)}</td><td class="n">${pct(p.v)}</td></tr>`).join('');
   const byI=new Map();for(const e of exp){const k=(e.item||'').trim();byI.set(k,(byI.get(k)||0)+amt(e))}
-  const t2=[...byI.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td class="tl">${k?esc(k):'<i>من غير بند</i>'}</td><td class="n b">${money0(v)}</td><td class="n">${pct(v)}</td></tr>`).join('');
+  const t2=igAnyGroups()?igRollup(exp,e=>igPfOfSite(e.siteId)).map(G=>`<tr class="${G.g?'grp-h':'grp-free'}"><td class="tl">${G.g?esc(G.g):'بنود مش تحت بند عام'}</td><td class="n b">${money0(G.t)}</td><td class="n">${pct(G.t)}</td></tr>`+G.items.map(y=>`<tr class="grp-i"><td class="tl">${y.name==='بدون بند'?'<i>من غير بند</i>':esc(y.name)}</td><td class="n">${money0(y.t)}</td><td class="n">${pct(y.t)}</td></tr>`).join('')).join(''):[...byI.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td class="tl">${k?esc(k):'<i>من غير بند</i>'}</td><td class="n b">${money0(v)}</td><td class="n">${pct(v)}</td></tr>`).join('');
   const present=r2(DEP-ndD-(EXP-ndE));
   let body=`<div class="tiles"><div><span>دفعات المالك</span><b class="in">${money0(DEP)}</b>${ndD?`<small>منها شيكات لم تستحق ${money0(ndD)}</small>`:''}</div><div><span>المصروف الفعلي للمقاولين والموردين</span><b>${money0(EXP)}</b>${ndE?`<small>منها شيكات لم تستحق ${money0(ndE)}</small>`:''}</div><div><span>الفرق (الموجود من دفعات المالك)</span><b class="${present<0?'neg':''}">${money0(present)}</b>${cu?`<small>منه عهد مع المهندسين ${money0(cu)}</small>`:''}</div>${debts?'<div><span>المديونيات</span><b class="neg" id="spDebtTile">—</b></div><div><span>صافي الموقف</span><b id="spNetTile">—</b></div>':''}</div>
   <h3>المصروف الفعلي حسب المقاول والمورد</h3><table><thead><tr><th>الاسم</th><th>النوع</th><th>البند</th><th>اتصرفله فعلًا</th><th>النسبة</th></tr></thead><tbody>${t1||'<tr><td colspan="5">مافيش مصروفات.</td></tr>'}</tbody><tfoot><tr><td colspan="3">الإجمالي (${people.length})</td><td class="n">${money0(EXP)}</td><td>100%</td></tr></tfoot></table>
-  <h3>المصروف الفعلي حسب البند الرئيسي</h3><table><thead><tr><th>البند</th><th>إجمالي المصروف</th><th>النسبة</th></tr></thead><tbody>${t2||'<tr><td colspan="3">مافيش مصروفات.</td></tr>'}</tbody><tfoot><tr><td>الإجمالي (${byI.size} بند)</td><td class="n">${money0(EXP)}</td><td>100%</td></tr></tfoot></table>`;
+  <h3>المصروف الفعلي حسب ${igAnyGroups()?'البند العام والبند':'البند الرئيسي'}</h3><table><thead><tr><th>البند</th><th>إجمالي المصروف</th><th>النسبة</th></tr></thead><tbody>${t2||'<tr><td colspan="3">مافيش مصروفات.</td></tr>'}</tbody><tfoot><tr><td>الإجمالي (${byI.size} بند)</td><td class="n">${money0(EXP)}</td><td>100%</td></tr></tfoot></table>`;
   let D=0;
   if(debts){
     const rows=[],warn=[],notes=[];let RET=0;
@@ -3747,7 +3813,55 @@ function spSupItems(){
   for(const e of spExp())if(ids.has(e.siteId)&&spN(e.contractor)===spN(SP.name))add(e.item);
   return [...m.values()].sort((a,b)=>a.localeCompare(b,'ar'));
 }
-function spDoc(){return SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():spSite()}
+/* ---------- (د) كشف بند عام ---------- */
+function spGroupNames(){const sc=spScope();const pf=sc.length?igPfOfSite(sc[0].id):igMyPf();return igNames(pf)}
+function spGroup(){
+  const sites=spScope(),ids=new Set(sites.map(s=>s.id)),to=spTo(),from=SP.from||'',g=SP.gname,multi=sites.length>1;if(!g)return null;
+  const inG=(it,site)=>!!String(it||'').trim()&&igOf(it,igPfOfSite(site))===g;
+  const xl=[];SP.xl=null;let body='';
+  if(SP.mode!=='debts'){
+    const L=spExp().filter(e=>ids.has(e.siteId)&&(e.date||'')<=to&&(!from||(e.date||'')>=from)&&inG(e.item,e.siteId)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created||0)-(b.created||0));
+    const by=new Map();for(const e of L){const k=String(e.item).trim();if(!by.has(k))by.set(k,[]);by.get(k).push(e)}
+    const items=[...by.entries()].sort((a,b)=>spSum(b[1])-spSum(a[1]));
+    xl.push(['البند','التاريخ',...(multi?['الموقع']:[]),'المقاول / المورد','البيان','طريقة الدفع','المبلغ']);const tot=[];
+    body=items.map(([k,es])=>{const T=spSum(es);for(const e of es)xl.push([k,e.date||'',...(multi?[spSiteName(e.siteId)]:[]),spShow(e.contractor||''),e.notes||'',spMethTxt(e),amt(e)]);xl.push(['إجمالي '+k,'',...(multi?['']:[]),'','','',T]);tot.push(xl.length-1);
+      return `<h3>${esc(k)}</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>المقاول / المورد</th><th>البيان</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${es.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(spShow(e.contractor||''))||'—'}</td><td class="tl">${esc(e.notes||'')}</td><td>${esc(spMethTxt(e))}</td><td class="n">${money0(amt(e))}</td></tr>`).join('')}<tr class="sub-t"><td colspan="${multi?5:4}">إجمالي ${esc(k)}</td><td class="n">${money0(T)}</td></tr></tbody></table>`}).join('');
+    const GT=spSum(L);xl.push(['إجمالي '+g,'',...(multi?['']:[]),'','','',GT]);tot.push(xl.length-1);
+    body=(items.length?body+`<div class="keep"><h3>الملخص</h3><table style="width:60%"><tbody>${items.map(([k,es])=>`<tr><td class="tl">${esc(k)}</td><td class="n">${money0(spSum(es))}</td></tr>`).join('')}<tr class="tot"><td class="tl b">إجمالي ${esc(g)}</td><td class="n b">${money0(GT)}</td></tr></tbody></table></div>`:'<p>مافيش مصروفات على بنود البند العام ده في الفترة دي.</p>')+`<p class="note">المصروفات الفعلية المسجّلة على البنود اللي تحت «${esc(g)}».${spScopeNote(sites)}</p>`;
+    SP.xl={rows:xl,tot,title:'كشف بند عام - '+g};
+    return {title:'كشف بند عام — '+g+' — المنصرف الفعلي',sub:spScopeTxt(sites)+' · '+(from?'من '+from+' ':'من البداية ')+'إلى '+to,body};
+  }
+  /* بالمديونيات: المقاولين من آخر مستخلص معتمد، والموردين من فواتير المخزن ناقص المرتجعات والخصومات */
+  const exp=spExp().filter(e=>ids.has(e.siteId)&&(e.date||'')<=to&&inG(e.item,e.siteId));
+  const rows=new Map(),R=(item)=>{let x=rows.get(item);if(!x)rows.set(item,x=[]);return x},used=new Set();
+  const certs=(typeof CT!=='undefined'?CT.rows:[]).filter(c=>ids.has(c.site_id)&&((c.data||{}).date||'')<=to&&inG(ctItem(c),c.site_id));
+  const keys=new Map();for(const c of certs){const k=ctKey(c);if(!keys.has(k))keys.set(k,[]);keys.get(k).push(c)}
+  for(const [k,L] of keys){const ap=L.filter(c=>c.status==='approved').sort((a,b)=>b.no-a.no)[0],c0=ap||L.sort((a,b)=>b.no-a.no)[0],it=ctItem(c0);
+    const pl=exp.filter(e=>e.siteId===c0.site_id&&spN(e.contractor)===spN(c0.contractor)&&String(e.item).trim()===it);pl.forEach(e=>used.add(e));
+    R(it).push({n:c0.contractor,src:ap?'مستخلص رقم '+ap.no+' (معتمد)':'مافيش مستخلص معتمد لسه',site:c0.site_id,due:ap?ctCalc(ap).after:null,paid:spSum(pl)})}
+  const invs=spInvoices(ids).filter(x=>inG(x.sitem,x.site)),crs=spCredits(ids).filter(c=>inG(c.sitem,c.site)),sk=new Map();
+  for(const x of invs){const k=x.site+'|'+spN(x.sup)+'|'+x.sitem;let y=sk.get(k);if(!y)sk.set(k,y={site:x.site,name:spShow(x.sup),it:x.sitem,n:0,good:0,cr:0,bad:0});y.n++;if(x.bad)y.bad++;else y.good+=x.net}
+  for(const c of crs){const k=c.site+'|'+spN(c.sup)+'|'+c.sitem;let y=sk.get(k);if(!y)sk.set(k,y={site:c.site,name:spShow(c.sup),it:c.sitem,n:0,good:0,cr:0,bad:0});if(!c.bad)y.cr+=c.val}
+  for(const y of sk.values()){const pl=exp.filter(e=>e.siteId===y.site&&spN(e.contractor)===spN(y.name)&&String(e.item).trim()===y.it);pl.forEach(e=>used.add(e));
+    R(y.it).push({n:y.name,src:y.n+' '+(y.n===1?'فاتورة':'فواتير')+' مخزن'+(y.cr?' − مرتجعات وخصومات '+money0(y.cr):'')+(y.bad?` <b class="neg">· ${y.bad} من غير سعر</b>`:''),site:y.site,due:r2(y.good-y.cr),paid:spSum(pl)})}
+  const other=exp.filter(e=>!used.has(e)),om=new Map();for(const e of other){const k=String(e.item).trim()+'|'+spN(e.contractor)+'|'+e.siteId;let y=om.get(k);if(!y)om.set(k,y={it:String(e.item).trim(),n:spShow(e.contractor||'')||'—',site:e.siteId,paid:0});y.paid+=amt(e)}
+  for(const y of om.values())R(y.it).push({n:y.n,src:'مدفوع من غير مستخلص ولا فاتورة مخزن',site:y.site,due:null,paid:r2(y.paid)});
+  let TD=0,TP=0,TL=0;xl.push(['البند','المقاول / المورد',...(multi?['الموقع']:[]),'المصدر','المستحق','اتصرفله','المتبقي']);const tot=[];
+  const items=[...rows.entries()].sort((a,b)=>a[0].localeCompare(b[0],'ar'));
+  body=`<table><thead><tr><th>المقاول / المورد</th>${multi?'<th>الموقع</th>':''}<th>المصدر</th><th>المستحق</th><th>اتصرفله</th><th>المتبقي</th></tr></thead><tbody>${items.map(([it,L])=>{let sl=0;
+    const tr=L.map(r=>{const left=r.due==null?null:r2(r.due-r.paid);if(r.due!=null){TD+=r.due;if(left>0){sl+=left;TL+=left}}TP+=r.paid;xl.push([it,r.n,...(multi?[spSiteName(r.site)]:[]),r.src.replace(/<[^>]+>/g,''),r.due==null?'':r.due,r.paid,left==null?'':left]);
+      return `<tr><td class="tl">${esc(r.n)}</td>${multi?`<td class="tl">${esc(spSiteName(r.site))}</td>`:''}<td class="tl">${r.src}</td><td class="n">${r.due==null?'—':money0(r.due)}</td><td class="n in">${money0(r.paid)}</td><td class="n ${left>0?'b neg':''}">${left==null?'—':left<0?'('+money0(-left)+') مقدم':left===0?'—':money0(left)}</td></tr>`}).join('');
+    xl.push(['إجمالي متبقي '+it,'',...(multi?['']:[]),'','','',r2(sl)]);tot.push(xl.length-1);
+    return `<tr class="grp-h"><td colspan="${multi?6:5}" class="tl">${esc(it)}</td></tr>${tr}<tr class="sub-t"><td colspan="${multi?5:4}">إجمالي متبقي ${esc(it)}</td><td class="n">${money0(r2(sl))}</td></tr>`}).join('')||`<tr><td colspan="${multi?6:5}">مافيش مستخلصات ولا فواتير ولا دفعات على بنود البند العام ده.</td></tr>`}</tbody>
+    <tfoot><tr><td colspan="${multi?3:2}">إجمالي ${esc(g)}</td><td class="n">${money0(r2(TD))}</td><td class="n">${money0(r2(TP))}</td><td class="n">${money0(r2(TL))}</td></tr></tfoot></table>
+    <p class="note">مستحق المقاول = «إجمالي الأعمال بعد الخصومات» في آخر مستخلص معتمد. مستحق المورد = صافي فواتير المخزن ناقص المرتجعات وإشعارات الخصم. اتصرفله = المصروفات المسجّلة له على نفس البند في نفس الموقع.${spScopeNote(sites)}</p>`;
+  xl.push(['إجمالي '+g,'',...(multi?['']:[]),'',r2(TD),r2(TP),r2(TL)]);tot.push(xl.length-1);
+  SP.xl={rows:xl,tot,title:'كشف بند عام بالمديونيات - '+g};
+  return {title:'كشف بند عام — '+g+' — بالمديونيات',sub:spScopeTxt(sites)+' · حتى '+to,body};
+}
+async function spGroupXl(){if(!SP.xl)return;const x=SP.xl,st={0:1};for(const i of x.tot)st[i]=3;
+  try{await saveFile(x.title.replace(/[\/:*?"<>|]/g,'-')+' - '+today()+'.xlsx',XLSX_W.build([{name:'كشف بند عام',rows:x.rows,styles:st,widths:[24,12,22,26,22,14,14],freeze:1}]))}catch(e){}}
+function spDoc(){return SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():spSite()}
 
 /* ---------- الصفحة ---------- */
 function spNames(kind){
@@ -3765,26 +3879,29 @@ function spRenderPage(){
   const opt=(v,t,cur)=>`<option value="${esc(v)}" ${v===cur?'selected':''}>${esc(t)}</option>`;
   $('#pane').innerHTML=`<div class="pane-h"><h2>الكشوف المختصرة</h2></div>
   <div class="card"><form class="entry" id="spForm" onsubmit="return false">
-    <div class="f fw"><label>نوع الكشف</label><div class="seg">${(spTech()?[['sup','كشف مورد'],['pay','كشف دفعات مقاول أو مورد']]:[['site','كشف موقع'],['sup','كشف مورد'],['pay','كشف دفعات']]).map(([v,t])=>`<button type="button" data-sp="type" data-v="${v}" aria-selected="${SP.type===v}">${t}</button>`).join('')}</div></div>
+    <div class="f fw"><label>نوع الكشف</label><div class="seg">${(spTech()?[['sup','كشف مورد'],['pay','كشف دفعات مقاول أو مورد']]:[['site','كشف موقع'],['sup','كشف مورد'],['pay','كشف دفعات'],['grp','كشف بند عام']]).map(([v,t])=>`<button type="button" data-sp="type" data-v="${v}" aria-selected="${SP.type===v}">${t}</button>`).join('')}</div></div>
     ${(S.isManager||spTech())&&owners.length>1&&!SP.site?`<div class="f c2"><label for="sp_owner">${spTech()?'مجموعة المواقع (الحسابات منفصلة لكل صاحب موقع)':'مواقع مين (الحسابات منفصلة)'}</label><select id="sp_owner">${owners.map(([k])=>opt(k,spOwnerName(k),spOwnerKey(sc[0]))).join('')}</select></div>`:''}
     <div class="f c2"><label for="sp_site">الموقع</label><select id="sp_site">${opt('',S.isManager?'كل مواقع صاحب الموقع':spTech()&&spOwners().length>1?'كل مواقع المجموعة':'كل مواقعك',SP.site)}${spAllSites().map(s=>opt(s.id,s.name,SP.site)).join('')}</select></div>
+    ${SP.type==='grp'?(()=>{const G=spGroupNames();if(SP.gname&&!G.some(n=>regNormK(n)===regNormK(SP.gname)))SP.gname='';return `<div class="f c2"><label for="sp_grp">البند العام</label><select id="sp_grp">${opt('','اختر…',SP.gname)}${G.map(n=>opt(n,n,SP.gname)).join('')}</select></div>${G.length?'':'<p class="note fw">مافيش بنود عامة لسه. اعملها من صفحة «البنود».</p>'}<div class="f fw"><label>الشكل</label><div class="seg">${[['now','المنصرف الفعلي'],['debts','بالمديونيات']].map(([v,t])=>`<button type="button" data-sp="mode" data-v="${v}" aria-selected="${SP.mode===v}">${t}</button>`).join('')}</div></div>`})():''}
     ${SP.type==='site'?`<div class="f fw"><label>الشكل</label><div class="seg">${[['now','الموقف الحالي'],['debts','بالمديونيات']].map(([v,t])=>`<button type="button" data-sp="mode" data-v="${v}" aria-selected="${SP.mode===v}">${t}</button>`).join('')}</div></div>`:''}
     ${SP.type==='pay'&&!spTech()?`<div class="f c2"><label for="sp_party">دفعات لمين</label><select id="sp_party">${opt('con','مقاول أو مورد',SP.party)}${opt('owner','المالك (الإيداعات)',SP.party)}</select></div>`:''}
     ${SP.type==='sup'||(SP.type==='pay'&&SP.party!=='owner')?`<div class="f c2"><label for="sp_name">${SP.type==='sup'?'المورد':'الاسم'}</label><select id="sp_name">${opt('','اختر…',SP.name)}${names.map(n=>opt(n,n,SP.name)).join('')}</select></div>`:''}
     ${SP.type==='sup'&&SP.name?(()=>{const L=spSupItems();if(SP.item&&!L.some(n=>soNorm(n)===soNorm(SP.item)))SP.item='';return `<div class="f c2"><label for="sp_item">البند</label><select id="sp_item">${opt('','كل البنود',SP.item)}${L.map(n=>opt(n,n,SP.item)).join('')}</select></div>`})():''}
-    ${SP.type==='pay'?`<div class="f c1"><label for="sp_from">من تاريخ</label><input id="sp_from" type="date" value="${esc(SP.from)}"></div>`:''}
+    ${SP.type==='pay'||(SP.type==='grp'&&SP.mode!=='debts')?`<div class="f c1"><label for="sp_from">من تاريخ</label><input id="sp_from" type="date" value="${esc(SP.from)}"></div>`:''}
     <div class="f c1"><label for="sp_to">حتى تاريخ</label><input id="sp_to" type="date" value="${esc(SP.to||today())}"></div>
-    <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}</div>
+    <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}${d&&SP.type==='grp'&&SP.xl?'<button type="button" class="ghost" data-sp="xl">Excel</button>':''}</div>
   </form></div>
   ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>`:'<div class="card blank" style="padding:24px"><p>اختار الاسم علشان الكشف يظهر.</p></div>'}
   ${spAliasCard()}`;
   const on=(id,k,re)=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SP[k]=e.value;if(re)re();render()}};
-  on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_party','party',()=>{SP.name=''});on('sp_from','from');on('sp_to','to');
+  on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_grp','gname');on('sp_party','party',()=>{SP.name=''});on('sp_from','from');on('sp_to','to');
 }
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-sp]');if(!b)return;const a=b.dataset.sp;
   if(a==='type'){SP.type=b.dataset.v;SP.name='';SP.item='';render()}else if(a==='mode'){SP.mode=b.dataset.v;render()}
   else if(a==='alias'){spAliasSave(b.dataset.from,(document.getElementById('spa_'+b.dataset.i)||{}).value||'')}
-  else if(a==='unalias'){spAliasSave(b.dataset.from,'')}});
+  else if(a==='unalias'){spAliasSave(b.dataset.from,'')}
+  else if(a==='xl'){spGroupXl()}});
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-iggo]');if(!b)return;const site=S.sites.some(s=>s.id===S.sel)?S.sel:'';SP.type='grp';SP.gname=b.dataset.iggo;SP.mode='now';SP.site=site;SP.from='';S.sel='__stmts';render();window.scrollTo({top:0})});
 
 /* ---------- دمج أسماء الموردين (المدير) ---------- */
 function spAliasCard(){
@@ -4343,7 +4460,9 @@ function itemSummary(exps){
   const rows=[...m.entries()].sort((a,b)=>b[1].t-a[1].t),tot=sum(exps);
   return `<details class="card isum"${S.isumClosed?'':' open'} id="isumBox"><summary><span class="sec-h" style="margin:0">ملخص البنود</span><span class="note">${rows.length} بند · ${fmt(tot)} ${CUR}</span></summary>
   <div class="tbl-wrap"><table><thead><tr><th>البند</th><th class="num">الإجمالي (${CUR})</th><th class="num">النسبة</th><th class="num">الحركات</th><th>آخر صرف</th><th></th></tr></thead><tbody>
-  ${rows.map(([k,r])=>`<tr><td><b>${esc(k)}</b></td><td class="num">${fmt(r.t)}</td><td class="num plain"><span class="pct"><i style="width:${tot?Math.round(r.t/tot*100):0}%"></i></span>${tot?Math.round(r.t/tot*100):0}%</td><td class="num plain">${r.n}</td><td class="date">${esc(r.last)||'—'}</td><td class="acts">${k==='بدون بند'?'':`<button class="ghost" data-stmtgo="items" data-name="${esc(k)}">كشف حساب</button>`}</td></tr>`).join('')}
+  ${(()=>{const row=([k,r],cls)=>`<tr${cls?` class="${cls}"`:''}><td><b>${esc(k)}</b></td><td class="num">${fmt(r.t)}</td><td class="num plain"><span class="pct"><i style="width:${tot?Math.round(r.t/tot*100):0}%"></i></span>${tot?Math.round(r.t/tot*100):0}%</td><td class="num plain">${r.n}</td><td class="date">${esc(r.last)||'—'}</td><td class="acts">${k==='بدون بند'?'':`<button class="ghost" data-stmtgo="items" data-name="${esc(k)}">كشف حساب</button>`}</td></tr>`;
+    if(!igAnyGroups())return rows.map(x=>row(x)).join('');
+    return igRollup(exps,e=>igPfOfSite(e.siteId)).map(G=>`<tr class="${G.g?'grp-h':'grp-free'}"><td>${G.g?esc(G.g):'بنود مش تحت بند عام'}</td><td class="num">${fmt(G.t)}</td><td class="num plain">${tot?Math.round(G.t/tot*100):0}%</td><td class="num plain">${G.n}</td><td></td><td class="acts">${G.g&&APP?`<button class="ghost" data-iggo="${esc(G.g)}">كشف بند عام</button>`:''}</td></tr>`+G.items.map(y=>row([y.name,{t:y.t,n:y.n,last:y.last}],'grp-i')).join('')).join('')})()}
   </tbody><tfoot><tr><td>الإجمالي</td><td class="num">${fmt(tot)}</td><td class="num plain">100%</td><td class="num plain">${exps.length}</td><td colspan="2"></td></tr></tfoot></table></div></details>`;
 }
 function renderSite(){
@@ -5423,9 +5542,43 @@ function conSplitHTML(exps){
   const all=gs.reduce((a,x)=>a+x.total,0);
   return `<div class="tbl-wrap"><table class="split-t"><tbody>${gs.map(x=>`<tr class="ct-sec"><td colspan="2"><b>${x.label}</b></td></tr>${x.rows.map(([n,v])=>`<tr><td>${n==='—'?'—':`<button class="linkish" data-stmtgo="contractors" data-name="${esc(n)}">${esc(n)}</button>`}</td><td class="num">${fmt(v)}</td></tr>`).join('')}${gs.length>1||x.k?`<tr class="sub"><td>إجمالي ${x.k===''?'بدون مقاول':x.label==='مورد'?'الموردين':'مقاولين الباطن'}</td><td class="num strong">${fmt(x.total)}</td></tr>`:''}`).join('')}<tr class="grand"><td>الإجمالي</td><td class="num strong">${fmt(all)}</td></tr></tbody></table></div>`;
 }
+/* سجلات القائمة من غير «البنود العامة» (اللي متخزنة في نفس مجموعة البنود بنوع group) */
+const regRecsK=R=>(S[R.key]||[]).filter(r=>r&&r.kind!=='group');
+const regRecs=col=>regRecsK(REG[col]);
+/* ===== البند العام: سجل في قائمة البنود {name, kind:'group', items:[أسماء البنود]} في قائمة المدير (الجذر) أو قائمة صاحب الموقع ===== */
+const igPfOfSite=id=>{const s=S.sites.find(x=>x.id===id);return s?(s._p||''):(S.isManager?'':(S.pfx||''))};
+const igMyPf=()=>S.isManager?'':(S.pfx||'');
+function igGroups(pf){return (S.items||[]).filter(r=>r&&r.kind==='group'&&!r.hidden&&(r._p||'')===pf)}
+/* البند العام لبند في مواقع صاحب موقع: تقسيمه هو، ولو مالوش يمشي تقسيم المدير */
+function igOf(item,pf){
+  const n=regNormK(item);if(!n)return '';
+  const find=p=>{for(const g of igGroups(p))if((g.items||[]).some(x=>regNormK(x)===n))return g.name.trim();return ''};
+  if(pf){const a=find(pf);if(a)return a}
+  return find('');
+}
+function igNames(pf){const m=new Map();for(const p of pf?[pf,'']:[''])for(const g of igGroups(p)){const k=regNormK(g.name);if(!m.has(k))m.set(k,g.name.trim())}return [...m.values()].sort((a,b)=>a.localeCompare(b,'ar'))}
+/* تجميع مصروفات بالبند العام: [{g,t,n,items:[{name,t,n,last}]}] — اللي مش تحت بند عام g='' في الآخر */
+function igRollup(exps,pfOf){
+  const G=new Map();
+  for(const e of exps){const it=(e.item||'').trim()||'بدون بند',g=it==='بدون بند'?'':igOf(it,pfOf(e));let x=G.get(g);if(!x)G.set(g,x={g,t:0,n:0,m:new Map()});x.t+=amt(e);x.n++;let y=x.m.get(it);if(!y)x.m.set(it,y={name:it,t:0,n:0,last:''});y.t+=amt(e);y.n++;if((e.date||'')>y.last)y.last=e.date||''}
+  return [...G.values()].map(x=>({g:x.g,t:x.t,n:x.n,items:[...x.m.values()].sort((a,b)=>b.t-a.t)})).sort((a,b)=>(a.g===''?1:0)-(b.g===''?1:0)||b.t-a.t);
+}
+const igAnyGroups=()=>(S.items||[]).some(r=>r&&r.kind==='group'&&!r.hidden);
+function igSave(g,patch){const d={...clean(g),...patch,updated:Date.now()};queue('items',g.id,d)}
+function igCreate(name){name=String(name||'').trim();if(!name)return 'اكتب اسم البند العام.';const pf=igMyPf();
+  if(igGroups(pf).some(g=>regNormK(g.name)===regNormK(name)))return 'البند العام ده موجود.';
+  if(regNames('items').some(x=>regNormK(x.name)===regNormK(name)))return 'فيه بند بنفس الاسم. اختار اسم تاني للبند العام (مثال: أعمال …).';
+  queue('items',newId(),{name,kind:'group',items:[],created:Date.now(),byId:S.uid||'',_p:pf});logChange('add','items',{name:name+' (بند عام)'});return ''}
+/* البند في بند عام واحد بس (في نفس القائمة) */
+function igAssign(item,gname){const pf=igMyPf(),n=regNormK(item);
+  for(const g of igGroups(pf)){const has=(g.items||[]).some(x=>regNormK(x)===n),want=gname&&regNormK(g.name)===regNormK(gname);
+    if(has&&!want)igSave(g,{items:(g.items||[]).filter(x=>regNormK(x)!==n)});else if(!has&&want)igSave(g,{items:[...(g.items||[]),item]})}
+  if(gname&&!igGroups(pf).some(g=>regNormK(g.name)===regNormK(gname)))queue('items',newId(),{name:gname,kind:'group',items:[item],created:Date.now(),byId:S.uid||'',_p:pf});
+}
+function igRenameItem(oldN,newN){for(const g of (S.items||[]).filter(r=>r&&r.kind==='group'&&!r.hidden&&(r._p||'')===igMyPf()))if((g.items||[]).some(x=>regNormK(x)===regNormK(oldN)))igSave(g,{items:(g.items||[]).map(x=>regNormK(x)===regNormK(oldN)?newN:x)})}
 function regNames(col){
   const set=new Map();
-  for(const r of (S[REG[col].key]||[]))if(r.name&&!r.hidden)set.set(r.name.trim(),true);
+  for(const r of regRecs(col))if(r.name&&!r.hidden)set.set(r.name.trim(),true);
   for(const e of S.exp){if(e._priv)continue;const v=(e[REG[col].field]||'').trim();if(v&&!set.has(v))set.set(v,false)}
   let out=[...set.entries()].map(([name,reg])=>({name,reg}));
   if(col==='items'&&typeof accHidePriv==='function'&&accHidePriv())out=out.filter(x=>!accIsPriv(x.name));
@@ -5435,7 +5588,7 @@ function regNames(col){
 function regMine(col){
   const list=regNames(col);if(S.isManager||OFF||!S.pfx)return list;
   const f=REG[col].field,used=new Set(S.exp.map(e=>(e[f]||'').trim()).filter(Boolean));
-  const mine=new Set((S[REG[col].key]||[]).filter(r=>!r.hidden&&r.byId&&r.byId===S.uid).map(r=>r.name.trim()));
+  const mine=new Set(regRecs(col).filter(r=>!r.hidden&&r.byId&&r.byId===S.uid).map(r=>r.name.trim()));
   return list.filter(x=>used.has(x.name)||mine.has(x.name));
 }
 /* القوائم المنسدلة: الأسماء المسجّلة بس (من غير أسماء اتكتبت في مصروفات قديمة ومش في القائمة)، ومن غير تكرار بسبب الإملاء (ة/ه، أ/ا، ى/ي، المسافات) */
@@ -5460,7 +5613,7 @@ function regValue(id,col){
 function commitNewRegs(pairs){for(const [id,col] of pairs){const sel=document.getElementById(id);if(sel&&sel.value==='__new'){const n=((document.getElementById(id+'_new')||{}).value||'').trim();if(n){const d={name:n};if(col==='contractors'){const iid=id.replace('contractor','item'),iv=regValue(iid,'items');if(iv)d.item=iv}addReg(col,d)}}}}
 function addReg(col,data){
   const R=REG[col],name=data.name.trim();
-  const ex=(S[R.key]||[]).find(r=>r.name.trim()===name);
+  const ex=regRecsK(R).find(r=>r.name.trim()===name);
   if(ex&&!ex.hidden)return false;
   const rec={...data,name,created:Date.now(),byId:S.uid||''};if(OFF&&SEC.user)rec.offUser=SEC.user.name;
   if(ex){queue(col,ex.id,{...clean(ex),...rec,hidden:false,updated:Date.now()})}else queue(col,newId(),rec);
@@ -5490,12 +5643,37 @@ function regStats(col,name){
   const f=REG[col].field,l=S.exp.filter(e=>(e[f]||'').trim()===name);
   return {n:l.length,total:sum(l),sites:new Set(l.map(e=>e.siteId)).size,last:l.map(e=>e.date).sort().pop()||''};
 }
+S.igOpen=S.igOpen||new Set();
+function igCard(){
+  const pf=igMyPf(),names=igNames(pf),items=regNames('items').filter(x=>!(typeof accIsPriv==='function'&&APP&&typeof isAcct==='function'&&isAcct()&&accIsPriv(x.name)));
+  const by=new Map(names.map(n=>[regNormK(n),{name:n,items:[]}])),free=[];
+  for(const x of items){const g=igOf(x.name,pf);if(g){const k=regNormK(g);if(!by.has(k))by.set(k,{name:g,items:[]});by.get(k).items.push(x.name)}else free.push(x.name)}
+  const mineK=new Set(igGroups(pf).map(g=>regNormK(g.name)));
+  const sel=(it,cur)=>`<select data-igitem="${esc(it)}" aria-label="البند العام لـ${esc(it)}"><option value="">— مش تحت بند عام —</option>${[...by.values()].map(g=>`<option value="${esc(g.name)}" ${g.name===cur?'selected':''}>تحت: ${esc(g.name)}</option>`).join('')}</select>`;
+  const m=S.igMsg;S.igMsg=null;
+  const grp=g=>{const open=S.igOpen.has(regNormK(g.name));return `<div class="g-card"><div class="gh" data-igtog="${esc(regNormK(g.name))}">${open?'▾':'◂'} ${esc(g.name)} <span class="cnt">(بند عام · ${g.items.length} ${g.items.length===1||g.items.length>10?'بند':'بنود'})${!mineK.has(regNormK(g.name))&&pf?' · من المدير':''}</span>${mineK.has(regNormK(g.name))?`<span class="acts"><button type="button" class="ghost" data-igren="${esc(g.name)}">تعديل الاسم</button>${g.items.length?'':`<button type="button" class="ghost" data-igdel="${esc(g.name)}">حذف</button>`}</span>`:''}</div>
+    ${open?g.items.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,g.name)}</div>`).join('')||'<div class="gi"><span class="note">مافيش بنود تحته لسه. اختار البند العام قدام أي بند من «بنود مش تحت بند عام».</span></div>':''}</div>`};
+  const fo=S.igOpen.has('__free');
+  return `<div class="card" id="igCard"><div class="sec-h">البنود العامة</div>
+  <p class="note">البند العام بيجمع كذا بند (مثال: «أعمال السباكة» = مصنعيات + توريدات أعمال السباكة) ويظهر بإجماليه في الكشوف. البند الواحد تحت بند عام واحد بس.${pf?' في مواقعك بيمشي تقسيمك، ولو البند مش متقسّم عندك بيمشي تقسيم المدير.':''}</p>
+  <div class="row" style="gap:8px;flex-wrap:wrap"><input id="ig_new" maxlength="80" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:220px"><button type="button" class="primary" data-igadd>إضافة بند عام</button></div>
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
+  ${[...by.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(grp).join('')}
+  <div class="g-card g-free"><div class="gh" data-igtog="__free">${fo?'▾':'◂'} بنود مش تحت بند عام <span class="cnt">(${free.length})</span></div>${fo?free.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,'')}</div>`).join('')||'<div class="gi"><span class="note">كل البنود تحت بنود عامة.</span></div>':''}</div></div>`;
+}
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest('[data-igtog]');if(t&&!ev.target.closest('button,select,input')){const k=t.dataset.igtog;if(S.igOpen.has(k))S.igOpen.delete(k);else S.igOpen.add(k);render();return}
+  if(ev.target.closest('[data-igadd]')){const n=(($('#ig_new')||{}).value||'').trim(),e=igCreate(n);S.igMsg=e?{t:e}:{ok:1,t:'اتضاف البند العام «'+n+'». اختاره قدام البنود اللي تحته.'};if(!e){S.igOpen.add(regNormK(n));S.igOpen.add('__free')}render();return}
+  const r=ev.target.closest('[data-igren]');if(r){const old=r.dataset.igren,g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(old));if(!g)return;const n=(prompt('الاسم الجديد للبند العام',old)||'').trim();if(!n||n===old)return;if(igGroups(igMyPf()).some(x=>x.id!==g.id&&regNormK(x.name)===regNormK(n))){S.igMsg={t:'الاسم ده موجود.'};render();return}igSave(g,{name:n});S.igMsg={ok:1,t:'اتغيّر الاسم.'};render();return}
+  const d=ev.target.closest('[data-igdel]');if(d){const g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(d.dataset.igdel));if(g){igSave(g,{hidden:true});S.igMsg={ok:1,t:'اتحذف البند العام.'};render()}return}
+});
+document.addEventListener('change',ev=>{const s=ev.target.closest&&ev.target.closest('[data-igitem]');if(!s)return;const it=s.dataset.igitem,v=s.value;igAssign(it,v);S.igMsg={ok:1,t:v?'«'+it+'» بقى تحت «'+v+'».':'«'+it+'» بقى مش تحت بند عام.'};if(v)S.igOpen.add(regNormK(v));render()});
 function renderRegister(col){
   const R=REG[col];
   if(S.stmt&&S.stmt.col===col)return renderStatement(col,S.stmt.name);
   const isC=col==='contractors',rk=isC?(S.regKind||''):'';
   const list=regMine(col).filter(x=>!rk||conKind(x.name)===rk);
-  const recs=new Map((S[R.key]||[]).filter(r=>!r.hidden).map(r=>[r.name.trim(),r]));
+  const recs=new Map(regRecsK(R).filter(r=>!r.hidden).map(r=>[r.name.trim(),r]));
   const pick=S.regPick&&S.regPick.col===col?S.regPick.set:new Set();
   const totalAll=list.reduce((a,x)=>a+regStats(col,x.name).total,0);
   $('#pane').innerHTML=`
@@ -5514,6 +5692,7 @@ function renderRegister(col){
     <div class="f c2"><label for="r_item">البند الأساسي (اختياري)</label><select id="r_item"><option value="">— بدون —</option>${regNames('items').map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`
     :`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div><div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
+  ${col==='items'&&canReg()?igCard():''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
     ${isC?`<div class="row reg-tools"><div class="seg" role="tablist" aria-label="النوع">${[['','الكل'],['contractor','مقاولين باطن'],['supplier','موردين']].map(([v,t])=>`<button role="tab" data-regkind="${v}" aria-selected="${rk===v}">${t}</button>`).join('')}</div><span class="grow"></span>${list.length?'<button class="ghost" data-regx="xlsx">Excel</button><button class="ghost" data-regx="print">طباعة / PDF</button>':''}</div>`:''}
     <div class="sec-h">${list.length} ${R.one==='بند'?'بند':(rk==='supplier'?'مورد':rk==='contractor'?'مقاول باطن':'مقاول ومورد')} · إجمالي المصروف عليهم ${fmt(totalAll)} ${CUR}</div>
@@ -5529,16 +5708,16 @@ function renderRegister(col){
   const f=$('#regForm');if(f)f.onsubmit=ev=>{ev.preventDefault();const m=$('#regMsg'),name=$('#r_name').value.trim();
     if(!name){m.className='msg err';m.textContent='أدخل الاسم.';return}
     const data={name};if(col==='contractors'){data.kind=($('#r_kind')||{}).value||'';data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();data.item=($('#r_item')||{}).value||'';if($('#r_claim')){const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim()}
-    if(S.regEdit){const old=(S[R.key]||[]).find(r=>r.id===S.regEdit.id);if(!old)return;
-      if(name!==old.name.trim()&&(S[R.key]||[]).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
+    if(S.regEdit){const old=regRecsK(R).find(r=>r.id===S.regEdit.id);if(!old)return;
+      if(name!==old.name.trim()&&regRecsK(R).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
       const upd={...clean(old),...data,updated:Date.now()};delete upd.id;queue(col,old.id,upd);
       logChange('edit',col,upd,old);
       if(col==='items'&&name!==old.name.trim()&&APP&&typeof accIsPriv==='function'&&accIsPriv(old.name)&&!accIsPriv(name)){m.className='msg';m.textContent='لحظة…';accPrivSet(name,true).then(ok=>{if(ok){f.onsubmit(ev)}else{m.className='msg err';m.textContent='البند ده «خاص» ولازم اسمه الجديد يتعلّم «خاص» الأول، ومحتاج نت. جرّب تاني.'}});return}
-      if(name!==old.name.trim()){for(const e of S.exp.filter(e=>(e[R.field]||'').trim()===old.name.trim())){const ne={...clean(e),[R.field]:name,updated:Date.now()};delete ne.id;queue('expenses',e.id,ne)}}
+      if(name!==old.name.trim()){for(const e of S.exp.filter(e=>(e[R.field]||'').trim()===old.name.trim())){const ne={...clean(e),[R.field]:name,updated:Date.now()};delete ne.id;queue('expenses',e.id,ne)}if(col==='items')igRenameItem(old.name.trim(),name)}
       S.regEdit=null;S.flash={text:'تم حفظ التعديل',until:Date.now()+6000};S.justSaved=true;render();return}
     if(!addReg(col,data)){m.className='msg err';m.textContent=regMine(col).some(x=>x.name===data.name.trim())?'هذا الاسم موجود بالفعل.':'هذا الاسم مسجّل بالفعل في القائمة العامة. اختره مباشرةً عند تسجيل المصروف، وسيظهر هنا بعد ذلك.';return}
     S.flash={text:'أُضيف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
-  if(S.regFill&&S.regEdit){S.regFill=false;const r=(S[R.key]||[]).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_kind',r.kind||'');sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc)}
+  if(S.regFill&&S.regEdit){S.regFill=false;const r=regRecsK(R).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_kind',r.kind||'');sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc)}
   {const d=document.querySelector('.qs-multi');if(d)d.ontoggle=()=>{S.qsOpen=d.open}}
   document.querySelectorAll('[data-qsm]').forEach(c=>c.onchange=()=>{S.qsSel=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value)});
   const qm=$('#qsMulti');if(qm)qm.onclick=()=>{const v=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value);if(v.length<2){const m=$('#qsMsg');m.className='msg err';m.textContent='اختر اثنين على الأقل.';return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
@@ -5560,7 +5739,7 @@ function renderStatement(col,name){
   const all=S.exp.filter(e=>nset.has((e[R.field]||'').trim()));
   const sitesIn=[...new Set(all.map(e=>e.siteId))];
   let run=0;const tr=rows.map(e=>{run+=amt(e);return {...e,run}}).reverse();
-  const r=multi?{}:((S[R.key]||[]).find(x=>x.name.trim()===name&&!x.hidden)||{});
+  const r=multi?{}:(regRecsK(R).find(x=>x.name.trim()===name&&!x.hidden)||{});
   const byName=multi?NM(name).map(n=>{const l=rows.filter(e=>(e[R.field]||'').trim()===n);return [n,sum(l),l.length]}):[];
   const bySite=groupSum(rows.map(e=>({...e,_s:siteNameOf(e.siteId)})),'_s'),byOther=groupSum(rows,R.other);
   const filtOn=sf.site||sf.from||sf.to;
@@ -5851,6 +6030,7 @@ function reportDoc(kind){
     </tbody><tfoot><tr>${td('الإجمالي')}${td(money(ti),'n')}${td(money(to),'n')}${nOpt?`<td colspan="${nOpt}"></td>`:''}${td(money(run),'n')}</tr></tfoot></table>`;
     if(APP&&typeof custOpenPrint==='function')body+=custOpenPrint(site,money);
     {const gs=conSplit(rows.filter(r=>r.k==='exp'));if(gs.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">توزيع المصروف حسب المقاول والمورد</h3><table style="width:auto;min-width:55%"><thead><tr><th>الاسم</th><th>المصروف</th></tr></thead><tbody>${gs.map(x=>`<tr class="open"><td colspan="2" class="tl">${x.label}</td></tr>${x.rows.map(([n,v])=>`<tr>${td(esc(n),'tl')}${td(money(v),'n')}</tr>`).join('')}<tr>${td('إجمالي '+(x.k===''?'بدون مقاول':x.k==='supplier'?'الموردين':'مقاولين الباطن'),'tl b')}${td(money(x.total),'n b')}</tr>`).join('')}</tbody><tfoot><tr>${td('الإجمالي','tl')}${td(money(gs.reduce((a,x)=>a+x.total,0)),'n')}</tr></tfoot></table>`}
+    if(igAnyGroups()){const ex=rows.filter(r=>r.k==='exp'),T=ex.reduce((a,e)=>a+amt(e),0),G=igRollup(ex,e=>igPfOfSite(e.siteId));if(G.length)body+=`<h3 style="margin:14px 0 6px;font-size:13px">توزيع المصروف حسب البند العام</h3><table style="width:auto;min-width:55%"><thead><tr><th>البند</th><th>المصروف</th><th>النسبة</th></tr></thead><tbody>${G.map(g=>`<tr class="${g.g?'grp-h':'grp-free'}">${td(g.g?esc(g.g):'بنود مش تحت بند عام','tl b')}${td(money(g.t),'n b')}${td(T?Math.round(g.t/T*100)+'%':'—','n')}</tr>`+g.items.map(y=>`<tr class="grp-i">${td(esc(y.name),'tl')}${td(money(y.t),'n')}${td(T?Math.round(y.t/T*100)+'%':'—','n')}</tr>`).join('')).join('')}</tbody><tfoot><tr>${td('الإجمالي')}${td(money(T),'n')}${td('100%','n')}</tr></tfoot></table>`}
     land=true;
   }else if(kind==='regs'){
     const rk=S.regKind||'',L=regMine('contractors').filter(x=>!rk||conKind(x.name)===rk);
@@ -5894,6 +6074,7 @@ body{margin:0;font-family:Tahoma,"Segoe UI",Arial,sans-serif;color:#111;font-siz
 .hd h1{margin:0;font-size:18px}.hd .co{font-size:10.5px;color:#555;margin-top:3px}
 .hd .meta{text-align:left;font-size:10px;color:#444;direction:rtl}
 .sub{margin:0 0 8px;color:#333;font-size:11px}
+tr.grp-h td{background:#e6e6e6;font-weight:700}tr.grp-free td{background:#f2f2f2;font-weight:700;color:#444}tr.grp-i td:first-child{padding-right:18px}tr.sub-t td{font-weight:700;border-top:1.5px solid #555}tr.cr td.n{color:#a00}
 .tiles{display:flex;gap:8px;margin:0 0 10px}
 .tiles div{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
 .tiles span{font-size:10px;color:#555}.tiles b{font-size:14px}.tiles small{font-size:9px;color:#555}
@@ -6158,7 +6339,7 @@ function render(){
   if(APP&&!appIsEngineer()&&(S.conflicts||[]).length)$('#pane').insertAdjacentHTML('afterbegin',cfCard());
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
-  {const eng=APP&&appIsEngineer(),bar=eng?'':excelBar();if(bar&&bar.includes('xbar ok'))$('#pane').insertAdjacentHTML('afterbegin',bar);uiNoticeBtn(eng?[]:uiNotices());uiBottom()}
+  {const eng=APP&&appIsEngineer(),bar=eng?'':excelBar();if(bar&&bar.includes('xbar ok'))$('#pane').insertAdjacentHTML('afterbegin',bar);uiNoticeBtn(eng?[]:uiNotices());uiBottom();if(APP&&typeof backBar==='function'){const bb=backBar();if(bb)$('#pane').insertAdjacentHTML('afterbegin',bb);else if(S.back&&S.back.at!==navAt()){S.back=null;navClear()}}}
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
@@ -6178,10 +6359,10 @@ document.addEventListener('click',ev=>{
   const sg=ev.target.closest('[data-stmtgo]');if(sg){S.sel=sg.dataset.stmtgo==='contractors'?'__contractors':'__items';S.stmt={col:sg.dataset.stmtgo,name:sg.dataset.name};S.sf={site:'',from:'',to:''};S.editing=null;render();window.scrollTo({top:0});return}
   const st=ev.target.closest('[data-stmt]');if(st){S.stmt={col:st.dataset.stmt,name:st.dataset.name};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0});return}
   const ra=ev.target.closest('[data-regadd]');if(ra){addReg(ra.dataset.regadd,{name:ra.dataset.name});render();return}
-  const re=ev.target.closest('[data-regedit]');if(re){const R=REG[re.dataset.regedit],r=(S[R.key]||[]).find(x=>x.name.trim()===re.dataset.name&&!x.hidden);if(r&&canEditRec(r)){S.regEdit={id:r.id,name:r.name};S.regFill=true;S.justSaved=true;render();const c=$('#regCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})}return}
+  const re=ev.target.closest('[data-regedit]');if(re){const R=REG[re.dataset.regedit],r=regRecsK(R).find(x=>x.name.trim()===re.dataset.name&&!x.hidden);if(r&&canEditRec(r)){S.regEdit={id:r.id,name:r.name};S.regFill=true;S.justSaved=true;render();const c=$('#regCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})}return}
   const rd=ev.target.closest('[data-regdel]');if(rd){S.confirmReg=rd.dataset.regdel+'|'+rd.dataset.name;render();return}
   if(ev.target.closest('[data-regdelno]')){S.confirmReg='';render();return}
-  const ry=ev.target.closest('[data-regdelyes]');if(ry){const col=ry.dataset.regdelyes,R=REG[col],r=(S[R.key]||[]).find(x=>x.name.trim()===ry.dataset.name&&!x.hidden);
+  const ry=ev.target.closest('[data-regdelyes]');if(ry){const col=ry.dataset.regdelyes,R=REG[col],r=regRecsK(R).find(x=>x.name.trim()===ry.dataset.name&&!x.hidden);
     if(r&&canEditRec(r)){queue(col,r.id,{...clean(r),hidden:true,updated:Date.now()});logChange('delete',col,{name:r.name})}S.confirmReg='';render();return}
   const pb=ev.target.closest('[data-print]');if(pb){printReport(pb.dataset.print);return}
   const sgo=ev.target.closest('[data-sogo]');if(sgo&&APP){closePops();S.sel='__store';SO.want=sgo.dataset.sogo;SO.site=sgo.dataset.sogo;SO.form=null;S.justSaved=true;render();window.scrollTo({top:0});return}
