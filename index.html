@@ -1991,8 +1991,8 @@ function lastMonthEnd(){const d=new Date();d.setDate(0);return d.getFullYear()+'
 /* قفل الفواتير والحد اليومي — بيتظبطوا من الإعدادات (المدير) */
 const SO_LIM_DEF={store_lock_h:72,edit_limit:10};
 const soIntSet=(rows,k)=>{const x=(rows||[]).find(z=>z.key===k);const v=x&&/^\d+$/.test(String(x.value||''))?+x.value:SO_LIM_DEF[k];return v};
-function soLimFrom(rows){SO.editH=soIntSet(rows,'store_lock_h');SO.editLim=soIntSet(rows,'edit_limit');appLs('adc_lims_v1',{h:SO.editH,l:SO.editLim})}
-{const c=appLs('adc_lims_v1');if(c){SO.editH=c.h;SO.editLim=c.l}}
+function soLimFrom(rows){SO.editH=soIntSet(rows,'store_lock_h');SO.editLim=soIntSet(rows,'edit_limit');const x=(rows||[]).find(z=>z.key==='store_edit_any');SO.editAny=!!(x&&x.value==='1');appLs('adc_lims_v1',{h:SO.editH,l:SO.editLim,a:SO.editAny})}
+{const c=appLs('adc_lims_v1');if(c){SO.editH=c.h;SO.editLim=c.l;SO.editAny=!!c.a}}
 function limCard(){
   const m=SO.limMsg,h=soEditH(),l=quMax();SO.limMsg=null;
   const o=(v,t,cur)=>`<option value="${v}" ${v===cur?'selected':''}>${t}</option>`;
@@ -2005,19 +2005,20 @@ function limCard(){
     <div class="f"><label for="lim_h">تعديل أو حذف فاتورة المخزن مسموح للي سجّلها لمدة</label><select id="lim_h">${hs.map(([v,t])=>o(v,t,h)).join('')}</select></div>
     <div class="f"><label for="lim_l">عدد التعديلات والحذف في اليوم لكل مستخدم</label><select id="lim_l">${ls.map(([v,t])=>o(v,t,l)).join('')}</select></div>
   </div>
-  <p class="note">دلوقتي: ${h>0?'الفاتورة بتتقفل بعد <b>'+h+' ساعة</b>':'<b>الفواتير مش بتتقفل بالوقت</b>'} · ${l>0?'<b>'+l+'</b> تعديل وحذف في اليوم':'<b>التعديل والحذف من غير حد يومي</b>'}. (قفل الفترات والجرد شغالين زي ما هم.)</p>
+  <label class="chk" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="lim_any" ${SO.editAny?'checked':''}> فتح تعديل الفواتير لغير مسجّلها (أي حد عنده صلاحية على مخزن الموقع يعدّل الفواتير اللي سجّلها غيره) — اقفله لما تخلصوا التعديلات</label>
+  <p class="note">دلوقتي: ${h>0?'الفاتورة بتتقفل بعد <b>'+h+' ساعة</b>':'<b>الفواتير مش بتتقفل بالوقت</b>'} · ${l>0?'<b>'+l+'</b> تعديل وحذف في اليوم':'<b>التعديل والحذف من غير حد يومي</b>'}. ${SO.editAny?' · <b class="neg">تعديل الفواتير مفتوح لغير مسجّلها</b>':''} (قفل الفترات والجرد شغالين زي ما هم.)</p>
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}`;
 }
 async function limSet(k,v){
   if(!SB||!APPU.owner)return;
   const r=await SB.from('app_settings').upsert({key:k,value:String(v)},{onConflict:'key'});
   if(r.error)SO.limMsg={t:ctNetErr(r.error)?'الإعداد ده يحتاج اتصال بالإنترنت.':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100)};
-  else{if(k==='store_lock_h')SO.editH=v;else SO.editLim=v;appLs('adc_lims_v1',{h:soEditH(),l:quMax()});
-    const t=k==='store_lock_h'?(v>0?'قفل فواتير المخزن بقى بعد '+v+' ساعة':'فواتير المخزن مابقتش بتتقفل بالوقت'):(v>0?'الحد اليومي للتعديل والحذف بقى '+v:'التعديل والحذف بقى من غير حد يومي');
+  else{if(k==='store_lock_h')SO.editH=v;else if(k==='store_edit_any')SO.editAny=v==='1';else SO.editLim=v;appLs('adc_lims_v1',{h:soEditH(),l:quMax(),a:!!SO.editAny});
+    const t=k==='store_edit_any'?(v==='1'?'تعديل فواتير المخزن بقى مفتوح لغير مسجّلها':'تعديل فواتير المخزن رجع للي سجّلها بس'):k==='store_lock_h'?(v>0?'قفل فواتير المخزن بقى بعد '+v+' ساعة':'فواتير المخزن مابقتش بتتقفل بالوقت'):(v>0?'الحد اليومي للتعديل والحذف بقى '+v:'التعديل والحذف بقى من غير حد يومي');
     SO.limMsg={ok:1,t:t+'.'};logChange('edit','files',{details:t})}
   render();
 }
-document.addEventListener('change',ev=>{const t=ev.target;if(!t)return;if(t.id==='lim_h')limSet('store_lock_h',+t.value);else if(t.id==='lim_l')limSet('edit_limit',+t.value)});
+document.addEventListener('change',ev=>{const t=ev.target;if(!t)return;if(t.id==='lim_h')limSet('store_lock_h',+t.value);else if(t.id==='lim_l')limSet('edit_limit',+t.value);else if(t.id==='lim_any')limSet('store_edit_any',t.checked?'1':'')});
 function lockCard(){
   const m=SO.lockMsg;SO.lockMsg=null;
   return `<div class="sec-h" style="margin-top:14px">قفل الفترات</div>
@@ -2106,7 +2107,7 @@ function soLocked(m){const t=soTs(m);return (SO.d.moves||[]).some(c=>c.site_id==
 /* مدة قفل الفاتورة بالساعات من الإعدادات (app_settings «store_lock_h»، الافتراضي 72، 0 = من غير قفل). السيرفر بيطبّق نفس القاعدة */
 const soEditH=()=>SO.editH!=null?SO.editH:72;
 const soAgeOk=m=>m.kind!=='in'||!m.created_at||soEditH()<=0||Date.now()-Date.parse(m.created_at)<soEditH()*3600e3;
-function soCanEdit(m){return soCanAppr(m.site_id)||(m.created_by===soMe()&&!soLocked(m)&&!isLocked(m.date)&&soAgeOk(m))}
+function soCanEdit(m){return soCanAppr(m.site_id)||((m.created_by===soMe()||!!SO.editAny)&&!soLocked(m)&&!isLocked(m.date)&&soAgeOk(m))}
 function soLockWhy(m){return isLocked(m.date)?'الفترة مقفولة':soLocked(m)?'مقفول بعد جرد لاحق':!soAgeOk(m)?'عدّى '+soEditH()+' ساعة — التعديل للمدير أو صاحب الموقع':'للي سجّله بس'}
 /* ---------- invoices: lines of one bon (or same date + supplier + invoice no.) ---------- */
 const soInvKey=m=>{const d=m.data||{};return (m.kind==='ret'?'r':'')+(d.bon?'b:'+d.bon:'x:'+m.date+'|'+soNorm(d.supplier)+'|'+soNorm(d.inv))};
@@ -2582,9 +2583,9 @@ function soRenderPage(){
   ${appr?soEnableHTML(sites)+appRegSummary(ctMySites(),'store'):''}`;
   if(site)soBindForm(site);
   const ss=$('#so_site');if(ss)ss.onchange=()=>{SO.site=ss.value;SO.form=null;SO.imp=null;render()};
-  for(const [id,k] of [['so_rmain','main'],['so_rsub','sub'],['so_rfrom','from'],['so_rto','to']]){const e=document.getElementById(id);if(e)e.onchange=()=>{SO.rep[k]=e.value;if(k==='main')SO.rep.sub='';render()}}
+  for(const [id,k] of [['so_rmain','main'],['so_rsub','sub'],['so_rfrom','from'],['so_rto','to']]){const e=document.getElementById(id);if(!e)continue;if(e.type==='date')dfBind(e,v=>{SO.rep[k]=v;render()});else e.onchange=()=>{SO.rep[k]=e.value;if(k==='main')SO.rep.sub='';render()}}
   const rs=$('#so_rsup');if(rs)rs.onchange=()=>{SO.rep.sup=rs.value;render()};
-  const md=$('#so_mdate');if(md)md.onchange=()=>{SO.mf.date=md.value;render()};
+  dfBind($('#so_mdate'),v=>{SO.mf.date=v;render()});
   const mq=$('#so_mq');if(mq)mq.onchange=()=>{SO.mf.q=mq.value;render()};
   const gp=$('#so_gp');if(gp)gp.onchange=()=>{SO.grantP=gp.value;render()};
   for(const [id,k] of [['soCatBox','openCat'],['soEnBox','openEn']]){const b=document.getElementById(id);if(b)b.ontoggle=()=>{if(SO[k]===b.open)return;SO[k]=b.open}}
@@ -3894,7 +3895,7 @@ function spRenderPage(){
   ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>`:'<div class="card blank" style="padding:24px"><p>اختار الاسم علشان الكشف يظهر.</p></div>'}
   ${spAliasCard()}`;
   const on=(id,k,re)=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SP[k]=e.value;if(re)re();render()}};
-  on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_grp','gname');on('sp_party','party',()=>{SP.name=''});on('sp_from','from');on('sp_to','to');
+  on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_grp','gname');on('sp_party','party',()=>{SP.name=''});dfBind(document.getElementById('sp_from'),v=>{SP.from=v;render()});dfBind(document.getElementById('sp_to'),v=>{SP.to=v;render()});
 }
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-sp]');if(!b)return;const a=b.dataset.sp;
   if(a==='type'){SP.type=b.dataset.v;SP.name='';SP.item='';render()}else if(a==='mode'){SP.mode=b.dataset.v;render()}
@@ -4586,6 +4587,10 @@ document.addEventListener('click',ev=>{
   const k=ev.target.closest('[data-pcok]');if(k){S.pcOk=k.dataset.pcok;const f=$('#entryForm');if(f)f.requestSubmit();return}
   if(ev.target.closest('[data-pcdate]')){const d=$('#e_date');if(d)d.focus();return}
 });
+/* فلاتر التاريخ: مانعيدش رسم الصفحة مع كل جزء بيتكتب من التاريخ (يوم/شهر/سنة) — بنستنى لما التاريخ يكمل والكتابة تقف، أو الخروج من الخانة، أو Enter */
+function dfBind(el,apply){if(!el)return;let t=0,last=el.value;
+  const go=()=>{clearTimeout(t);const v=el.value;if(v===last)return;if(v&&!/^\d{4}-\d{2}-\d{2}$/.test(v))return;last=v;apply(v)};
+  el.onchange=()=>{clearTimeout(t);t=setTimeout(go,1200)};el.oninput=el.onchange;el.onblur=go;el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}}
 function bindSite(site){
   const form=$('#entryForm');
   if(form)form.onsubmit=async ev=>{
@@ -4640,7 +4645,7 @@ function bindSite(site){
   const mb=$('#moreBox');if(mb)mb.ontoggle=()=>{S.moreOpen=mb.open};
   if(S.lastMsg){S.flash={text:S.lastMsg,until:Date.now()+8000};S.lastMsg=''}
   if(S.flash&&S.flash.until>Date.now()&&$('#formMsg')){$('#formMsg').className='msg ok';$('#formMsg').textContent=S.flash.text}
-  const setF=(k,id)=>{const el=$(id);if(el)el.onchange=()=>{S.filt[k]=el.value;S.siteLim=20;render()}};
+  const setF=(k,id)=>{const el=$(id);if(!el)return;if(el.type==='date')dfBind(el,v=>{S.filt[k]=v;S.siteLim=20;render()});else el.onchange=()=>{S.filt[k]=el.value;S.siteLim=20;render()}};
   setF('k','#f_k');setF('c','#f_c');setF('i','#f_i');setF('from','#f_from');setF('to','#f_to');setF('q','#f_q');
   const cf=$('#clearF');if(cf)cf.onclick=()=>{S.filt={c:'',i:'',from:'',to:'',q:''};S.siteLim=20;S.rvPick=new Set();render()};
   {const list=filtered(S.exp.filter(e=>e.siteId===site.id),'exp'),LIM=S.siteLim||20,rvPick=S.rvPick||(S.rvPick=new Set());const on=$('#rvOn');if(on)on.onclick=()=>{S.filt.rv=true;S.rvPick=new Set();render()};const off=$('#rvOff');if(off)off.onclick=()=>{S.filt.rv=false;S.rvPick=new Set();render()};
@@ -4760,7 +4765,7 @@ function renderJournal(){
 function bindJournal(){
   const on=(id,ev,fn)=>{const el=$(id);if(el)el[ev]=fn};
   on('#exportAll','onclick',()=>exportExcel(null));
-  const setF=(k,id)=>on(id,'onchange',e=>{S.jf[k]=e.target.value;S.jLimit=200;render()});
+  const setF=(k,id)=>{const el=$(id);if(el&&el.type==='date')dfBind(el,v=>{S.jf[k]=v;S.jLimit=200;render()});else on(id,'onchange',e=>{S.jf[k]=e.target.value;S.jLimit=200;render()})};
   setF('site','#jf_site');setF('type','#jf_type');setF('from','#jf_from');setF('to','#jf_to');setF('q','#jf_q');
   on('#jfClear','onclick',()=>{S.jf={site:'',type:'',from:'',to:'',q:''};render()});
   on('#jMore','onclick',()=>{S.jLimit+=200;render()});
@@ -5771,7 +5776,7 @@ function renderStatement(col,name){
   ${rows.length?`<div class="breakdowns"><div class="card"><div class="sec-h">حسب الموقع</div>${barsHTML(bySite)}</div><div class="card"><div class="sec-h">حسب ${col==='contractors'?'البند':'المقاول'}</div>${barsHTML(byOther)}</div></div>`:''}`;
   const on=(id,ev,fn)=>{const el=$(id);if(el)el[ev]=fn};
   on('#stmtBack','onclick',()=>{S.stmt=null;render()});
-  const setF=(k,id)=>on(id,'onchange',e=>{S.sf[k]=e.target.value;render()});setF('site','#sf_site');setF('from','#sf_from');setF('to','#sf_to');
+  const setF=(k,id)=>{const el=$(id);if(el&&el.type==='date')dfBind(el,v=>{S.sf[k]=v;render()});else on(id,'onchange',e=>{S.sf[k]=e.target.value;render()})};setF('site','#sf_site');setF('from','#sf_from');setF('to','#sf_to');
   on('#sfClear','onclick',()=>{S.sf={site:'',from:'',to:''};render()});
   on('#stmtXl','onclick',()=>exportStatement(col,name));
 }
