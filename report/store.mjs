@@ -14,6 +14,8 @@ function calc(moves, from, to) {
     if (to && m.date > to) break;
     const inP = !from || m.date >= from, d = m.data || {};
     if (m.kind === 'in') { if (!d.item) continue; const r = g(d.item), q = num(d.qty); start(r, inP); r.bal += q; if (inP) { r.inQ += q; r.ins.push(m); } }
+    else if (m.kind === 'ret') { if (!d.item) continue; const r = g(d.item), q = num(d.qty); start(r, inP); r.bal -= q; if (inP) r.inQ -= q; }
+    else if (m.kind !== 'count') continue;
     else for (const [id, v] of Object.entries(d.lines || {})) {
       if (v === '' || v == null || isNaN(+v)) continue;
       const r = g(id), c = +v, diff = r.bal - c; start(r, inP);
@@ -88,6 +90,7 @@ export function storeReport({ sites, moves, items, from, to, since, until, siteN
     </tbody></table>
     ${low.length ? `<p class="warn">رصيد بالسالب (يحتاج جرد أو مراجعة): ${low.map(x => esc(x.it.name)).join('، ')}</p>` : ''}
     ${ins.length ? invTable(ins, label, unit, invNos(ms)) : '<p>لا توجد توريدات هذا الأسبوع.</p>'}
+    ${(() => { const cr = ms.filter(m => !m.deleted && (m.kind === 'ret' || m.kind === 'cn') && (!from || m.date >= from) && (!to || m.date <= to)).sort((a, b) => (a.date || '').localeCompare(b.date || '')); if (!cr.length) return ''; return `<h3>مرتجعات وإشعارات خصم الأسبوع</h3><table><thead><tr><th>التاريخ</th><th>النوع</th><th>المورد</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${cr.map(m => { const d = m.data || {}, v = m.kind === 'cn' ? num(d.amount) : num(d.qty) * num(d.price); return `<tr><td class="n">${esc(m.date)}</td><td>${m.kind === 'cn' ? 'إشعار خصم' : 'مرتجع'}</td><td class="tl">${esc(d.supplier || '')}${d.supPend ? ' (مستني التسجيل)' : ''}</td><td class="tl">${m.kind === 'cn' ? esc(d.notes || d.inv || '') : esc(label(d.item)) + ' · ' + fmt(num(d.qty)) + ' ' + esc(unit(d.item))}</td><td class="n">(${fmt(r2(v))})</td></tr>`; }).join('')}</tbody></table>`; })()}
     ${counts.length ? `<h3>جرد الأسبوع</h3><table><thead><tr><th>التاريخ</th><th>الخامة</th><th>الوحدة</th><th>الرصيد الدفتري</th><th>الموجود فعلًا</th><th>المنصرف</th></tr></thead><tbody>${counts.map(c => `<tr><td class="n">${esc(c.date)}</td><td class="tl">${esc(label(c.id))}</td><td>${esc(unit(c.id))}</td><td class="n">${fmt(c.book)}</td><td class="n b">${fmt(c.actual)}</td><td class="n">${c.adj ? 'رصيد افتتاحي' : fmt(c.out)}</td></tr>`).join('')}</tbody></table>` : '<p>لم يتم جرد هذا الأسبوع.</p>'}
     </section>`);
   }
