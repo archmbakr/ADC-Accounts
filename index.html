@@ -1441,7 +1441,8 @@ function appRenderCustEng(){
     <div class="stat"><div class="l">المتبقي معك</div><div class="v bal${s.left<0?' neg':''}">${fmt(s.left)}<small>${CUR}</small></div><div class="split"><span>بعد المراجعة <b>${fmt(s.avail)}</b></span>${s.returned?`<span>مردود <b>${fmt(s.returned)}</b></span>`:''}</div></div>
   </div>
   ${custDraftCard(rows.filter(r=>r.kind==='claim'&&r.status==='draft'),false)}
-  ${sites.size?`<div class="card entry-card" id="enCard"><div class="sec-h">${CU.edit?'تعديل مصروف في المسودة':'تسجيل مصروف من العهدة'}</div>
+  ${sites.size&&CU.imp&&!CU.edit?cxHTML(sites.get(enS)):''}
+  ${sites.size?`<div class="card entry-card" id="enCard"><div class="sec-h" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>${CU.edit?'تعديل مصروف في المسودة':'تسجيل مصروف من العهدة'}</span>${!CU.edit&&!CU.imp?'<button type="button" class="ghost" data-cx="open" style="margin-inline-start:auto">📥 استيراد من Excel</button>':''}</div>
   <form id="enForm" class="entry" novalidate>
     <div class="f c2"><label for="en_site">الموقع</label><select id="en_site">${[...sites.values()].map(x=>`<option value="${esc(x.id)}" ${x.id===CU.enSite?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
     <div class="f c1"><label for="en_amount">المبلغ (${CUR})</label><input id="en_amount" data-words type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"><small class="amt-w" id="en_amount_w"></small></div>
@@ -3134,6 +3135,121 @@ function soFollow(siteId){
 
 /* قائمة الخامات: الضغط على البند الرئيسي بيفتح/يقفل الخامات اللي تحته */
 document.addEventListener('click',ev=>{const h=ev.target.closest('[data-cattog]');if(!h||ev.target.closest('button,input,select,label,.filebtn,a'))return;const id=h.dataset.cattog;if(!soSubs(id).length)return;if(SO.catOpen.has(id))SO.catOpen.delete(id);else SO.catOpen.add(id);render()});
+/* ---------- نموذج Excel لمصروفات العهدة: المهندس يملأه ويرفعه، والمصروفات تدخل «مسودة التصفية» ---------- */
+const CX_N=150,CX_FIRST=6,CX_METH=[['cash','نقدي'],['transfer','تحويل'],['bank','بنك']];
+function cxSites(){const me=APPU.me||{},m=new Map();for(const r of custMerged().filter(r=>r.engineer===me.id&&r.kind==='issue'))m.set(r.site_id,{id:r.site_id,name:(r.data||{}).siteName||siteNameOf(r.site_id),manager:r.manager});return m}
+function cxItems(siteId){return (typeof siteItems==='function'?siteItems(siteId):regNames('items').map(x=>x.name)).filter(Boolean)}
+function cxTemplate(site){
+  const C=SOX.col,LS="'القوائم'",its=cxItems(site.id),regs=typeof regsFor==='function'?regsFor(site.id):[];
+  const put=(sh,ref,v,s)=>{sh.cells[ref]={v,s}};
+  const lists={name:'القوائم',cells:{},cols:[34,4,30,4,12],merges:[],dv:[]};
+  put(lists,'A1','البنود',3);its.forEach((v,i)=>put(lists,'A'+(i+2),v));
+  put(lists,'C1','المقاولون والموردون',3);regs.forEach((x,i)=>put(lists,'C'+(i+2),x.name));
+  put(lists,'E1','طريقة الدفع',3);CX_METH.forEach(([,t],i)=>put(lists,'E'+(i+2),t));
+  const F=CX_FIRST,L=F+CX_N-1,T=L+1;
+  const sh={name:'مصروفات العهدة',cells:{},cols:[6,13,26,24,34,14,12,24,34],merges:['A1:I1','A2:I2','A3:B3','C3:E3',`A${T}:E${T}`],dv:[],freeze:'A'+F,heights:{1:26,2:30,5:24},active:true,fit:true};
+  put(sh,'A1','مصروفات العهدة — '+site.name,1);
+  put(sh,'A2','سجّل كل مصروف في سطر. البند والمقاول/المورد وطريقة الدفع من القوائم. بعد الملء ارفع الملف من صفحة «عهدتي» في التطبيق، وستدخل المصروفات «مسودة التصفية» لتراجعها قبل الإرسال.',2);
+  put(sh,'A3','الموقع',3);put(sh,'B3','',3);put(sh,'C3',site.name,4);put(sh,'D3','',4);put(sh,'E3','',4);
+  ['م','التاريخ *','البند *','المقاول / المورد','البيان *','المبلغ *','طريقة الدفع','ملاحظات','تنبيه'].forEach((h,i)=>put(sh,C(i)+5,h,7));
+  for(let r=F;r<=L;r++){
+    sh.cells['A'+r]={f:`IF(AND(B${r}="",C${r}="",F${r}=""),"",ROW()-${F-1})`,s:10};
+    put(sh,'B'+r,'',5);put(sh,'C'+r,'',8);put(sh,'D'+r,'',8);put(sh,'E'+r,'',8);put(sh,'F'+r,'',9);put(sh,'G'+r,'',8);put(sh,'H'+r,'',8);
+    const sup=`ISNUMBER(SEARCH("توريد",C${r}))`;
+    sh.cells['I'+r]={f:`IF(AND(B${r}="",C${r}="",F${r}=""),"",TRIM(IF(AND(C${r}<>"",ISNA(MATCH(C${r},${LS}!$A$2:$A$2000,0))),"⚠ البند غير موجود في القائمة  ","")&IF(AND(${sup},D${r}=""),"⚠ اختر المورد  ","")&IF(AND(D${r}<>"",ISNA(MATCH(D${r},${LS}!$C$2:$C$2000,0))),"ℹ اسم جديد يُرسل لصاحب الموقع  ","")&IF(AND(${sup},N(F${r})>${CU_INV_MIN}),"📎 أضف صورة الفاتورة بعد الرفع","")))`,s:13};
+  }
+  put(sh,'A'+T,'الإجمالي',14);for(const c of 'BCDE')put(sh,c+T,'',14);sh.cells['F'+T]={f:`SUM(F${F}:F${L})`,s:14};for(const c of 'GHI')put(sh,c+T,'',14);
+  sh.dv=[{type:'date',op:'greaterThan',sqref:`B${F}:B${L}`,f1:'36526',title:'التاريخ',msg:'اكتب تاريخًا صحيحًا، مثال 2026-10-15'},
+    {type:'list',sqref:`C${F}:C${L}`,f1:`${LS}!$A$2:$A$2000`,title:'البند',msg:'اختر البند من القائمة. إذا لم يكن موجودًا فاطلب من صاحب الموقع إضافته.'},
+    {type:'list',sqref:`D${F}:D${L}`,f1:`${LS}!$C$2:$C$2000`,style:'warning',title:'اسم غير موجود في القائمة',msg:'هذا الاسم غير مسجّل. إذا أكملت فسيُرسل إلى صاحب الموقع ليسجّله أو يربطه بمقاول/مورد مسجّل.'},
+    {type:'decimal',op:'greaterThan',sqref:`F${F}:F${L}`,f1:'0',msg:'اكتب المبلغ رقمًا أكبر من صفر.'},
+    {type:'list',sqref:`G${F}:G${L}`,f1:`${LS}!$E$2:$E$4`,msg:'اختر طريقة الدفع من القائمة.'}];
+  const how={name:'طريقة الاستخدام',cells:{},cols:[110],merges:[],dv:[]};
+  ['طريقة ملء النموذج',
+   '1) هذا النموذج لموقع «'+site.name+'» فقط. لموقع آخر نزّل نموذجه من التطبيق.',
+   '2) كل مصروف في سطر: التاريخ، والبند من القائمة، والبيان، والمبلغ. طريقة الدفع إذا تُركت فارغة تُسجَّل «نقدي».',
+   '3) المقاول/المورد: اختره من القائمة. وهو إجباري في بنود التوريد. إذا لم يكن الاسم في القائمة فاكتبه يدويًا، وسيُرسل إلى صاحب الموقع ليسجّله.',
+   '4) مصروف التوريد الذي يزيد على '+CU_INV_MIN+' ج.م يحتاج صورة الفاتورة: بعد رفع الملف افتح «تعديل» لهذا المصروف في المسودة وأضف الصورة قبل إرسال التصفية.',
+   '5) عمود «تنبيه» يوضح المشكلات قبل الرفع، والتطبيق يراجع كل سطر مرة أخرى عند الرفع.',
+   '6) الرفع لا يرسل شيئًا لصاحب الموقع: المصروفات تدخل «مسودة التصفية»، وتراجعها وتعدّلها، ثم تضغط «إرسال التصفية للمراجعة».',
+   '7) ورقة «القوائم» يملؤها التطبيق وقت تنزيل النموذج — لا تعدّل فيها.'].forEach((t,i)=>put(how,'A'+(i+1),t,i?0:15));
+  return SOX.build([sh,how,lists]);
+}
+function cxParse(sheets,site,existing){
+  const norm=v=>String(v??'').replace(/[*\s]+/g,' ').trim();
+  let rows=null,hr=-1,col={},fileSite='';
+  for(const s of sheets){if(/القوائم|طريقة/.test(s.name||''))continue;const R=s.rows||[];
+    for(let r=0;r<Math.min(R.length,15);r++){const t=(R[r]||[]).map(norm);
+      const li=t.findIndex(x=>x==='الموقع');if(li>=0){for(let j=li+1;j<t.length;j++)if(t[j]){fileSite=t[j];break}}
+      if(t.some(x=>/^المبلغ/.test(x))&&t.some(x=>/^البند/.test(x))&&t.some(x=>/^التاريخ/.test(x))){hr=r;rows=R;
+        t.forEach((x,i)=>{if(/^التاريخ/.test(x))col.date=i;else if(/^البند/.test(x))col.item=i;else if(/المقاول|المورد/.test(x))col.con=i;else if(/^البيان/.test(x))col.notes=i;else if(/^المبلغ/.test(x))col.amt=i;else if(/طريقة/.test(x))col.meth=i;else if(/ملاحظ/.test(x))col.rem=i});break}}
+    if(rows)break}
+  if(!rows)return {err:'الملف ليس بشكل نموذج مصروفات العهدة. نزّل النموذج من زر «تنزيل النموذج» واملأه.'};
+  if(fileSite&&soNorm(fileSite)!==soNorm(site.name))return {err:'هذا الملف لموقع «'+fileSite+'»، والموقع المختار في التطبيق «'+site.name+'». اختر الموقع الصحيح أو نزّل نموذج هذا الموقع.'};
+  const g=(row,k)=>col[k]===undefined?'':row[col[k]],its=cxItems(site.id),RG=typeof regsFor==='function'?regsFor(site.id):[],out=[];
+  for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[];
+    if(row.some(v=>/^الإجمالي/.test(norm(v))))break;
+    const raw={date:g(row,'date'),item:norm(g(row,'item')),con:norm(g(row,'con')),notes:norm(g(row,'notes')),amt:g(row,'amt'),meth:norm(g(row,'meth')),rem:norm(g(row,'rem'))};
+    if(!String(raw.date??'').trim()&&!raw.item&&!raw.notes&&String(raw.amt??'').trim()===''&&!raw.con)continue;
+    const L={n:r+1,raw,errs:[]};
+    L.d=parseDate(raw.date);if(!L.d)L.errs.push('التاريخ');else if(isLocked(L.d))L.errs.push('الفترة حتى '+SO.lock+' مقفولة');
+    L.a=parseAmount(raw.amt);if(!(L.a>0))L.errs.push('المبلغ');
+    if(!raw.item)L.errs.push('البند');else{const h=its.find(x=>soNorm(x)===soNorm(raw.item));if(h)L.item=h;else L.errs.push('البند «'+raw.item+'» غير موجود في بنود الموقع')}
+    if(!raw.notes)L.errs.push('البيان');L.notes=raw.notes;L.rem=raw.rem;
+    if(raw.con){const h=regFind(RG,raw.con);if(h)L.con=h.name;else{L.con=raw.con;L.pend=true}}
+    else if(/توريد/.test(L.item||raw.item))L.errs.push('المورد (بند توريد)');
+    const m=CX_METH.find(([v,t])=>!raw.meth||soNorm(t)===soNorm(raw.meth)||v===raw.meth);if(m)L.meth=raw.meth?m[0]:'cash';else L.errs.push('طريقة الدفع «'+raw.meth+'»');
+    L.inv=!L.errs.length&&custNeedInv(L.item,L.a);
+    if(!L.errs.length){
+      if(existing.some(x=>x.kind==='claim'&&x.status!=='rejected'&&x.site_id===site.id&&Math.abs((+x.data.amount||0)-L.a)<0.005&&Math.abs(Date.parse(x.data.date)-Date.parse(L.d))<=2*864e5))L.dup='قد يكون مسجّلًا من قبل';
+      else if(out.some(x=>!x.errs.length&&x.d===L.d&&Math.abs(x.a-L.a)<0.005&&x.item===L.item))L.dup='مكرر في الملف';
+    }
+    out.push(L);
+  }
+  if(!out.length)return {err:'لا يوجد أي مصروف مكتوب في الملف.'};
+  return {lines:out};
+}
+function cxHTML(site){
+  const I=CU.imp;if(!I)return '';const m=I.msg,L=I.lines||[],bad=L.filter(x=>x.errs.length),dups=L.filter(x=>x.dup&&!x.errs.length),use=L.filter(x=>!x.errs.length&&(!x.dup||I.keepDup)),inv=use.filter(x=>x.inv).length,tot=r2(use.reduce((a,x)=>a+x.a,0));
+  const tag=x=>x.errs.length?`<span class="neg">❌ ${esc(x.errs.join('، '))}</span>`:x.dup?`<span class="pill-over">مكرر: ${esc(x.dup)}</span>`:`<span class="pill-ok">✓</span>${x.inv?' <span class="pill-none">📎 يحتاج صورة الفاتورة</span>':''}${x.pend?' <span class="pill-none">🆕 اسم جديد</span>':''}`;
+  return `<div class="card entry-card" id="cxCard"><div class="sec-h">استيراد مصروفات العهدة من Excel — ${esc(site.name)}</div>
+    <div class="row"><span class="filebtn"><button type="button" class="primary">اختر الملف</button><input type="file" id="cxFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="ملف مصروفات العهدة"></span><button type="button" data-cx="tpl">تنزيل النموذج</button><button type="button" class="ghost" data-cx="close">إلغاء</button></div>
+    ${m?`<p class="msg ${m.ok?'ok':'err'}" style="white-space:pre-line">${esc(m.t)}</p>`:''}
+    ${L.length?`<p>${L.length} مصروف في الملف: <b>${L.length-bad.length-dups.length}</b> جاهز${dups.length?` · <b>${dups.length}</b> مكرر`:''}${bad.length?` · <b class="neg">${bad.length} فيه أخطاء</b>`:''}</p>
+    <div class="tbl-wrap"><table><thead><tr><th>السطر</th><th>التاريخ</th><th>البند</th><th>المقاول / المورد</th><th>البيان</th><th class="num">المبلغ</th><th>الحالة</th></tr></thead><tbody>
+    ${L.map(x=>`<tr${x.errs.length?' class="bad"':''}><td>${x.n}</td><td class="date">${esc(x.d||String(x.raw.date??''))}</td><td>${esc(x.item||x.raw.item)}</td><td>${esc(x.con||'')}</td><td>${esc(x.notes||'')}</td><td class="num">${x.a>0?fmt(x.a):esc(String(x.raw.amt??''))}</td><td>${tag(x)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${dups.length?`<label class="chk"><input type="checkbox" id="cxDup" ${I.keepDup?'checked':''}> سجّل المصروفات المكررة أيضًا</label>`:''}
+    ${inv?`<p class="note">📎 ${inv} ${inv===1?'مصروف توريد':'مصروفات توريد'} فوق ${CU_INV_MIN} ج.م: بعد الإضافة افتح «تعديل» في المسودة وأضف صورة الفاتورة قبل إرسال التصفية.</p>`:''}
+    <div class="form-foot">${bad.length?'<span class="msg err">صحّح الأخطاء في الملف وارفعه مرة أخرى. لم يُضف أي شيء.</span>':`<button class="primary" type="button" data-cx="save" ${use.length?'':'disabled'}>إضافة ${use.length} ${use.length===1?'مصروف':'مصروفات'} (${fmt(tot)} ${CUR}) إلى المسودة</button>`}</div>`
+    :'<p class="note">نزّل النموذج واملأه (كل مصروف في سطر)، ثم اختر الملف. ستظهر المصروفات هنا للمراجعة، ولن يُضاف شيء إلا بعد الضغط على «إضافة إلى المسودة». الإضافة لا ترسل التصفية.</p>'}
+  </div>`;
+}
+function cxSave(site){
+  const I=CU.imp;if(!I||!I.lines)return;const me=APPU.me||{},sv=cxSites().get(site.id);
+  const use=I.lines.filter(x=>!x.errs.length&&(!x.dup||I.keepDup));if(!use.length)return;
+  const at=Date.now();let k=0;
+  for(const x of use){const nd={amount:x.a,date:x.d,item:x.item,contractor:x.con||'',notes:x.notes,method:x.meth||'cash',remarks:x.rem||'',receipt:'',receiptType:'',siteName:site.name,engName:me.name||'',imported:true,at:at+(k++)};
+    if(x.pend)nd.conPend=true;
+    custPut({id:'c'+newId(),kind:'claim',engineer:me.id,manager:sv?sv.manager:null,site_id:site.id,status:'draft',data:nd})}
+  const inv=use.filter(x=>x.inv).length;
+  CU.imp=null;CU.claimMsg={ok:1,t:'أُضيف '+use.length+(use.length===1?' مصروف':' مصروفات')+' إلى مسودة التصفية.'+(inv?' منها '+inv+' تحتاج صورة الفاتورة: اضغط «تعديل» وأضف الصورة قبل الإرسال.':' راجعها ثم اضغط «إرسال التصفية للمراجعة».')};
+  S.justSaved=true;render();
+}
+document.addEventListener('click',async ev=>{
+  const b=ev.target.closest('[data-cx]');if(!b)return;const a=b.dataset.cx,sites=cxSites(),sid=CU.enSite&&sites.has(CU.enSite)?CU.enSite:[...sites.keys()][0],site=sid&&sites.get(sid);if(!site)return;
+  if(a==='open'){CU.imp={};render();const c=$('#cxCard');if(c)c.scrollIntoView({block:'start'});return}
+  if(a==='close'){CU.imp=null;render();return}
+  if(a==='tpl'){try{await saveFile(safeName('نموذج مصروفات العهدة - '+site.name)+'.xlsx',cxTemplate(site))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تجهيز النموذج.',1)}return}
+  if(a==='save'){b.disabled=true;cxSave(site);return}
+});
+document.addEventListener('change',async ev=>{
+  const t=ev.target;if(!t)return;
+  if(t.id==='cxFile'){const f=t.files&&t.files[0];t.value='';const sites=cxSites(),sid=CU.enSite&&sites.has(CU.enSite)?CU.enSite:[...sites.keys()][0],site=sid&&sites.get(sid);if(!f||!site)return;
+    let sheets;try{sheets=await XLSX_R.readAll(await f.arrayBuffer())}catch(e){CU.imp={msg:{t:'تعذّرت قراءة الملف. تأكد أنه ملف Excel ‏(.xlsx).'}};return render()}
+    const me=APPU.me||{},p=cxParse(sheets,site,custMerged().filter(r=>r.engineer===me.id));CU.imp={lines:p.lines||[],msg:p.err?{t:p.err}:null,keepDup:false};render();const c=$('#cxCard');if(c)c.scrollIntoView({block:'start'})}
+  if(t.id==='cxDup'&&CU.imp){CU.imp.keepDup=t.checked;render()}
+});
 
 /* ===== المدير: النسخ الاحتياطي + المديرين الاحتياطيين + المساحة (للمدير بس) ===== */
 const ADM={busy:false,at:0,owners:null,usage:null,dev:null,bk:null,req:null,missing:false,msg:null,ownMsg:null};
