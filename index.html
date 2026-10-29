@@ -788,7 +788,10 @@ document.addEventListener('click',async ev=>{
 const pColOf=p=>p.slice(0,p.lastIndexOf('/')),pIdOf=p=>p.slice(p.lastIndexOf('/')+1);
 const APPLIS=new Map();
 let APPCH=null,appLastAll=0;
-async function appHasSes(){try{return !!(SB&&(await SB.auth.getSession()).data.session)}catch(e){return false}}
+/* النت الضعيف: أي تحميل من السيرفر ليه حد زمني، وبعده نكمّل بالنسخة المحفوظة على الجهاز بدل «جاري التحميل» على طول */
+const NET_MS=8000;
+function netTO(p,ms){let t;return Promise.race([p,new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error('timeout')),ms||NET_MS)})]).finally(()=>clearTimeout(t))}
+async function appHasSes(){try{return !!(SB&&(await netTO(SB.auth.getSession(),4000)).data.session)}catch(e){return false}}
 function sbErr(e){const c=String(e&&e.code||''),m=String(e&&e.message||'');
   if(c==='42501'||/row-level security|permission denied/i.test(m))return {code:'invalid_argument'};
   if(/JWT|token/i.test(m))return {code:'unauthenticated'};
@@ -827,7 +830,7 @@ function appChannel(){
     appSchedEmit(col);
   }).subscribe(st=>{if(st==='SUBSCRIBED')appRefreshAll(true)});
 }
-window.addEventListener('online',()=>appRefreshAll(true));
+window.addEventListener('online',()=>{appRefreshAll(true);setTimeout(()=>{const L=[];if(CU.netFail)L.push(custLoad());if(CT.netFail)L.push(ctLoad());if(typeof SO!=='undefined'&&SO.netFail)L.push(soLoad());if(L.length)Promise.all(L.map(p=>p.catch(()=>{}))).then(()=>{try{render()}catch(e){}})},1500)});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')appRefreshAll(false)});
 const APPDB={
   collection(col){
@@ -1127,10 +1130,12 @@ function custMerged(){
   for(const op of custQ()){if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}
   return [...m.values()];
 }
-async function custLoad(){
-  if(!SB||!navigator.onLine||!(await appHasSes())){const c=appLs(LS_CUST);if(c)CU.rows=c;CU.loaded=true;return}
-  try{const {data,error}=await SB.from('custody').select('*').order('updated_at',{ascending:true}).limit(5000);
-    if(!error){CU.rows=data||[];appLs(LS_CUST,CU.rows);CU.missing=false}else if(/custody|relation|does not exist|schema cache/i.test(error.message||''))CU.missing=true}catch(e){}
+function custLoad(){if(CU._ld)return CU._ld;CU._ld=custLoad0().finally(()=>{CU._ld=null});return CU._ld}
+async function custLoad0(){
+  if(!SB||!navigator.onLine||!(await appHasSes())){const c=appLs(LS_CUST);if(c)CU.rows=c;CU.noData=!c;CU.netFail=true;CU.loaded=true;return}
+  let ok=false;try{const {data,error}=await netTO(SB.from('custody').select('*').order('updated_at',{ascending:true}).limit(5000));
+    if(!error){CU.rows=data||[];appLs(LS_CUST,CU.rows);CU.missing=false;ok=true}else if(/custody|relation|does not exist|schema cache/i.test(error.message||'')){CU.missing=true;ok=true}}catch(e){}
+  if(!ok){const c=appLs(LS_CUST);if(c&&!(CU.rows||[]).length)CU.rows=c;CU.noData=!c&&!(CU.rows||[]).length}else CU.noData=false;CU.netFail=!ok;
   CU.loaded=true;
 }
 async function custEngs(){
@@ -1414,10 +1419,10 @@ function appRenderEngineer(){
   if(isSiteEngR(r))tabs.push(['cust','عهدتي']);
   if(isTechR(r))tabs.push(['certs','المستخلصات']);
   if(isTechR(r))tabs.push(['stmts','الكشوف']);
-  if(r==='store'||soHasAccess())tabs.push(['store','المخزن']);
+  if(r==='store'||soHasAccess()||(SO.noData&&['engineer','tech','eng_tech'].includes(r)))tabs.push(['store','المخزن']);
   const tab=tabs.some(t=>t[0]===CT.tab)?CT.tab:(tabs[0]||['store'])[0];
   if(typeof engNotices==='function'&&tab!=='stmts'){}
-  if(tab==='stmts'){if(!CT.loaded||!SO.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';Promise.all([CT.loaded?0:ctLoad(),SO.loaded?0:soLoad()]).then(()=>render())}else spRenderPage()}
+  if(tab==='stmts'){if(!CT.loaded||!SO.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';Promise.all([CT.loaded?0:ctLoad().catch(()=>{CT.loaded=true}),SO.loaded?0:soLoad().catch(()=>{SO.loaded=true})]).then(()=>render())}else spRenderPage()}
   else if(tab==='certs')ctRenderEngineer();else if(tab==='store')soRenderPage();else appRenderCustEng();
   if(typeof engNotices==='function'){const en=engNotices();if(en)$('#pane').insertAdjacentHTML('afterbegin',en)}
   if(tabs.length>1)$('#pane').insertAdjacentHTML('afterbegin',`<div class="seg eng-tabs" role="tablist">${tabs.map(([v,t])=>`<button role="tab" data-ct="tab" data-v="${v}" aria-selected="${tab===v}">${t}</button>`).join('')}</div>`);
@@ -1505,19 +1510,21 @@ const LS_CT='adc_ct_cache_v1',LS_CTQ='adc_ct_q_v1';
 const ctQ=()=>appLs(LS_CTQ)||[];
 function ctMerged(){const m=new Map((CT.srv||[]).map(r=>[r.id,r]));for(const op of ctQ()){if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}return [...m.values()]}
 function ctFromCache(){const c=appLs(LS_CT);if(c){CT.srv=c.rows||[];CT.access=c.access||[];CT.ret=c.ret||[];CT.boq=c.boq||[];if(c.paid)CT.paid=c.paid}}
-async function ctLoad(){
+function ctLoad(){if(CT._ld)return CT._ld;CT._ld=ctLoad0().finally(()=>{CT._ld=null});return CT._ld}
+async function ctLoad0(){
   let ok=false;
   if(SB&&navigator.onLine){
     try{
-      const [a,b,c,d]=await Promise.all([SB.from('certs').select('*').limit(5000),SB.from('site_access').select('*').limit(5000),SB.from('cert_ret').select('*').limit(5000),SB.from('cert_boq').select('*').limit(5000)]);
+      const [a,b,c,d]=await netTO(Promise.all([SB.from('certs').select('*').limit(5000),SB.from('site_access').select('*').limit(5000),SB.from('cert_ret').select('*').limit(5000),SB.from('cert_boq').select('*').limit(5000)]));
       if(a.error&&/certs|relation|does not exist|schema cache/i.test(a.error.message||'')){CT.missing=true;ok=true}
       else if(!a.error){CT.missing=false;CT.srv=a.data||[];CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[];ok=true;
-        if(appIsEngineer()&&isTechR(myRole())){try{const p=await SB.rpc('cert_paid_rows');CT.paid=p.error?null:(p.data||[])}catch(e){CT.paid=null}}
+        if(appIsEngineer()&&isTechR(myRole())){try{const p=await netTO(SB.rpc('cert_paid_rows'));CT.paid=p.error?null:(p.data||[])}catch(e){CT.paid=CT.paid||null}}
         appLs(LS_CT,{rows:CT.srv,access:CT.access,ret:CT.ret,boq:CT.boq,paid:CT.paid||null,at:Date.now()})}
     }catch(e){}
   }
   if(!ok&&!CT.srv)ctFromCache();
-  CT.rows=ctMerged();CT.loaded=true;
+  CT.netFail=!ok;CT.noData=!ok&&!appLs(LS_CT)&&!(CT.srv||[]).length;
+  try{CT.rows=ctMerged()}catch(e){CT.rows=CT.rows||[]}CT.loaded=true;
 }
 const ctNetErr=e=>!navigator.onLine||/fetch|network|timeout|load failed|offline/i.test(String(e&&(e.message||e)||''));
 let ctBusy=false;
@@ -1951,7 +1958,7 @@ document.addEventListener('click',async ev=>{
   if(a==='retdel'){const {error}=await SB.from('cert_ret').delete().eq('owner_key',APPU.owner?'owner':APPU.me.id).eq('contractor',b.dataset.con);if(error)showBanner('تعذّر الحذف.');await ctLoad();render();return}
 });
 function ctStart(){
-  if(!SB)return;
+  if(!SB){ctLoad().then(()=>{try{render()}catch(e){}});return}
   ctLoad().then(()=>{try{render()}catch(e){}});ctChannel();
   for(const id of ['ct_rcon','ct_rpct'])KEEP.push(id);
 }
@@ -1964,18 +1971,21 @@ const soEmpty=()=>({moves:[],items:[],sites:[],access:[]});
 function soOverlay(list,t){const m=new Map(list.map(r=>[r.id,r]));for(const op of soQ()){if(op.t!==t)continue;if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}return [...m.values()]}
 function soData(){const s=SO.srv||soEmpty();return {moves:soOverlay(s.moves||[],'store_moves'),items:soOverlay(s.items||[],'store_items'),sites:s.sites||[],access:s.access||[]}}
 async function soAll(t){const out=[];for(let off=0;;off+=1000){const r=await SB.from(t).select('*').range(off,off+999);if(r.error)return r;out.push(...(r.data||[]));if(!r.data||r.data.length<1000)break}return {data:out,error:null}}
-async function soLoad(){
+function soLoad(){if(SO._ld)return SO._ld;SO._ld=soLoad0().finally(()=>{SO._ld=null});return SO._ld}
+async function soLoad0(){
   let ok=false;
   if(SB&&navigator.onLine){
     try{
-      const [m,i,s,a]=await Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll));
-      try{const r=await SB.from('app_settings').select('*');if(!r.error){const x=(r.data||[]).find(z=>z.key==='lock_until');SO.lock=x?x.value:'';appLs('adc_lock_v1',SO.lock);const xa=(r.data||[]).find(z=>z.key==='lock_acct');SO.lockAcct=!!(xa&&xa.value==='1');appLs('adc_lock_acct_v1',SO.lockAcct);soLimFrom(r.data);if(typeof rsFromSettings==='function')rsFromSettings(r.data);if(typeof spAliasFrom==='function')spAliasFrom(r.data)}}catch(e){}
+      const [m,i,s,a]=await netTO(Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll)));
+      try{const r=await netTO(SB.from('app_settings').select('*'),5000);if(!r.error){const x=(r.data||[]).find(z=>z.key==='lock_until');SO.lock=x?x.value:'';appLs('adc_lock_v1',SO.lock);const xa=(r.data||[]).find(z=>z.key==='lock_acct');SO.lockAcct=!!(xa&&xa.value==='1');appLs('adc_lock_acct_v1',SO.lockAcct);soLimFrom(r.data);if(typeof rsFromSettings==='function')rsFromSettings(r.data);if(typeof spAliasFrom==='function')spAliasFrom(r.data)}}catch(e){}
       if(m.error&&/store_moves|relation|does not exist|schema cache/i.test(m.error.message||'')){SO.missing=true;SO.srv=SO.srv||soEmpty();ok=true}
       else if(!m.error){SO.missing=false;SO.srv={moves:m.data||[],items:i.data||[],sites:s.data||[],access:a.data||[]};ok=true;appLs(LS_SO,{...SO.srv,at:Date.now()})}
     }catch(e){}
   }
-  if(!ok&&!SO.srv){const c=appLs(LS_SO);SO.srv=c?{moves:c.moves||[],items:c.items||[],sites:c.sites||[],access:c.access||[]}:soEmpty()}
-  SO.d=soData();SO.loaded=true;
+  const cc=ok?null:appLs(LS_SO);
+  if(!ok&&!SO.srv){SO.srv=cc?{moves:cc.moves||[],items:cc.items||[],sites:cc.sites||[],access:cc.access||[]}:soEmpty()}
+  SO.netFail=!ok;SO.noData=!ok&&!cc&&!((SO.srv||{}).sites||[]).length;if(cc)SO.cacheAt=cc.at||0;
+  try{SO.d=soData()}catch(e){SO.d=SO.d||{moves:[],items:[],sites:[],access:[]}}SO.loaded=true;
 }
 /* ---------- قفل الفترات: المدير يقفل لحد تاريخ، والمهندسين وأمين المخزن ما يعدّلوش قبله ---------- */
 if(SO.lock==null)SO.lock=appLs('adc_lock_v1')||'';
@@ -2068,7 +2078,7 @@ async function soPut(t,row){soQueue(t,'put',row.id,row);await soFlush();return !
 let soT=null;
 function soRefresh(){clearTimeout(soT);soT=setTimeout(async()=>{await soLoad();try{if(!document.activeElement||!/^so_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
 function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access','site_access','app_settings'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
-function soStart(){if(!SB)return;soLoad().then(()=>{try{render()}catch(e){}});soChannel()}
+function soStart(){soLoad().then(()=>{try{render()}catch(e){}});if(SB)soChannel()}
 function soNeedSql(){return SO.missing?'<div class="card"><p class="msg err">جداول المخزن غير موجودة في قاعدة البيانات. شغّل ملف «ADC-إعداد-المخزن.sql» في Supabase.</p></div>':''}
 
 /* ---------- who can do what ---------- */
@@ -2306,8 +2316,10 @@ function soReport(site,rep){
   return {gs,ins,counts,want};
 }
 function soRepHTML(site){
+  const tg=o=>`<button type="button" class="so-rtog" data-so="reptog" aria-expanded="${o}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;font-weight:700"><span style="font-size:18px;color:var(--accent)">${o?'▾':'◂'}</span><span>تقارير المخزن</span><span class="note" style="font-weight:400">(اضغط علشان ${o?'تقفل':'تفتح'})</span></button>`;
+  if(!SO.repOpen)return `<div class="card so-rep"><div class="sec-h">${tg(false)}</div></div>`;
   const rep=SO.rep,mains=soMains(),subs=rep.main?soSubs(rep.main):[],x=soReport(site,rep),sups=soSuppliers();
-  return `<div class="card"><div class="sec-h">تقارير المخزن</div>
+  return `<div class="card so-rep"><div class="sec-h">${tg(true)}</div>
   <div class="filters">
     <div class="f"><label for="so_rmain">البند الرئيسي</label><select id="so_rmain"><option value="">كل البنود</option>${mains.map(m=>`<option value="${esc(m.id)}" ${rep.main===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></div>
     ${subs.length?`<div class="f"><label for="so_rsub">البند الفرعي</label><select id="so_rsub"><option value="">كل البنود الفرعية</option>${subs.map(s=>`<option value="${esc(s.id)}" ${rep.sub===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`:''}
@@ -2560,7 +2572,8 @@ function soBindForm(site){
   fm.querySelectorAll('input,select').forEach(e=>{if(!e.oninput&&!e.onchange)e.addEventListener('input',()=>{soReadForm();const t=$('#so_tot');if(t&&SO.form&&SO.form.kind==='in')t.innerHTML=soFormTot(SO.form)})});
 }
 function soRenderPage(){
-  if(!SO.loaded){soLoad().then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
+  if(!SO.loaded){soLoad().catch(()=>{SO.loaded=true}).then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
+  if(SO.noData&&SO.netFail){$('#pane').innerHTML=`<div class="pane-h"><h2>المخزن</h2></div><div class="card blank" style="padding:24px"><h3>محتاج اتصال بالإنترنت مرة واحدة</h3><p>بيانات المخزن لسه ماتحمّلتش على الجهاز ده. اتأكد إن النت شغال واضغط «حاول تاني». بعد أول مرة المخزن هيفتح حتى من غير نت.</p><button type="button" class="primary" data-so="retry">حاول تاني</button></div>`;return}
   const appr=soIsAppr(),eng=appIsEngineer();
   if(appr&&(SO.people===null||Date.now()-(SO.pplAt||0)>60000)){SO.people=SO.people||[];SO.pplAt=Date.now();custEngs().then(()=>render())}
   const sites=soMySites(),en=sites.filter(s=>s.enabled);
@@ -2573,6 +2586,7 @@ function soRenderPage(){
     ${eng?`<button class="ghost" data-cu="eng-settings">${CU.engSettings?'إخفاء الإعدادات':'الإعدادات'}</button>`:''}</div></div>${soNeedSql()}
   ${eng&&CU.engSettings?appSecurityCard():''}
   ${wantSite&&!wantSite.enabled&&soCanAppr(wantSite.id)?`<div class="card due-card"><p>المخزن مش مفعّل في موقع <b>${esc(wantSite.name)}</b>.</p><div class="row"><button class="primary" data-so="enable" data-id="${esc(wantSite.id)}">تفعيل المخزن في هذا الموقع</button><button class="ghost" data-so="nowant">لا</button></div></div>`:''}
+  ${SO.netFail&&!SO.noData?`<p class="msg so-offnote" style="background:#fff6e0;border:1px solid #e0b252">بدون اتصال — بتشوف آخر نسخة محفوظة على الجهاز${SO.cacheAt?' (آخر تحديث '+esc(new Date(SO.cacheAt).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'}))+')':''}. هتتحدّث لوحدها لما النت يرجع. <button type="button" class="ghost" data-so="retry">تحديث</button></p>`:''}
   ${msg?`<p class="msg ${msg.ok?'ok':'err'}">${esc(msg.t)}</p>`:''}
   ${en.length>1?`<div class="row"><label for="so_site">الموقع</label><select id="so_site" style="width:auto">${en.map(s=>`<option value="${esc(s.id)}" ${s.id===SO.site?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`:''}
   ${!en.length?(appr?`<div class="card blank"><h3>المخزن مش مفعّل في أي موقع</h3><p>فعّله من «تفعيل المخزن على المواقع» تحت، أو من ⋯ في صفحة الموقع.</p></div>`:`<div class="card blank"><h3>لا توجد مخازن متاحة لك بعد</h3><p>اطلب من المدير أو صاحب الموقع يضيفك على مخزن الموقع.</p></div>`):''}
@@ -2675,6 +2689,8 @@ document.addEventListener('click',async ev=>{
     const sh={name:'الموردين',rows:[x.head,...x.rows,x.tot],styles:{0:1,[x.rows.length+1]:3},widths:[26,16,11,11,15,13,15,15,15,15,12,30],freeze:1};
     try{await saveFile(x.title.replace(/[\/:*?"<>|]/g,'-')+' - '+today()+'.xlsx',XLSX_W.build([sh]))}catch(e){}return}
   if(a==='new'||a==='newfor'){SO.imp=null;SO.form=b.dataset.k==='count'?{kind:'count',date:today(),lines:{},extra:[]}:b.dataset.k==='cn'?{kind:'cn',date:today(),amount:'',notes:''}:{kind:b.dataset.k==='ret'?'ret':'in',date:today(),rows:[{txt:a==='newfor'?soPickText(id):'',qty:''}]};SO.pick=null;SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});const q=document.getElementById(a==='newfor'?'so_lq_0':(b.dataset.k==='count'||b.dataset.k==='cn'?'so_date':'so_li_0'));if(q)q.focus();return}
+  if(a==='reptog'){SO.repOpen=!SO.repOpen;render();return}
+  if(a==='retry'){SO.loaded=false;render();return}
   if(a==='addline'){soReadForm();SO.form.rows=[...(SO.form.rows||[]),{txt:'',qty:''}];render();const n=document.getElementById('so_li_'+(SO.form.rows.length-1));if(n)n.focus();return}
   if(a==='addsup'){soReadForm();const n=b.dataset.n;if(n&&typeof addReg==='function'){addReg('contractors',{name:n,kind:'supplier'});SO.msg={ok:1,t:'اتضاف «'+n+'» لقائمة الموردين. اضغط حفظ تاني.'}}render();return}
   if(a==='dupmerge'){soReadForm();soDupMerge(SO.form);SO.msg={ok:1,t:'اتدمجت السطور المتكررة اللي بنفس السعر. راجع الكميات واضغط حفظ.'};render();return}
