@@ -2763,7 +2763,7 @@ async function soPhoto(id,file){
 function soMergeCands(it){return soItems().filter(x=>x.id!==it.id&&(!!x.parent)===(!!it.parent)).sort((a,b)=>soLabel(a.id).localeCompare(soLabel(b.id),'ar'))}
 function soMergePick(it,isSub){const c=soMergeCands(it);if(!c.length)return '';
   return `<div class="so-merge"><select id="so_mg" aria-label="دمج مع"><option value="">دمج مع صنف آخر…</option>${c.map(x=>`<option value="${esc(x.id)}">${esc(soLabel(x.id))}${x.unit?' ('+esc(x.unit)+')':''}</option>`).join('')}</select><button class="ghost" type="button" data-so="merge" data-id="${esc(it.id)}">دمج</button></div>`}
-function soMovesOf(id){const all=(SO.d&&SO.d.moves)||[];return {ins:all.filter(m=>m.kind==='in'&&(m.data||{}).item===id),counts:all.filter(m=>m.kind==='count'&&((m.data||{}).lines||{})[id]!=null)}}
+function soMovesOf(id){const all=(SO.d&&SO.d.moves)||[];return {ins:all.filter(m=>(m.kind==='in'||m.kind==='ret')&&(m.data||{}).item===id),counts:all.filter(m=>m.kind==='count'&&((m.data||{}).lines||{})[id]!=null)}}
 function soMergeErr(src,dst){
   if(!src||!dst||src.id===dst.id)return 'اختر صنفًا آخر.';
   if((!!src.parent)!==(!!dst.parent))return 'يكون الدمج بين بندين رئيسيين أو بندين فرعيين.';
@@ -2780,16 +2780,23 @@ function soMergeAsk(src,dst){
   if(su&&du&&soNorm(su)!==soNorm(du)&&!confirm('تنبيه: الوحدة مختلفة!\n«'+src.name+'» بالـ'+su+' و«'+dst.name+'» بالـ'+du+'.\nستُجمع الكميات كما هي من دون تحويل. هل أنت متأكد؟'))return false;
   return true;
 }
-function soMergeQueue(src,dst){
-  const m=soMovesOf(src.id);
-  for(const x of m.ins)soQueue('store_moves','put',x.id,{...soClean(x),data:{...x.data,item:dst.id}});
-  for(const x of m.counts){const L={...(x.data.lines||{})},a=L[src.id],b=L[dst.id];delete L[src.id];
-    L[dst.id]=b==null||b===''?a:(a==null||a===''?b:r2(+a + +b));
+/* نقل حركات خامة (توريد ومرتجع وجرد) لخامة تانية */
+function soMoveMoves(srcId,dstId){
+  const m=soMovesOf(srcId);
+  for(const x of m.ins)soQueue('store_moves','put',x.id,{...soClean(x),data:{...x.data,item:dstId}});
+  for(const x of m.counts){const L={...(x.data.lines||{})},a=L[srcId],b=L[dstId];delete L[srcId];
+    L[dstId]=b==null||b===''?a:(a==null||a===''?b:r2(+a + +b));
     soQueue('store_moves','put',x.id,{...soClean(x),data:{...x.data,lines:L}});
     x.data={...x.data,lines:L}}               /* keep local copy in step for nested merges */
+  return m.ins.length+m.counts.length;
+}
+/* السيرفر بيعرف «اتدمجت في» بعد ملف تصليح 30 أكتوبر */
+const soHasMI=()=>((SO.srv&&SO.srv.items)||[]).some(i=>i&&'merged_into' in i);
+function soMergeQueue(src,dst){
+  soMoveMoves(src.id,dst.id);
   for(const s of soSubs(src.id)){const t=soSubs(dst.id).find(y=>soNorm(y.name)===soNorm(s.name));
     if(t)soMergeQueue(s,t);else soQueue('store_items','put',s.id,{...soClean(s),parent:dst.id})}
-  soQueue('store_items','put',src.id,{...soClean(src),deleted:true});
+  soQueue('store_items','put',src.id,{...soClean(src),deleted:true,...(soHasMI()?{merged_into:dst.id}:{})});
 }
 async function soMerge(srcId,dstId){
   const src=soItem(srcId),dst=soItem(dstId);if(!APPU.owner||!src||!dst)return;
@@ -4401,7 +4408,7 @@ async function cdAuto(){
 let cdAutoT=null;function cdAutoSoon(){if(!cdOn())return;clearTimeout(cdAutoT);cdAutoT=setTimeout(cdAuto,2500)}
 
 /* ================= صفحة «مراجعة الأسماء والأكواد» (المدير وصاحب الموقع) ================= */
-const CDP={tab:'con',sel:{},open:{},want:{},msg:null,busy:false,matPick:{}};
+const CDP={tab:'con',sel:{},open:{},want:{},msg:null,busy:false,matPick:{},orph:{}};
 const cdCan=()=>APP&&!!APPU.approved&&(APPU.owner||(typeof myRole==='function'&&myRole()==='user'))&&!(typeof isAcct==='function'&&isAcct());
 /* الاسم بدون «ال» وبدون مسافات — للمقارنة */
 const cdCmp=t=>arNorm(t).replace(/\s+/g,'').replace(/^ال/,'');
@@ -4456,6 +4463,17 @@ function cdMatGroups(){if(typeof SO==='undefined'||!SO.d)return [];const its=(SO
     for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){const a=L[i],b=L[j];if(lvl&&a.parent!==b.parent)continue;if(CD.dupOk[cdOkKey('mat',a.id,b.id)])continue;if(cdSimilar(a.name,b.name)){const ra=find(a.id),rb=find(b.id);if(ra!==rb)par.set(rb,ra)}}
     const G=new Map();for(const i of L){const r=find(i.id);if(!G.has(r))G.set(r,[]);G.get(r).push(i)}for(const g of G.values())if(g.length>1)out.push(g)}
   return out}
+/* حركات على خامات اتمسحت (دمج اتقطع في النص قبل تصليح 30 أكتوبر) */
+function cdOrphans(){if(typeof SO==='undefined'||!SO.d)return [];const all=SO.d.items||[],live=all.filter(i=>!i.deleted);
+  return all.filter(i=>i.deleted).map(it=>{const m=soMovesOf(it.id),n=m.ins.filter(x=>!x.deleted).length+m.counts.filter(x=>!x.deleted).length;if(!n)return null;
+    const same=live.filter(x=>(!!x.parent)===(!!it.parent));let t=it.merged_into&&live.some(x=>x.id===it.merged_into)?it.merged_into:'';
+    if(!t){const c=same.filter(x=>cdSimilar(x.name,it.name)).sort((a,b)=>(b.parent===it.parent)-(a.parent===it.parent));t=c[0]?c[0].id:''}
+    return {it,n,t,same}}).filter(Boolean)}
+function cdOrphCard(){const L=cdOrphans();if(!L.length)return '';
+  return `<div class="card" style="border-color:#e0b252"><div class="sec-h">⚠ حركات على خامات اتمسحت (${L.length})</div><p class="note">الخامات دي اتدمجت واتشالت من القائمة، لكن جزء من توريداتها أو جردها ما اتنقلش (الفواتير القديمة اللي من غير بند توريد). اختار الخامة الصح واضغط «انقل حركاتها». لازم ملف تصليح 30 أكتوبر (SQL) يكون اتشغّل.</p>
+  <div class="tbl-wrap"><table><thead><tr><th>الخامة الممسوحة</th><th class="num">حركات</th><th>انقلها إلى</th><th></th></tr></thead><tbody>
+  ${L.map(o=>`<tr><td class="tl"><b>${esc(soLabel(o.it.id))}</b></td><td class="num">${o.n}</td><td><select data-cdorph="${esc(o.it.id)}"><option value="">— اختر —</option>${o.same.slice().sort((a,b)=>soLabel(a.id).localeCompare(soLabel(b.id),'ar')).map(x=>`<option value="${esc(x.id)}" ${x.id===(CDP.orph[o.it.id]??o.t)?'selected':''}>${esc(soLabel(x.id))}</option>`).join('')}</select></td>
+   <td><button class="primary" type="button" data-cd="orphfix" data-id="${esc(o.it.id)}" ${CDP.busy?'disabled':''}>انقل حركاتها</button></td></tr>`).join('')}</tbody></table></div></div>`}
 const cdMatUse=id=>{const m=typeof soMovesOf==='function'?soMovesOf(id):{ins:[],counts:[]};return m.ins.length+m.counts.length};
 /* اقتراح بند التوريد للخامة من فواتيرها (الأكثر استخدامًا) */
 function cdMatSuggest(main){if(typeof SO==='undefined'||!SO.d)return '';const ids=new Set([main.id,...(SO.d.items||[]).filter(i=>i.parent===main.id).map(i=>i.id)]),c=new Map();
@@ -4463,7 +4481,7 @@ function cdMatSuggest(main){if(typeof SO==='undefined'||!SO.d)return '';const id
   return [...c.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||''}
 const cdSupplyItems=()=>regNames('items').filter(x=>x.reg&&x.name!==REV_ITEM&&x.name!==PAY_ITEM).map(x=>x.name);
 function cdTabs(){
-  const nCon=cdGroupsOf('con').length,nItem=cdGroupsOf('item').length,nMat=APPU.owner?cdMatGroups().length:0;
+  const nCon=cdGroupsOf('con').length,nItem=cdGroupsOf('item').length,nMat=APPU.owner?cdMatGroups().length+cdOrphans().length:0;
   const ungrouped=cdItemRegs().filter(x=>x.name!==REV_ITEM&&!cdGroupOf(x.name)).length,noAbbr=cdGroups().filter(g=>!cdG(g.name)).length;
   const mains=typeof SO!=='undefined'&&SO.d?(SO.d.items||[]).filter(i=>!i.deleted&&!i.parent):[],unl=mains.filter(m=>!m.sitem).length;
   return [['con','المقاولون والموردون',nCon],['item','البنود',nItem],...(APPU.owner?[['mat','خامات المخزن',nMat]]:[]),['grp','البنود العامة والاختصارات',ungrouped+noAbbr],['link','ربط الخامات ببنود التوريد',unl],['list','الأكواد',null]];
@@ -4532,7 +4550,7 @@ function renderCodes(){
     body=`${al.length?`<div class="card"><div class="sec-h">دمجات قديمة في «التقارير المختصرة» (${al.length})</div><p class="note">الأسماء دي اتدمجت في التقارير بس. «طبّقها على الحركات» بيغيّر الاسم في كل فواتير المخزن والمصروفات فعلًا.</p><button class="primary" type="button" data-cd="alias">طبّقها على الحركات</button></div>`:''}
     <div class="card"><p class="note" style="margin-top:0">أسماء شبه بعض (همزة، تاء مربوطة، مسافات، أو مكتوبة بشكلين). اختر الاسم الصحيح وادمج، أو علّمهم «مختلفين». الدمج بينقل كل الحركات (مصروفات، فواتير مخزن، مستخلصات، عهد) على الاسم الصحيح ومينفعش يتراجع (فيه نسخة احتياطية على السيرفر).</p>
     ${G.length?G.map((g,i)=>cdDupCard(tab,g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد أسماء متكررة.</p>'}</div>`}
-  else if(tab==='mat'){const G=cdMatGroups();body=`<div class="card"><p class="note" style="margin-top:0">خامات مكتوبة بشكلين في كتالوج المخزن. الدمج بينقل كل التوريدات والجرد للخامة الصحيحة.</p>${G.length?G.map((g,i)=>cdMatCard(g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد خامات متكررة.</p>'}</div>`}
+  else if(tab==='mat'){const G=cdMatGroups();body=cdOrphCard()+`<div class="card"><p class="note" style="margin-top:0">خامات مكتوبة بشكلين في كتالوج المخزن. الدمج بينقل كل التوريدات والجرد للخامة الصحيحة.</p>${G.length?G.map((g,i)=>cdMatCard(g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد خامات متكررة.</p>'}</div>`}
   else if(tab==='grp')body=cdGrpTab();else if(tab==='link')body=cdLinkTab();else body=cdListTab();
   const left=T.filter(t=>t[0]!=='list'&&t[2]).reduce((a,t)=>a+t[2],0);
   $('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة الأسماء والأكواد</h2></div>
@@ -4547,6 +4565,7 @@ document.addEventListener('change',async ev=>{
   if(t.dataset.cdsel){CDP.sel[t.dataset.cdsel]=t.value;delete CDP.open[t.dataset.cdsel+':x'];S.justSaved=true;render();return}
   if(t.dataset.cdex){const k=t.dataset.cdex+':x';CDP.open[k]={...(CDP.open[k]||{}),[t.value]:t.checked};S.justSaved=true;render();return}
   if(t.dataset.cdwant!=null){CDP.want[t.dataset.cdwant]=String(t.value||'').trim().toUpperCase();S.justSaved=true;render();return}
+  if(t.dataset.cdorph!=null){CDP.orph[t.dataset.cdorph]=t.value;return}
   if(t.dataset.cdgrp!=null){if(t.value)igAssign(t.dataset.cdgrp,t.value);S.justSaved=true;render();return}
   if(t.dataset.cdlink!=null){const it=soItem(t.dataset.cdlink);if(!it)return;soQueue('store_items','put',it.id,{...soClean(it),sitem:t.value||null});await soFlush();cdAutoSoon();S.justSaved=true;render();return}
 });
@@ -4566,6 +4585,9 @@ document.addEventListener('click',async ev=>{
     if(!navigator.onLine)return fail('الدمج يتطلب اتصالًا بالإنترنت.');CDP.busy=true;render();
     for(const s of g.filter(i=>i.id!==sel)){const e=soMergeErr(soItem(s.id),dst);if(e)return fail(e);soMergeQueue(soItem(s.id),dst)}
     await soFlush();CDP.busy=false;CDP.msg={ok:1,at:Date.now(),t:'تم دمج الخامات في «'+dst.name+'».'};render();return}
+  if(a==='orphfix'){if(!APPU.owner)return;const id=b.dataset.id,o=cdOrphans().find(x=>x.it.id===id),dst=CDP.orph[id]??(o&&o.t);if(!o||!dst)return fail('اختر الخامة اللي هتتنقل لها الحركات.');
+    if(!navigator.onLine)return fail('النقل يتطلب اتصالًا بالإنترنت.');CDP.busy=true;render();soMoveMoves(id,dst);await soFlush();
+    const left=cdOrphans().find(x=>x.it.id===id);CDP.busy=false;CDP.msg=left?{t:'اتنقل جزء، وفاضل '+left.n+' حركة ما اتنقلتش. اتأكد إن ملف تصليح 30 أكتوبر (SQL) اتشغّل.',at:Date.now()}:{ok:1,at:Date.now(),t:'اتنقلت حركات «'+soLabel(id)+'» إلى «'+soLabel(dst)+'».'};render();return}
   if(a==='alias'){if(!APPU.owner)return;CDP.busy=true;render();const al=Object.entries(SP.alias||{});let n=0;
     const raw=new Set();for(const m of (SO.d&&SO.d.moves)||[])if((m.data||{}).supplier)raw.add(m.data.supplier.trim());for(const e of S.exp)if(e.contractor)raw.add(e.contractor.trim());
     for(const [from,to] of al)for(const r of raw)if(soNorm(r)===from&&r!==to){const e=await cdMerge('con',r,to);if(e)return fail(e);n++}
