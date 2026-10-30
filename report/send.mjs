@@ -8,6 +8,8 @@ import { execFileSync } from 'node:child_process';
 import zlib from 'node:zlib';
 import { buildXlsx, buildHtml } from './statement.mjs';
 import { storeReport, storeHtml } from './store.mjs';
+import { siteDues, shortStatement, invoices as soInvs } from './dues.mjs';
+import { XLSX_W } from './xlsx.mjs';
 import { RS, setStyle } from './style.mjs';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
@@ -147,7 +149,7 @@ function mailBody(title, sub, week, lastMod, st) {
   return `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;color:#111;line-height:1.7">
   <h2 style="margin:0 0 6px">${esc(title)}</h2><p style="margin:0 0 10px;color:#444">${esc(sub)}</p>
   <p>تعديلات هذا الأسبوع: <b>${t.n}</b> · مصروفات أُضيفت: <b>${fmt(t.exp)} ${CUR}</b> · إيداعات أُضيفت: <b>${fmt(t.dep)} ${CUR}</b></p>
-  ${st ? `<p>المخزن: <b>${st.nIn}</b> توريد و<b>${st.nCount}</b> جرد هذا الأسبوع — مرفق «تقرير المخزن» (PDF).</p>` : ''}
+  ${st ? `<p>المخزن: <b>${st.nIn}</b> توريد و<b>${st.nCount}</b> جرد هذا الأسبوع — مرفق «تقرير المخزن» لكل موقع (PDF) ومعه جدول المستحق للموردين والمقاولين، وملف Excel بورقة لكل موقع${st.stmts && st.stmts.length ? '، و' + st.stmts.length + ' كشف مختصر للموردين والمقاولين الذين لهم حركة هذا الأسبوع' : ''}.</p>` : ''}
   <p>مرفق الكشف الكامل (Excel و PDF) حتى آخر تعديل بتاريخ <b dir="ltr">${esc(lastMod)}</b>، ومعه ملف نسخة احتياطية (JSON) يمكن استرجاع البيانات منه من «الإعدادات» ← «استرجاع من ملف».</p>
   <p style="color:#777;font-size:12px">رسالة آلية من تطبيق ADC حسابات المواقع.</p></div>`;
 }
@@ -342,11 +344,36 @@ async function backup(now, c) {
   const addDay = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
   const wkFrom = addDay(cairo(new Date(start)).day, 1);
   const siteNm = new Map(); for (const [uid, g] of G) for (const s of g.sites) siteNm.set(s.id, (s.name || '') + (uid ? '' : ''));
+  const allExp = [...G.values()].flatMap(g => g.expenses);
+  const kinds = new Map(); for (const g of G.values()) for (const k of g.contractors || []) if (k.name) kinds.set(String(k.name).trim(), k.kind || '');
+  const kindOf = n => kinds.get(String(n || '').trim()) || '';
   const storeFor = (uid, all) => {
     const sites = store_sites.filter(x => all || x.site_owner === uid);
     if (!sites.length) return null;
-    return storeReport({ sites, moves: store_moves, items: store_items, from: wkFrom, to: today, since: start, until: end,
-      siteName: s => (siteNm.get(s.site_id) || s.site_name || '') + (all && s.site_owner ? ' (' + uname(s.site_owner) + ')' : '') });
+    const siteName = s => (siteNm.get(s.site_id) || s.site_name || '') + (all && s.site_owner ? ' (' + uname(s.site_owner) + ')' : '');
+    const duesFor = id => siteDues({ siteId: id, moves: store_moves, exps: allExp, certs, boq: cert_boq, kindOf });
+    const r = storeReport({ sites, moves: store_moves, items: store_items, from: wkFrom, to: today, since: start, until: end, siteName, duesFor });
+    if (!r) return null;
+    /* كشف مختصر لكل مورد/مقاول له حركة هذا الأسبوع في هذه المواقع */
+    const ids = sites.map(s => s.site_id), inR = d => d && d >= wkFrom && d <= today, nrm = v => String(v || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
+    const names = new Map(); for (const x of r.sites) for (const d of duesFor(x.siteId)) names.set(nrm(d.name), d.name);
+    const act = new Set();
+    for (const x of soInvs(store_moves.filter(m => ids.includes(m.site_id)))) if (inR(x.date) || (x.at > start && x.at <= end)) act.add(nrm(x.sup));
+    for (const m of store_moves) if (ids.includes(m.site_id) && !m.deleted && (m.kind === 'ret' || m.kind === 'cn') && inR(m.date)) act.add(nrm((m.data || {}).supplier));
+    for (const e of allExp) if (ids.includes(e.siteId) && e.contractor && inR(e.date)) act.add(nrm(e.contractor));
+    for (const c of certs) if (ids.includes(c.site_id) && c.status === 'approved') { const t = Date.parse(c.updated_at || c.created_at || 0); if (t > start && t <= end) act.add(nrm(c.contractor)); }
+    const snm = id => { const s = sites.find(x => x.site_id === id); return s ? siteName(s) : ''; };
+    r.stmts = [...names].filter(([k]) => act.has(k)).map(([, name]) => ({ name, ...(shortStatement({ name, sites: ids, moves: store_moves, exps: allExp, certs, boq: cert_boq, siteName: snm }) || {}) })).filter(x => x.body)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    return r;
+  };
+  const safeName = s => String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const storeFiles = (st, who) => {
+    const out = [], period = 'من ' + wkFrom + ' إلى ' + today, used = new Set();
+    for (const x of st.sites) out.push({ filename: 'ADC-تقرير-المخزن-' + safeName(x.name) + '-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'تقرير المخزن الأسبوعي — ' + x.name, sub: period, sections: x.html, logo: logoUri() })) });
+    for (const x of st.stmts || []) out.push({ filename: 'ADC-كشف-مختصر-' + safeName(x.name) + '-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'كشف حساب مختصر — ' + x.name, sub: 'حتى ' + today + ' (له حركة في الأسبوع ' + period + ')', sections: '<div class="stm">' + x.body + '</div>', logo: logoUri(), note: false })) });
+    const sheets = st.sites.map(x => { let n = safeName(x.name).replace(/[\[\]]/g, '').slice(0, 28) || 'موقع', k = n, i = 2; while (used.has(k)) k = n.slice(0, 26) + ' ' + i++; used.add(k); return { ...x.sheet, name: k }; });
+    return { out, sheets };
   };
   const deliver = async (to, folder, who, data, extra = [], st = null, always = false) => {
     const week = data.log.filter(inWeek).sort((a, b) => a.at - b.at);
@@ -364,7 +391,7 @@ async function backup(now, c) {
     const quiet = !week.length && !(st && st.changed);
     if (quiet && !always) return;                    // صاحب الموقع: لا تعديلات = لا بريد. المدير: البريد يوصل كل أسبوع
     if (quiet) st = null;
-    if (st) more.push({ filename: 'ADC-تقرير-المخزن-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'تقرير المخزن الأسبوعي' + (who ? ' — ' + who : ''), sub: 'من ' + wkFrom + ' إلى ' + today, sections: st.sections, logo: logoUri() })) });
+    if (st) { const f = storeFiles(st, who); more.push(...f.out); if (f.sheets.length) more.push({ filename: 'ADC-تقرير-المخزن-' + today + '.xlsx', content: Buffer.from(await XLSX_W.build(f.sheets).arrayBuffer()) }); }
     await send(to, quiet ? `${title} — لا توجد تعديلات هذا الأسبوع` : `${title} — ${week.length} تعديل هذا الأسبوع`, mailBody(title, sub, week, lastMod, st), [{ filename: base + '.xlsx', content: xlsx }, { filename: base + '.pdf', content: pdf }, ...more]);
     sent++;
   };
