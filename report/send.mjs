@@ -149,7 +149,7 @@ function mailBody(title, sub, week, lastMod, st) {
   return `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;color:#111;line-height:1.7">
   <h2 style="margin:0 0 6px">${esc(title)}</h2><p style="margin:0 0 10px;color:#444">${esc(sub)}</p>
   <p>تعديلات هذا الأسبوع: <b>${t.n}</b> · مصروفات أُضيفت: <b>${fmt(t.exp)} ${CUR}</b> · إيداعات أُضيفت: <b>${fmt(t.dep)} ${CUR}</b></p>
-  ${st ? `<p>المخزن: <b>${st.nIn}</b> توريد و<b>${st.nCount}</b> جرد هذا الأسبوع — مرفق «تقرير المخزن» لكل موقع (PDF) ومعه جدول المستحق للموردين والمقاولين، وملف Excel بورقة لكل موقع${st.stmts && st.stmts.length ? '، و' + st.stmts.length + ' كشف مختصر للموردين والمقاولين الذين لهم حركة هذا الأسبوع' : ''}.</p>` : ''}
+  ${st ? `<p>المخزن: <b>${st.nIn}</b> توريد و<b>${st.nCount}</b> جرد هذا الأسبوع — مرفق «تقرير المخزن» لكل موقع (PDF) ومعه جدول المستحق للموردين والمقاولين، وملف Excel بورقة لكل موقع${st.stmts && st.stmts.length ? '، و' + st.stmts.length + ' تقرير مختصر للموردين والمقاولين الذين لهم حركة هذا الأسبوع' : ''}.</p>` : ''}
   <p>مرفق الكشف الكامل (Excel و PDF) حتى آخر تعديل بتاريخ <b dir="ltr">${esc(lastMod)}</b>، ومعه ملف نسخة احتياطية (JSON) يمكن استرجاع البيانات منه من «الإعدادات» ← «استرجاع من ملف».</p>
   <p style="color:#777;font-size:12px">رسالة آلية من تطبيق ADC حسابات المواقع.</p></div>`;
 }
@@ -354,7 +354,7 @@ async function backup(now, c) {
     const duesFor = id => siteDues({ siteId: id, moves: store_moves, exps: allExp, certs, boq: cert_boq, kindOf });
     const r = storeReport({ sites, moves: store_moves, items: store_items, from: wkFrom, to: today, since: start, until: end, siteName, duesFor });
     if (!r) return null;
-    /* كشف مختصر لكل مورد/مقاول له حركة هذا الأسبوع في هذه المواقع */
+    /* تقرير مختصر لكل مورد/مقاول له حركة هذا الأسبوع في هذه المواقع */
     const ids = sites.map(s => s.site_id), inR = d => d && d >= wkFrom && d <= today, nrm = v => String(v || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
     const names = new Map(); for (const x of r.sites) for (const d of duesFor(x.siteId)) names.set(nrm(d.name), d.name);
     const act = new Set();
@@ -371,7 +371,7 @@ async function backup(now, c) {
   const storeFiles = (st, who) => {
     const out = [], period = 'من ' + wkFrom + ' إلى ' + today, used = new Set();
     for (const x of st.sites) out.push({ filename: 'ADC-تقرير-المخزن-' + safeName(x.name) + '-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'تقرير المخزن الأسبوعي — ' + x.name, sub: period, sections: x.html, logo: logoUri() })) });
-    for (const x of st.stmts || []) out.push({ filename: 'ADC-كشف-مختصر-' + safeName(x.name) + '-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'كشف حساب مختصر — ' + x.name, sub: 'حتى ' + today + ' (له حركة في الأسبوع ' + period + ')', sections: '<div class="stm">' + x.body + '</div>', logo: logoUri(), note: false })) });
+    for (const x of st.stmts || []) out.push({ filename: 'ADC-تقرير-مختصر-' + safeName(x.name) + '-' + today + '.pdf', content: htmlToPdf(storeHtml({ title: 'تقرير مختصر — ' + x.name, sub: 'حتى ' + today + ' (له حركة في الأسبوع ' + period + ')', sections: '<div class="stm">' + x.body + '</div>', logo: logoUri(), note: false })) });
     const sheets = st.sites.map(x => { let n = safeName(x.name).replace(/[\[\]]/g, '').slice(0, 28) || 'موقع', k = n, i = 2; while (used.has(k)) k = n.slice(0, 26) + ' ' + i++; used.add(k); return { ...x.sheet, name: k }; });
     return { out, sheets };
   };
