@@ -367,6 +367,7 @@ details.fold[open]>summary{margin-bottom:10px}
 .hf-row .nm{font-weight:600;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:start;cursor:pointer}.hf-row small{display:block;color:var(--muted);font-size:12px}
 .hf-row.low .nm,.hf-row.low b{color:var(--danger)}
 .sp-subj{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}.sp-s{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--fg);cursor:pointer;font:inherit}.sp-s b{font-size:15px}.sp-s small{color:var(--muted);font-size:11.5px}.sp-s[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.sp-s[aria-pressed=true] small{color:var(--on-accent);opacity:.85}.sp-s.go{border-style:dashed}.sp-shape button[aria-selected=true]{font-weight:700}
+.gi.gt{padding:8px 4px 2px;border:0;background:transparent}
 .kind-tag{display:inline-block;margin-inline-start:6px;font-size:11px;padding:0 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600;vertical-align:middle}.kind-tag.it-sup{background:var(--accent-soft);color:var(--accent)}.kind-tag.it-lab{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}.kind-tag.it-srv{background:color-mix(in srgb,var(--money) 16%,transparent);color:var(--money)}.kind-tag[class*=it-]{margin-inline-start:0}
 .split-t{min-width:0}.split-t td{padding:7px 10px}.split-t tr.ct-sec td{background:var(--sunk)}.split-t tr.sub td{font-weight:600;color:var(--muted)}.split-t tr.grand td{font-weight:700;border-top:2px solid var(--line)}
 .reg-tools{align-items:center;gap:8px;flex-wrap:wrap}.reg-tools .grow{flex:1}.reg-tools .seg{margin:0}
@@ -1320,7 +1321,7 @@ const stTag=r=>r.kind==='claim'&&r.status==='draft'?'<span class="pill-none">م�
 function custReceiptBtn(d){return d.receipt?`<button class="ghost rcpt" data-receipt="${esc(d.receipt)}" data-rtype="${esc(d.receiptType||'')}">الإيصال</button>`:''}
 /* ---------- مسودة التصفية: المهندس (أو المحاسب نيابة عنه) يسجّل على كذا يوم، وبعدين يبعتها مرة واحدة ---------- */
 const CU_INV_MIN=500;
-const custNeedInv=(item,amount)=>/توريد/.test(String(item||''))&&+amount>CU_INV_MIN;
+const custNeedInv=(item,amount)=>(typeof itNeedSup==='function'?itNeedSup(String(item||'')):/توريد/.test(String(item||'')))&&+amount>CU_INV_MIN;
 const custInvMsg='مصروف توريد فوق '+CU_INV_MIN+' ج.م — يجب إرفاق صورة الفاتورة أو ملف PDF لها.';
 function custDraftCard(drafts,forAcct){
   if(!drafts.length)return '';
@@ -1360,7 +1361,7 @@ function custConBind(p){const s=document.getElementById(p+'_con'),w=document.get
 function custConRead(p,siteId,item){
   const s=document.getElementById(p+'_con');let v=s?s.value:'',pend=false;
   if(v==='__oth'){v=((document.getElementById(p+'_con_new')||{}).value||'').trim();if(!v)return {err:'اكتب اسم المقاول أو المورد (أو اختاره من القائمة).'};const h=typeof regFind==='function'?regFind(regsFor(siteId),v):null;if(h)v=h.name;else pend=true}
-  if(!v&&/توريد/.test(item||''))return {err:'بند توريد: يجب اختيار المورد.'};
+  if(!v&&(typeof itNeedSup==='function'?itNeedSup(item||''):/توريد/.test(item||'')))return {err:'بند توريد: يجب اختيار المورد.'};
   return {name:v,pend};
 }
 function custFillEdit(p){
@@ -1522,8 +1523,8 @@ function appRenderEngineer(){
   const r=myRole(),tabs=[];
   if(isSiteEngR(r))tabs.push(['cust','عهدتي']);
   if(isTechR(r))tabs.push(['certs','المستخلصات']);
-  if(isTechR(r))tabs.push(['stmts','الكشوف']);
   if(r==='store'||soHasAccess()||(SO.noData&&['engineer','tech','eng_tech'].includes(r)))tabs.push(['store','المخزن']);
+  if(isTechR(r)||(typeof spSubjects==='function'&&spSubjects().length))tabs.push(['stmts','التقارير']);
   const tab=tabs.some(t=>t[0]===CT.tab)?CT.tab:(tabs[0]||['store'])[0];
   if(typeof engNotices==='function'&&tab!=='stmts'){}
   if(tab==='stmts'){if(!CT.loaded||!SO.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';Promise.all([CT.loaded?0:ctLoad().catch(()=>{CT.loaded=true}),SO.loaded?0:soLoad().catch(()=>{SO.loaded=true})]).then(()=>render())}else spRenderPage()}
@@ -1573,7 +1574,7 @@ function appRenderCustEng(){
     const cr=custConRead('en',site,item);if(cr.err){CU.claimMsg={t:cr.err};return render()}
     const old=CU.edit?custMerged().find(x=>x.id===CU.edit&&x.status==='draft'):null;
     if(custNeedInv(item,amount)&&!CU.pick&&!(old&&old.data.receipt)){CU.claimMsg={t:custInvMsg};return render()}
-    if(rows.some(r=>r.id!==CU.edit&&r.kind==='claim'&&r.status!=='rejected'&&r.site_id===site&&Math.abs((+r.data.amount||0)-amount)<0.005&&Math.abs(Date.parse(r.data.date)-Date.parse(date))<=2*864e5)&&!confirm('يوجد مصروف عهدة بالمبلغ نفسه في الموقع نفسه خلال يومين، وقد يكون مسجّلًا من قبل.\n\nالمبلغ: '+fmtPlain(amount)+' '+CUR+' ('+amtWords(amount)+')\n\nتبعته برضه؟'))return;
+    if(rows.some(r=>r.id!==CU.edit&&r.kind==='claim'&&r.status!=='rejected'&&r.site_id===site&&Math.abs((+r.data.amount||0)-amount)<0.005&&Math.abs(Date.parse(r.data.date)-Date.parse(date))<=2*864e5)&&!confirm('يوجد مصروف عهدة بالمبلغ نفسه في الموقع نفسه خلال يومين، وقد يكون مسجّلًا من قبل.\n\nالمبلغ: '+fmtPlain(amount)+' '+CUR+' ('+amtWords(amount)+')\n\nهل ترسله على أي حال؟'))return;
     const sv=sites.get(site);const btn=$('#enSave');if(btn)btn.disabled=true;
     let receipt='',receiptType='';
     if(CU.pick){try{const blob=await shrinkFile(CU.pick);const r=await appStoreReceipt(blob,blob.type||CU.pick.type);receipt=r.id;receiptType=r.type}catch(e){CU.claimMsg={t:uploadErr(e)};return render()}}
@@ -1878,7 +1879,7 @@ async function ctBoqImport(file){
   const kept=old.filter(o=>!taken.has(o.id)&&ctBoqUsed(o.id));
   E.lines=lines.concat(kept);
   const n=lines.filter(l=>l.kind==='line').length,g=lines.length-n;
-  CT.boqMsg={ok:!kept.length,t:'تم قراءة '+n+' بند'+(g?' و'+g+' مجموعة':'')+' من الملف. راجعهم واضغط «حفظ بنود التعاقد».'+(kept.length?'\nتنبيه: '+kept.length+' بند قديم مستخدم في مستخلصات ومش موجود في الملف، فاتساب في آخر الجدول.':'')};
+  CT.boqMsg={ok:!kept.length,t:'تم قراءة '+n+' بند'+(g?' و'+g+' مجموعة':'')+' من الملف. راجعهم واضغط «حفظ بنود التعاقد».'+(kept.length?'\nتنبيه: '+kept.length+' بند قديم مستخدم في مستخلصات وغير موجود في الملف، فتُرك في آخر الجدول.':'')};
   render();
 }
 async function ctBoqSave(){
@@ -1942,7 +1943,7 @@ function ctRenderPage(){
   const overrides=CT.ret.filter(r=>r.owner_key===myKey);
   const ovWait=rows.filter(c=>ctCanApprove(c)&&c.status==='draft'&&(c.data||{}).overReq&&ctCalc(c).overBlocked);
   $('#pane').innerHTML=`<div class="pane-h"><h2>المستخلصات</h2><div class="actions">${CT.form?'':'<button class="primary" data-ct="new">+ مستخلص جديد</button>'}</div></div>${ctNeedSql()}
-  ${ovWait.length?`<div class="card due-card"><b>${ovWait.length===1?'مستخلص يحتاج إلى':ovWait.length+' مستخلصات تحتاج إلى'} موافقتك:</b> فيه بنود كميتها زادت عن التعاقد بأكتر من ${CT_OVER}%. ستجد «موافق على الزيادة» و«إرجاع للمهندس» بجانبه في الجدول أدناه.</div>`:''}
+  ${ovWait.length?`<div class="card due-card"><b>${ovWait.length===1?'مستخلص يحتاج إلى':ovWait.length+' مستخلصات تحتاج إلى'} موافقتك:</b> فيه بنود زادت كميتها على التعاقد بأكثر من ${CT_OVER}%. ستجد «موافق على الزيادة» و«إرجاع للمهندس» بجانبه في الجدول أدناه.</div>`:''}
   ${!CT.form&&CT.msg?`<p class="msg ${CT.msg.ok?'ok':'err'}">${esc(CT.msg.t)}</p>`:''}
   ${ctFormHTML()}
   ${pend.length?`<div class="card due-card"><div class="sec-h">بانتظار الاعتماد أو مطلوب تعديلها (${pend.length})</div>${ctListHTML(ctSort(pend))}<p class="note">عند الاعتماد يُثبَّت «إجمالي السابق صرفه» من المصروفات المسجّلة على نفس المقاول ونفس البند في نفس الموقع حتى تاريخ المستخلص.</p></div>`:''}
@@ -2456,7 +2457,7 @@ function soLoadThumbs(){
 SO.catOpen=SO.catOpen||new Set();
 function soCatHTML(){
   const A=SO.cat.add,E=SO.cat.edit,m=SO.catMsg;if(m){m.at=m.at||Date.now();if(Date.now()-m.at>8000||!m.ok)SO.catMsg=null}
-  const line=(it,isSub)=>E&&E.id===it.id?`<div class="so-cat-row${isSub?' sub':''}"><input id="so_en" value="${esc(E.name)}" aria-label="اسم الخامة"><input id="so_eu" value="${esc(E.unit)}" placeholder="الوحدة" aria-label="الوحدة" style="width:110px">${soPickable(it)||it.unit?`<input id="so_emin" type="number" inputmode="decimal" min="0" step="any" value="${E.min??''}" placeholder="الحد الأدنى" aria-label="الحد الأدنى (اختياري)" title="لما الرصيد ينزل عنه الخامة تظهر بالأحمر" style="width:120px">`:''}<button class="primary" data-so="catsave">حفظ</button><button class="ghost" data-so="catcancel">إلغاء</button>${APPU.owner?soMergePick(it,isSub):''}</div>`
+  const line=(it,isSub)=>E&&E.id===it.id?`<div class="so-cat-row${isSub?' sub':''}"><input id="so_en" value="${esc(E.name)}" aria-label="اسم الخامة"><input id="so_eu" value="${esc(E.unit)}" placeholder="الوحدة" aria-label="الوحدة" style="width:110px">${soPickable(it)||it.unit?`<input id="so_emin" type="number" inputmode="decimal" min="0" step="any" value="${E.min??''}" placeholder="الحد الأدنى" aria-label="الحد الأدنى (اختياري)" title="عندما ينخفض الرصيد عنه تظهر الخامة بالأحمر" style="width:120px">`:''}${soSubs(it.id).length?'':`<select id="so_ep" aria-label="تحت" title="تحويل الخامة إلى رئيسية أو فرعية تحت خامة أخرى"><option value="">تحت: — خامة رئيسية —</option>${soMains().filter(x=>x.id!==it.id).map(x=>`<option value="${esc(x.id)}" ${x.id===(E.parent??it.parent)?'selected':''}>تحت: ${esc(x.name)}</option>`).join('')}</select>`}<button class="primary" data-so="catsave">حفظ</button><button class="ghost" data-so="catcancel">إلغاء</button>${APPU.owner?soMergePick(it,isSub):''}</div>`
     :`<div class="so-cat-row${isSub?' sub':''}">${soThumb(it)}<span class="nm">${typeof cdOn==='function'&&cdOn()&&cdM(it.id)?cdTag(cdM(it.id))+' ':''}${esc(it.name)}${it.unit?` <small>(${esc(it.unit)})</small>`:''}${!isSub&&it.sitem?` <small>· ${esc(it.sitem)}</small>`:''}${+it.min_qty>0?` <small>· حد أدنى ${fmt(+it.min_qty)}</small>`:''}${it.unit?'':(!isSub&&!soSubs(it.id).length?' <small class="neg">بدون وحدة</small>':'')}${it._local?'<span class="pend">على الجهاز</span>':''}</span><span class="acts">
       ${!isSub?`<button class="ghost" data-so="addsub" data-id="${esc(it.id)}">+ بند فرعي</button>`:''}
       ${soCanEditItem(it)?`<button class="ghost" data-so="catedit" data-id="${esc(it.id)}">تعديل</button><span class="filebtn"><button type="button" class="ghost">${it.photo?'تغيير الصورة':'صورة'}</button><input type="file" accept="image/*" data-sophoto="${esc(it.id)}" aria-label="صورة ${esc(it.name)}"></span>`:''}
@@ -2846,7 +2847,7 @@ document.addEventListener('click',async ev=>{
     SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
   if(a==='invdel'||a==='invdelok'||a==='invreq'||a==='invdelno'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m)return;const L=soInvLines(m),tot=r2(L.reduce((t,o)=>t+(+(o.data||{}).price||0)*(+(o.data||{}).qty||0),0));
     const what=L.length+(L.length===1?' صنف':' أصناف')+(tot?' بقيمة '+fmt(tot)+' '+CUR:'');
-    if(a==='invdel'||a==='invdelok'){if(!(soCanAppr(m.site_id)||APPU.owner))return;if(!confirm('حذف الفاتورة كلها ('+what+')؟ ستنتقل إلى المحذوفات ويمكنك استرجاعها.'))return;await soInvDelAll(L);SO.msg={ok:1,t:'حُذفت الفاتورة ('+what+') واتنقلت للمحذوفات.'}}
+    if(a==='invdel'||a==='invdelok'){if(!(soCanAppr(m.site_id)||APPU.owner))return;if(!confirm('حذف الفاتورة كلها ('+what+')؟ ستنتقل إلى المحذوفات ويمكنك استرجاعها.'))return;await soInvDelAll(L);SO.msg={ok:1,t:'حُذفت الفاتورة ('+what+') ونُقلت إلى المحذوفات.'}}
     else if(a==='invreq'){if(!L.every(soCanEdit))return;if(!confirm('حذف الفاتورة كاملة يحتاج إلى موافقة المدير. هل ترسل طلب حذف ('+what+')؟'))return;await soInvReq(L,true);SO.msg={ok:1,t:'أُرسل طلب الحذف إلى المدير.'}}
     else{await soInvReq(L,false);SO.msg={ok:1,t:APPU.owner?'رُفض طلب الحذف.':'أُلغي طلب الحذف.'}}
     render();return}
@@ -2872,13 +2873,18 @@ document.addEventListener('click',async ev=>{
   if(a==='catedit'){const it=soItem(id);if(!it)return;SO.cat={add:null,edit:{id,name:it.name,unit:it.unit||'',min:+it.min_qty>0?+it.min_qty:''}};SO.openCat=true;render();const n=$('#so_en');if(n)n.focus();return}
   if(a==='catsave'){const E=SO.cat.edit,it=E&&soItem(E.id);if(!it)return;const n=$('#so_en'),u=$('#so_eu');const name=(n?n.value:E.name).trim(),unit=(u?u.value:E.unit).trim();
     if(!name){SO.catMsg={t:'اكتب اسم الخامة.'};render();return}
-    if(it.parent&&!unit){SO.catMsg={t:'البند الفرعي يحتاج إلى وحدة.'};render();return}
-    if(soDup(name,it.parent,it.id)){const d=soItems().find(i=>(i.parent||'')===(it.parent||'')&&i.id!==it.id&&soNorm(i.name)===soNorm(name));
+    /* «تحت»: تحويل خامة رئيسية لفرعية تحت خامة تانية والعكس — الحركات بتفضل على نفس رقم الخامة */
+    const pe=$('#so_ep'),np=pe?(pe.value||''):(it.parent||''),moved=np!==(it.parent||'');
+    if(moved&&np&&soSubs(it.id).length){SO.catMsg={t:'هذه الخامة تحتها خامات فرعية، ولا يمكن جعلها فرعية. انقل الخامات التابعة لها أولًا.'};render();return}
+    if((np||it.parent&&!moved)&&!unit){SO.catMsg={t:'البند الفرعي يحتاج إلى وحدة.'};render();return}
+    if(soDup(name,np||null,it.id)){const d=soItems().find(i=>(i.parent||'')===np&&i.id!==it.id&&soNorm(i.name)===soNorm(name));
       if(APPU.owner&&d){await soMerge(it.id,d.id);return}
       SO.catMsg={t:'هذا الاسم موجود بالفعل. إذا كانا الصنف نفسه فاطلب من المدير دمجهما.'};render();return}
     const mi=$('#so_emin'),mv=mi&&mi.value!==''?+mi.value:null;if(mv!=null&&!(mv>=0)){SO.catMsg={t:'الحد الأدنى يجب أن يكون رقمًا.'};render();return}
-    const row={...soClean(it),name,unit};if(mi)row.min_qty=mv;
-    const ok=await soPut('store_items',row);SO.cat.edit=null;SO.catMsg={ok:1,t:'تم الحفظ'+(ok?'.':' على هذا الجهاز.')};render();return}
+    const row={...soClean(it),name,unit};if(mi)row.min_qty=mv;if(moved)row.parent=np||null;
+    const ok=await soPut('store_items',row);SO.cat.edit=null;if(moved&&np)SO.catOpen.add(np);
+    const oc=moved&&typeof cdOn==='function'&&cdOn()&&typeof cdM==='function'?cdM(it.id):'';
+    SO.catMsg={ok:1,t:(moved?(np?'«'+name+'» أصبحت خامة فرعية تحت «'+soItem(np).name+'»':'«'+name+'» أصبحت خامة رئيسية')+'، وحركاتها كما هي':'تم الحفظ')+(oc?'. كودها الحالي '+oc+' يبقى إلى أن يعدّله المدير من «الأسماء والأكواد» ← «الأكواد»':'')+(ok?'.':' على هذا الجهاز.')};render();return}
   if(a==='catdel'){const it=soItem(id);if(!it||!APPU.owner)return;if(!confirm('حذف «'+it.name+'» من قائمة الخامات؟'))return;const ok=await soPut('store_items',{...soClean(it),deleted:true});SO.catMsg={ok,t:ok?'تم الحذف.':'تعذّر الحذف.'};render();return}
   if(a==='print'&&site){SO.printing={site,rep:{...SO.rep}};printReport('store');return}
   if(a==='xlsx'&&site){soExcel(site);return}
@@ -3418,7 +3424,7 @@ function cxParse(sheets,site,existing){
     if(!raw.item)L.errs.push('البند');else{const h=its.find(x=>soNorm(x)===soNorm(raw.item));if(h)L.item=h;else L.errs.push('البند «'+raw.item+'» غير موجود في بنود الموقع')}
     if(!raw.notes)L.errs.push('البيان');L.notes=raw.notes;L.rem=raw.rem;
     if(raw.con){const h=regFind(RG,raw.con);if(h)L.con=h.name;else{L.con=raw.con;L.pend=true}}
-    else if(/توريد/.test(L.item||raw.item))L.errs.push('المورد (بند توريد)');
+    else if(typeof itNeedSup==='function'?itNeedSup(L.item||raw.item):/توريد/.test(L.item||raw.item))L.errs.push('المورد (بند توريد)');
     const m=CX_METH.find(([v,t])=>!raw.meth||soNorm(t)===soNorm(raw.meth)||v===raw.meth);if(m)L.meth=raw.meth?m[0]:'cash';else L.errs.push('طريقة الدفع «'+raw.meth+'»');
     L.inv=!L.errs.length&&custNeedInv(L.item,L.a);
     if(!L.errs.length){
@@ -3819,7 +3825,7 @@ async function ofbGo(m){
       const r=await Promise.all([SB.from('site_access').delete().eq('engineer',id),SB.from('store_access').delete().eq('person',id),SB.from('acct_sites').delete().eq('acct',id)]);
       const bad=r.find(x=>x&&x.error);if(bad)say('تعذّرت إزالة بعض الصلاحيات: '+bad.error.message,false);else say('أُزيلت صلاحياته على المواقع')}
     if(OFB.move==='owner'&&ofbSites(id).length){
-      try{const x=await ofbMoveSites(id);say('نُقل '+x.s+' موقع لحسابك ('+x.n+' سجل)')}catch(e){say('تعذّر نقل المواقع: '+(e.message||e)+'. ممكن تعيد المحاولة وهيكمّل من مكانه.',false)}}
+      try{const x=await ofbMoveSites(id);say('نُقل '+x.s+' موقع لحسابك ('+x.n+' سجل)')}catch(e){say('تعذّر نقل المواقع: '+(e.message||e)+'. يمكنك إعادة المحاولة وسيُكمل من حيث توقف.',false)}}
     if(OFB.block){const {error}=await SB.from('members').update({approved:false}).eq('id',id);
       if(error)say('تعذّر منع الدخول',false);else{m.approved=false;say('مُنع من الدخول')}}
     logChange('edit','files',{details:'إنهاء عمل المستخدم '+nm+(OFB.move==='owner'?' ونقل مواقعه للمدير':'')});
@@ -3954,7 +3960,7 @@ async function prResolve(x,name,kind){
       else{const e={...clean(it.e),contractor:name,updated:Date.now(),editedById:S.uid||''};delete e.conPend;queue('expenses',it.e.id,e)}
     }
     await soFlush();
-    PR.msg={ok:1,t:(kind?'أُضيف «'+name+'» للقائمة':'رُبط «'+x.name+'» بـ«'+name+'»')+' واتعدّلت '+x.items.length+(x.items.length===1?' حركة.':' حركات.')};
+    PR.msg={ok:1,t:(kind?'أُضيف «'+name+'» للقائمة':'رُبط «'+x.name+'» بـ«'+name+'»')+' وعُدِّلت '+x.items.length+(x.items.length===1?' حركة.':' حركات.')};
     logChange('edit','files',{details:(kind?'إضافة «'+name+'» من الأسماء المنتظرة':'ربط «'+x.name+'» بـ«'+name+'»')});
   }finally{PR.busy=false}
   render();
@@ -3971,7 +3977,7 @@ function noPriceInv(siteId){
 }
 function prNotices(){
   if(!APP||appIsEngineer()||!APPU.approved)return [];const out=[];
-  const G=prGroups();if(G.length)out.push(`<div class="xbar"><span>${G.length===1?'اسم مورد/مقاول بانتظار التسجيل':G.length+' أسماء موردين/مقاولين بانتظار التسجيل'} التسجيل: ${G.slice(0,3).map(x=>'«'+esc(x.name)+'»').join('، ')}${G.length>3?'…':''}</span><button class="primary" data-nav="${esc(JSON.stringify({k:'pend',id:G[0].k,label:'أسماء بانتظار التسجيل'}))}">سجّلهم</button></div>`);
+  const G=prGroups();if(G.length)out.push(`<div class="xbar"><span>${G.length===1?'اسم مورد/مقاول بانتظار التسجيل':G.length+' أسماء موردين/مقاولين بانتظار التسجيل'}: ${G.slice(0,3).map(x=>'«'+esc(x.name)+'»').join('، ')}${G.length>3?'…':''}</span><button class="primary" data-nav="${esc(JSON.stringify({k:'pend',id:G[0].k,label:'أسماء بانتظار التسجيل'}))}">سجّلهم</button></div>`);
   let n=0;for(const s of ctMySites())n+=noPriceInv(s.id).length;
   if(n){let f=null;for(const s of ctMySites()){const L=noPriceInv(s.id);if(L.length){f=L[0].nav;break}}out.push(`<div class="xbar"><span>${n===1?'فاتورة مخزن فيها':n+' فواتير مخزن فيها'} أصناف بلا سعر — لا تدخل في حساب المورد إلى أن يُكتب السعر.</span>${f?`<button class="primary" data-nav="${esc(JSON.stringify(f))}">افتح${n>1?' أول واحدة':'ها'}</button>`:''}</div>`)}
   return out;
@@ -3986,7 +3992,7 @@ function navGo(t){
   if(t.k==='inv'){const m=(SO.d&&SO.d.moves||[]).find(x=>x.id===t.id);if(!m||m.deleted)gone='هذه الفاتورة حُذفت أو غير موجودة.';else{const k=soInvKey(m);S.sel='__store';SO.site=t.site||m.site_id;SO.want=SO.site;SO.tab='moves';SO.form=null;SO.imp=null;SO.mf={date:'',q:''};SO.lim=100000;SO.focus={key:k,id:m.id,mode:t.mode||'row'}}}
   else if(t.k==='cert'){const c=(CT.rows||[]).find(x=>x.id===t.id);if(!c)gone='هذا المستخلص حُذف أو غير موجود.';else{CT.hl=c.id;CT.form=null;if(appIsEngineer())CT.tab='certs';else S.sel='__certs';if(t.edit)CT.navEdit=c.id}}
   else if(t.k==='cust'){CU.hl=t.id;if(appIsEngineer())CT.tab='cust';else S.sel='__custody'}
-  else if(t.k==='pend'){PR.hl=t.id;S.sel='__pendregs'}
+  else if(t.k==='pend'){PR.hl=t.id;if(typeof cdCan==='function'&&cdCan()){CDP.tab='pend';S.sel='__codes'}else S.sel='__pendregs'}
   else if(t.k==='conf'){S.sel=t.site}
   if(gone){flash(gone,1);return}
   S.back={from,label:t.label||'',at:navAt()};S.justSaved=true;render();
@@ -4021,7 +4027,7 @@ const spShow=v=>{const a=SP.alias[soNorm(v)];return (a||String(v||'')).trim()};
 const spOwnerKey=s=>(s&&s._p)||'';
 /* المكتب الفني: كشف مورد أو كشف دفعات لمقاول/مورد في المواقع المسجّل عليها بس؛ الدفعات من cert_paid_rows (المبلغ والتاريخ والبند من دون طريقة الدفع) */
 const spTech=()=>APP&&typeof appIsEngineer==='function'&&appIsEngineer()&&isTechR(myRole());
-function spAllSites(){if(!spTech())return S.sites;const me=APPU.me&&APPU.me.id;return (CT.access||[]).filter(a=>a.engineer===me).map(a=>({id:a.site_id,name:a.site_name||'',owner:a.site_owner||null,_p:a.site_owner?'u/'+a.site_owner:''}))}
+function spAllSites(){if(APP&&typeof appIsEngineer==='function'&&appIsEngineer()&&!spTech())return spStoreSites().map(s=>({id:s.id,name:s.name,_p:''}));if(!spTech())return S.sites;const me=APPU.me&&APPU.me.id;return (CT.access||[]).filter(a=>a.engineer===me).map(a=>({id:a.site_id,name:a.site_name||'',owner:a.site_owner||null,_p:a.site_owner?'u/'+a.site_owner:''}))}
 function spExp(){if(!spTech())return S.exp;return (CT.paid||[]).map((e,i)=>({id:'tp'+i,siteId:e.site_id,contractor:e.contractor||'',item:e.item||'',date:e.date||'',amount:+e.amount||0,_tech:1}))}
 const spSiteName=id=>(spAllSites().find(s=>s.id===id)||{}).name||siteNameOf(id);
 const spOwnerName=k=>{if(spTech()){const L=spAllSites().filter(s=>spOwnerKey(s)===k).map(s=>s.name);return L.length?L.join('، '):'مواقع'}if(!k)return 'المدير';const id=k.split('/')[1];const m=(APPU.members||[]).find(x=>x.id===id);return (m&&(m.name||m.email))||S.names[id]||'صاحب موقع'};
@@ -4178,7 +4184,7 @@ function spGroup(one){
     const GT=spSum(L);xl.push(['إجمالي '+g,'',...(multi?['']:[]),'','','',GT]);tot.push(xl.length-1);
     const byN=new Map();if(one)for(const e of L){const k=spShow(e.contractor||'')||'—';byN.set(k,r2((byN.get(k)||0)+amt(e)))}
     const sumRows=one?[...byN.entries()].sort((a,b)=>b[1]-a[1]):items.map(([k,es])=>[k,spSum(es)]);
-    body=(items.length?body+`<div class="keep"><h3>${one?'الملخص حسب المقاول / المورد':'الملخص'}</h3><table style="width:60%"><tbody>${sumRows.map(([k,v])=>`<tr><td class="tl">${esc(k)}</td><td class="n">${money0(v)}</td></tr>`).join('')}<tr class="tot"><td class="tl b">إجمالي ${esc(g)}</td><td class="n b">${money0(GT)}</td></tr></tbody></table></div>`:`<p>${one?'لا توجد مصروفات على هذا البند في هذه الفترة.':'لا توجد مصروفات على بنود هذا البند العام في هذه الفترة.'}</p>`)+`<p class="note">${one?'المصروفات الفعلية المسجّلة على بند «'+esc(g)+'»'+(sites[0]&&parentOf(sites[0].id)?' (تابع لـ«'+esc(parentOf(sites[0].id))+'»)':'')+'.':'المصروفات الفعلية المسجّلة على البنود التابعة لـ«'+esc(g)+'».'}${spScopeNote(sites)}</p>`;
+    body=(items.length?body+`<div class="keep"><h3>${one?'الملخص حسب المقاول / المورد':'الملخص'}</h3><table style="width:60%"><tbody>${sumRows.map(([k,v])=>`<tr><td class="tl">${esc(k)}</td><td class="n">${money0(v)}</td></tr>`).join('')}<tr class="tot"><td class="tl b">إجمالي ${esc(g)}</td><td class="n b">${money0(GT)}</td></tr></tbody></table>${!one&&typeof itType==='function'&&items.some(([k])=>itType(k))?`<h3>حسب النوع</h3><table style="width:60%"><tbody>${[...IT_TYPES,['','من دون نوع']].map(([t,l])=>{const v=r2(items.filter(([k])=>(itType(k)||'')===t).reduce((a,[,es])=>a+spSum(es),0));return v?`<tr><td class="tl">${l}</td><td class="n">${money0(v)}</td><td class="n">${GT?Math.round(v/GT*100)+'%':''}</td></tr>`:''}).join('')}</tbody></table>`:''}</div>`:`<p>${one?'لا توجد مصروفات على هذا البند في هذه الفترة.':'لا توجد مصروفات على بنود هذا البند العام في هذه الفترة.'}</p>`)+`<p class="note">${one?'المصروفات الفعلية المسجّلة على بند «'+esc(g)+'»'+(sites[0]&&parentOf(sites[0].id)?' (تابع لـ«'+esc(parentOf(sites[0].id))+'»)':'')+'.':'المصروفات الفعلية المسجّلة على البنود التابعة لـ«'+esc(g)+'».'}${spScopeNote(sites)}</p>`;
     if(one){xl.push([]);xl.push(['الملخص حسب المقاول / المورد','',...(multi?['']:[]),'','','','']);for(const [k,v] of sumRows)xl.push([k,'',...(multi?['']:[]),'','','',v])}
     SP.xl={rows:xl,tot,title:KT+' - '+g,sheet:KT};
     return {title:KT+' — '+g+' — المنصرف الفعلي',sub:spScopeTxt(sites)+' · '+(from?'من '+from+' ':'من البداية ')+'إلى '+to,body};
@@ -4283,8 +4289,20 @@ function spSiteFull(){
   <h3>دفعات المالك (${Dp.length})</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البيان</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${Dp.map(d=>`<tr><td class="d">${esc(d.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(d.siteId))}</td>`:''}<td class="tl">${esc(d.notes||'')}</td><td>${esc(spMethTxt(d))}</td><td class="n in">${money0(amt(d))}</td></tr>`).join('')||`<tr><td colspan="${multi?5:4}">—</td></tr>`}</tbody>${Dp.length?`<tfoot><tr><td colspan="${multi?4:3}">الإجمالي</td><td class="n">${money0(spSum(Dp))}</td></tr></tfoot>`:''}</table>`;
 }
 /* المواضيع في صفحة «التقارير» */
-const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['go:__store','المخزن','أرصدة وحركات'],['go:__journal','اليومية','حركة يوم أو فترة'],['go:__all','ملخص المواقع','كل المواقع']];
+const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['store','المخزن','أرصدة وحركات'],['journal','اليومية','حركة يوم أو فترة'],['all','ملخص المواقع','كل المواقع']];
+/* مواقع المخزن المفعّلة اللي ليه صلاحية عليها */
+const spStoreSites=()=>typeof soMySites==='function'&&typeof SO!=='undefined'&&SO.d?soMySites().filter(s=>s.enabled):[];
+/* المواضيع المسموح بيها لكل دور (قرار 30 أكتوبر): المكتب الفني مقاول/مورد/دفعات (+ المخزن لو له صلاحية)، أمين المخزن ومهندس الموقع المخزن والخامة، المحاسب وصاحب الموقع والمدير الكل */
+function spSubjects(){
+  const st=spStoreSites().length>0,eng=APP&&typeof appIsEngineer==='function'&&appIsEngineer();
+  if(!eng)return SP_SUBJ.map(x=>x[0]).filter(v=>v!=='store'||st);
+  const out=[];if(spTech())out.push('con','sup','pay');if(st)out.push('store','mat');return out;
+}
 const SP_SHAPED=['site','sup','con'];
+/* «كشف حساب» من صفحة المقاولين والبنود بيفتح صفحة التقارير بالاسم متختار وشكل «عادي» */
+function spOpenStmt(col,name){if(!APP||typeof spRenderPage!=='function'||Array.isArray(name))return false;
+  if(col==='items'){SP.type='item';SP.iname=name;SP.mode='now'}else{SP.type=conKind(name)==='supplier'?'sup':'con';SP.name=name;SP.item=''}
+  SP.site='';SP.from='';SP.to='';SP.shape='full';S.stmt=null;S.sel='__stmts';S.justSaved=true;render();window.scrollTo({top:0});return true}
 function spDoc(){const d=SP.type==='con'?spContractor():SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite();
   if(d&&SP.shape==='full'&&SP_SHAPED.includes(SP.type)){d.title=d.title.replace('تقرير مختصر','تقرير تفصيلي');if(SP.type==='site')d.body+=spSiteFull()}return d}
 
@@ -4297,13 +4315,21 @@ function spNames(kind){
   return [...m.values()].sort((a,b)=>a.localeCompare(b,'ar'));
 }
 function spRenderPage(){
-  if(spTech()){if(SP.type==='site')SP.type='sup';SP.party='con'}
+  const SUBJ=spSubjects();if(!SUBJ.includes(SP.type))SP.type=SUBJ[0]||'site';if(spTech())SP.party='con';
+  const tiles=`<div class="card"><div class="sec-h">1. اختر الموضوع</div><div class="sp-subj">${SP_SUBJ.filter(([v])=>SUBJ.includes(v)).map(([v,t,h])=>`<button type="button" class="sp-s" data-sp="type" data-v="${v}" aria-pressed="${SP.type===v}"><b>${t}</b><small>${h}</small></button>`).join('')}</div></div>`;
+  /* المخزن واليومية وملخص المواقع: نفس شاشاتهم جوه صفحة التقارير */
+  if(SP.type==='journal'||SP.type==='all'){SP.type==='journal'?renderJournal():renderOverview();$('#pane').insertAdjacentHTML('afterbegin',`<div class="pane-h"><h2>التقارير</h2></div>`+tiles);return}
+  if(SP.type==='store'){const L=spStoreSites();if(!L.some(s=>s.id===SO.site))SO.site=(L[0]||{}).id||'';const site=L.find(s=>s.id===SO.site);SO.repOpen=true;
+    $('#pane').innerHTML=`<div class="pane-h"><h2>التقارير</h2></div>${tiles}<div class="card"><div class="sec-h">2. الموقع</div><select id="sp_ssite" style="width:auto">${L.map(s=>`<option value="${esc(s.id)}" ${s.id===SO.site?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>${site?soRepHTML(site):'<div class="card blank"><p>المخزن غير مفعّل في أي موقع.</p></div>'}`;
+    const ss=$('#sp_ssite');if(ss)ss.onchange=()=>{SO.site=ss.value;render()};
+    for(const [id,k] of [['so_rmain','main'],['so_rsub','sub'],['so_rfrom','from'],['so_rto','to']]){const e=document.getElementById(id);if(!e)continue;if(e.type==='date')dfBind(e,v=>{SO.rep[k]=v;render()});else e.onchange=()=>{SO.rep[k]=e.value;if(k==='main')SO.rep.sub='';render()}}
+    const rs=$('#so_rsup');if(rs)rs.onchange=()=>{SO.rep.sup=rs.value;render()};return}
   const owners=spOwners(),sc=spScope(),names=SP.type==='site'?[]:SP.type==='con'?spConNames():spNames(SP.type==='sup'?'sup':'all');
   if(SP.name&&!names.some(n=>spN(n)===spN(SP.name)))SP.name='';
   const d=spDoc();
   const opt=(v,t,cur)=>`<option value="${esc(v)}" ${v===cur?'selected':''}>${esc(t)}</option>`;
   $('#pane').innerHTML=`<div class="pane-h"><h2>التقارير</h2></div>
-  <div class="card"><div class="sec-h">1. اختر الموضوع</div><div class="sp-subj">${SP_SUBJ.filter(([v])=>spTech()?['con','sup','pay'].includes(v):true).map(([v,t,h])=>v.startsWith('go:')?`<button type="button" class="sp-s go" data-sp="go" data-v="${v.slice(3)}"><b>${t}</b><small>${h} ↗</small></button>`:`<button type="button" class="sp-s" data-sp="type" data-v="${v}" aria-pressed="${SP.type===v}"><b>${t}</b><small>${h}</small></button>`).join('')}</div></div>
+  ${tiles}
   <div class="card"><div class="sec-h">2. الفلاتر والشكل</div><form class="entry" id="spForm" onsubmit="return false">
     ${SP_SHAPED.includes(SP.type)?`<div class="f fw"><label>شكل التقرير</label><div class="seg sp-shape">${[['short','مختصر'],['full','عادي (تفصيلي)']].map(([v,t])=>`<button type="button" data-sp="shape" data-v="${v}" aria-selected="${SP.shape===v}">${t}</button>`).join('')}</div></div>`:''}
     ${(S.isManager||spTech())&&owners.length>1&&!SP.site?`<div class="f c2"><label for="sp_owner">${spTech()?'مجموعة المواقع (الحسابات منفصلة لكل صاحب موقع)':'مواقع من (الحسابات منفصلة)'}</label><select id="sp_owner">${owners.map(([k])=>opt(k,spOwnerName(k),spOwnerKey(sc[0]))).join('')}</select></div>`:''}
@@ -4320,7 +4346,7 @@ function spRenderPage(){
     <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}${d&&['grp','item','mat'].includes(SP.type)&&SP.xl?'<button type="button" class="ghost" data-sp="xl">Excel</button>':''}</div>
   </form></div>
   ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>`:'<div class="card blank" style="padding:24px"><p>اختر الاسم ليظهر الكشف.</p></div>'}
-  ${spAliasCard()}`;
+  `;
   const on=(id,k,re)=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SP[k]=e.value;if(re)re();render()}};
   on('sp_site','site');on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_grp','gname');on('sp_iname','iname');on('sp_mmain','mmain',()=>{SP.msub=''});on('sp_msub','msub');on('sp_party','party',()=>{SP.name=''});dfBind(document.getElementById('sp_from'),v=>{SP.from=v;render()});dfBind(document.getElementById('sp_to'),v=>{SP.to=v;render()});
 }
@@ -4441,7 +4467,10 @@ const cdCan=()=>APP&&!!APPU.approved&&(APPU.owner||(typeof myRole==='function'&&
 /* الاسم بدون «ال» وبدون مسافات — للمقارنة */
 const cdCmp=t=>arNorm(t).replace(/\s+/g,'').replace(/^ال/,'');
 function cdLev(a,b){if(Math.abs(a.length-b.length)>2)return 9;const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function cdSimilar(a,b){const x=cdCmp(a),y=cdCmp(b);if(!x||!y)return false;if(x===y)return true;
+/* الأرقام اللي في الاسم (مقاسات، أوزان، أعداد): اسمين أرقامهم مختلفة مش متشابهين أبدًا (قرار 30 أكتوبر) */
+const nmNums=t=>(String(t||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).match(/\d+(?:[.,]\d+)?/g)||[]).map(x=>x.replace(',','.').replace(/^0+(?=\d)/,'')).join('|');
+const nmNumsDiff=(a,b)=>nmNums(a)!==nmNums(b);
+function cdSimilar(a,b){if(nmNumsDiff(a,b))return false;const x=cdCmp(a),y=cdCmp(b);if(!x||!y)return false;if(x===y)return true;
   const wa=arNorm(a).split(' '),wb=arNorm(b).split(' ');if(wa.length>=2&&wb.length>=2){const s=wa.length<wb.length?wa:wb,l=s===wa?wb:wa;if(s.every((w,i)=>cdCmp(w)===cdCmp(l[i]||'')))return true}
   if(x.length>=5&&y.length>=5)return cdLev(x,y)<=(Math.min(x.length,y.length)>=8?2:1);return false}
 /* كل الأسماء المستخدمة: القوائم + المصروفات + المخزن + المستخلصات + العهد، مع عدد الحركات والمبلغ والمواقع */
@@ -4491,14 +4520,14 @@ function cdMatGroups(){if(typeof SO==='undefined'||!SO.d)return [];const its=(SO
     for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){const a=L[i],b=L[j];if(lvl&&a.parent!==b.parent)continue;if(CD.dupOk[cdOkKey('mat',a.id,b.id)])continue;if(cdSimilar(a.name,b.name)){const ra=find(a.id),rb=find(b.id);if(ra!==rb)par.set(rb,ra)}}
     const G=new Map();for(const i of L){const r=find(i.id);if(!G.has(r))G.set(r,[]);G.get(r).push(i)}for(const g of G.values())if(g.length>1)out.push(g)}
   return out}
-/* حركات على خامات اتمسحت (دمج اتقطع في النص قبل تصليح 30 أكتوبر) */
+/* حركات على خامات محذوفة (دمج اتقطع في النص قبل تصليح 30 أكتوبر) */
 function cdOrphans(){if(typeof SO==='undefined'||!SO.d)return [];const all=SO.d.items||[],live=all.filter(i=>!i.deleted);
   return all.filter(i=>i.deleted).map(it=>{const m=soMovesOf(it.id),n=m.ins.filter(x=>!x.deleted).length+m.counts.filter(x=>!x.deleted).length;if(!n)return null;
     const same=live.filter(x=>(!!x.parent)===(!!it.parent));let t=it.merged_into&&live.some(x=>x.id===it.merged_into)?it.merged_into:'';
     if(!t){const c=same.filter(x=>cdSimilar(x.name,it.name)).sort((a,b)=>(b.parent===it.parent)-(a.parent===it.parent));t=c[0]?c[0].id:''}
     return {it,n,t,same}}).filter(Boolean)}
 function cdOrphCard(){const L=cdOrphans();if(!L.length)return '';
-  return `<div class="card" style="border-color:#e0b252"><div class="sec-h">⚠ حركات على خامات اتمسحت (${L.length})</div><p class="note">الخامات دي اتدمجت واتشالت من القائمة، لكن جزء من توريداتها أو جردها ما اتنقلش (الفواتير القديمة اللي من غير بند توريد). اختار الخامة الصح واضغط «انقل حركاتها». لازم ملف تصليح 30 أكتوبر (SQL) يكون اتشغّل.</p>
+  return `<div class="card" style="border-color:#e0b252"><div class="sec-h">⚠ حركات على خامات محذوفة (${L.length})</div><p class="note">دُمجت هذه الخامات وحُذفت من القائمة، لكن جزءًا من توريداتها أو جردها لم يُنقل (الفواتير القديمة التي ليس لها بند توريد). اختر الخامة الصحيحة واضغط «انقل حركاتها». يجب أن يكون ملف تصليح 30 أكتوبر (SQL) قد شُغِّل.</p>
   <div class="tbl-wrap"><table><thead><tr><th>الخامة الممسوحة</th><th class="num">حركات</th><th>انقلها إلى</th><th></th></tr></thead><tbody>
   ${L.map(o=>`<tr><td class="tl"><b>${esc(soLabel(o.it.id))}</b></td><td class="num">${o.n}</td><td><select data-cdorph="${esc(o.it.id)}"><option value="">— اختر —</option>${o.same.slice().sort((a,b)=>soLabel(a.id).localeCompare(soLabel(b.id),'ar')).map(x=>`<option value="${esc(x.id)}" ${x.id===(CDP.orph[o.it.id]??o.t)?'selected':''}>${esc(soLabel(x.id))}</option>`).join('')}</select></td>
    <td><button class="primary" type="button" data-cd="orphfix" data-id="${esc(o.it.id)}" ${CDP.busy?'disabled':''}>انقل حركاتها</button></td></tr>`).join('')}</tbody></table></div></div>`}
@@ -4512,7 +4541,7 @@ function cdTabs(){
   const nCon=cdGroupsOf('con').length,nItem=cdGroupsOf('item').length,nMat=APPU.owner?cdMatGroups().length+cdOrphans().length:0;
   const ungrouped=cdItemRegs().filter(x=>x.name!==REV_ITEM&&!cdGroupOf(x.name)).length,noAbbr=cdGroups().filter(g=>!cdG(g.name)).length;
   const mains=typeof SO!=='undefined'&&SO.d?(SO.d.items||[]).filter(i=>!i.deleted&&!i.parent):[],unl=mains.filter(m=>!m.sitem).length;
-  return [['con','المقاولون والموردون',nCon],['item','البنود',nItem],...(APPU.owner?[['mat','خامات المخزن',nMat]]:[]),['grp','البنود العامة والاختصارات',ungrouped+noAbbr],['link','ربط الخامات ببنود التوريد',unl],['list','الأكواد',null]];
+  return [['con','المقاولون والموردون',nCon],['item','البنود',nItem],...(APPU.owner?[['mat','خامات المخزن',nMat]]:[]),['grp','البنود العامة والاختصارات',ungrouped+noAbbr],['link','ربط الخامات ببنود التوريد',unl],...(typeof prGroups==='function'?[['pend','بانتظار التسجيل',prGroups().length]]:[]),['list','الأكواد',null]];
 }
 function cdDupCard(kind,g,gi){
   const k=kind+':'+gi,sel=CDP.sel[k]||g[0].name,mineOk=g.every(cdMineOnly),hidden=CDP.open[k+':x']||{};
@@ -4535,10 +4564,10 @@ function cdGrpTab(){
   const G=cdGroups(),its=cdItemRegs().filter(x=>x.name!==REV_ITEM&&x.name!==PAY_ITEM),un=its.filter(x=>!cdGroupOf(x.name)),gn=igNames(typeof igMyPf==='function'?igMyPf():'');
   const abbr=G.map(g=>{const c=cdG(g.name),sg=cdSuggest(g.name),w=CDP.want[arNorm(g.name)]??(sg?sg.c:''),n=its.filter(x=>arNorm(cdGroupOf(x.name))===arNorm(g.name)).length;
     return `<tr><td class="tl"><b>${esc(g.name)}</b></td><td class="num">${n}</td><td>${c?cdTag(c)+' <span class="note">ثابت</span>':`<input class="cd-abbr" data-cdwant="${esc(arNorm(g.name))}" value="${esc(w)}" maxlength="3" dir="ltr" style="width:70px;text-transform:uppercase" aria-label="الاختصار">${sg?` <span class="note">${esc(sg.en)}</span>`:' <span class="note">اكتب حرفين أو ثلاثة بالإنجليزي</span>'}${w&&cdTaken(w)?' <span class="msg err">مستخدم</span>':''}`}</td></tr>`}).join('');
-  return `<div class="card"><div class="sec-h">1) كل بند تحت بنده العام</div><p class="note">قبل عمل الأكواد: حط كل بند تحت البند العام بتاعه — الكود بيتبني من مكانه ويفضل ثابت بعد كده. البند اللي يفضل من غير بند عام بياخد كود GN.</p>
+  return `<div class="card"><div class="sec-h">1) كل بند تحت بنده العام</div><p class="note">قبل عمل الأكواد: ضع كل بند تحت بنده العام — يُبنى الكود من مكانه ويبقى ثابتًا بعد ذلك. البند الذي يبقى من دون بند عام يأخذ كود GN.</p>
    <div class="row" style="gap:8px;flex-wrap:wrap"><input id="cdNewG" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:220px"><button class="primary" type="button" data-cd="newg">إضافة بند عام</button></div>
    ${un.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>البند</th><th>البند العام</th></tr></thead><tbody>${un.map(x=>`<tr><td class="tl">${esc(x.name)}</td><td><select data-cdgrp="${esc(x.name)}"><option value="">— من غير بند عام (GN) —</option>${gn.map(g=>`<option>${esc(g)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>`:'<p class="pill-ok" style="display:inline-block">كل البنود تحت بنود عامة.</p>'}</div>
-  <div class="card"><div class="sec-h">2) اختصار كل بند عام</div><p class="note">الاختصار بالإنجليزي على ترجمة البند (السباكة PL = Plumbing). التطبيق بيقترحه من القاموس وتقدر تغيّره قبل عمل الأكواد.</p>
+  <div class="card"><div class="sec-h">2) اختصار كل بند عام</div><p class="note">الاختصار بالإنجليزية وفق ترجمة البند (السباكة PL = Plumbing). يقترحه التطبيق من القاموس، ويمكنك تغييره قبل عمل الأكواد.</p>
    ${G.length?`<div class="tbl-wrap"><table><thead><tr><th>البند العام</th><th class="num">البنود</th><th>الاختصار</th></tr></thead><tbody>${abbr}</tbody></table></div>`:'<p class="note">لا توجد بنود عامة بعد.</p>'}</div>`;
 }
 function cdLinkTab(){
@@ -4547,7 +4576,7 @@ function cdLinkTab(){
   const st=mains.map(m=>({m,s:cdMatSuggest(m)})),nOk=st.filter(x=>x.m.sitem).length,nSg=st.filter(x=>!x.m.sitem&&x.s).length,nNo=st.length-nOk-nSg;
   const can=APPU.owner||(typeof myRole==='function'&&myRole()==='user');
   return `<div class="card"><div class="stat"><div>مربوطة <b>${nOk}</b></div><div>مقترحة <b>${nSg}</b></div><div>غير مربوطة <b>${nNo}</b></div></div>
-  <p class="note">كل خامة رئيسية في المخزن تتربط ببند توريد أساسي: لما تختار الخامة في فاتورة المخزن البند بيتحط لوحده (وتقدر تغيّره في الفاتورة لو المرة دي على بند تاني). الاقتراح من «بند التوريد» المكتوب على فواتير الخامة.</p>
+  <p class="note">تُربط كل خامة رئيسية في المخزن ببند توريد أساسي: عند اختيار الخامة في فاتورة المخزن يوضع البند تلقائيًا (ويمكنك تغييره في الفاتورة إذا كانت هذه المرة على بند آخر). الاقتراح من «بند التوريد» المكتوب على فواتير الخامة.</p>
   ${mains.length?`<div class="tbl-wrap"><table><thead><tr><th>الخامة الرئيسية</th><th class="num">الفرعية</th><th>بند التوريد</th><th>الكود</th><th>الحالة</th></tr></thead><tbody>
   ${st.map(({m,s})=>{const v=m.sitem||s||'';return `<tr><td class="tl"><b>${esc(m.name)}</b></td><td class="num">${(SO.d.items||[]).filter(i=>!i.deleted&&i.parent===m.id).length}</td>
    <td><select data-cdlink="${esc(m.id)}" ${can?'':'disabled'}><option value="">— اختر بند التوريد —</option>${sup.map(n=>`<option ${n===v?'selected':''}>${esc(n)}</option>`).join('')}</select></td>
@@ -4565,27 +4594,30 @@ function cdListTab(){
   return `<div class="card"><div class="row" style="gap:8px"><input id="cdQ" placeholder="بحث بالاسم أو الكود، مثال: PL-01" value="${esc(CDP.q||'')}" style="flex:1" autocomplete="off"><button class="ghost" type="button" data-cd="xlsx">Excel</button></div>
    <div class="sec-h" style="margin-top:10px">البنود والخامات</div><div class="tree">${tree||'<p class="note">لا توجد نتائج.</p>'}</div>
    <div class="sec-h" style="margin-top:12px">المقاولون والموردون</div><div class="tbl-wrap"><table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th>${APPU.owner?'<th></th>':''}</tr></thead><tbody>${cons.map(r=>`<tr><td>${cdTag(r.code)}</td><td class="tl">${esc(r.name)}</td><td>${r.kind==='C'?'مقاول':'مورد'}</td>${APPU.owner?`<td><button class="ghost" type="button" data-cd="setcode" data-kind="${r.kind}" data-key="${esc(r.key)}" data-code="${esc(r.code)}">تعديل الكود</button></td>`:''}</tr>`).join('')||'<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
-   ${APPU.owner?'<p class="note">الأكواد ثابتة. تعديل كود يدويًا للمدير بس، ولازم ما يتكررش.</p>':''}</div>`;
+   ${APPU.owner?'<p class="note">الأكواد ثابتة. تعديل الكود يدويًا للمدير فقط، ويجب ألا يتكرر.</p>':''}</div>`;
 }
 function renderCodes(){
   if(!cdCan()){$('#pane').innerHTML='<div class="blank"><h3>هذه الصفحة للمدير وصاحب الموقع.</h3></div>';return}
   if(typeof SO!=='undefined'&&!SO.loaded&&typeof soLoad==='function'){soLoad().then(()=>{if(S.sel==='__codes')render()}).catch(()=>{})}
   if(typeof CT!=='undefined'&&!CT.loaded&&typeof ctLoad==='function'){ctLoad().then(()=>{if(S.sel==='__codes')render()}).catch(()=>{})}
-  if(CD.missing){$('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة الأسماء والأكواد</h2></div><div class="card"><p class="msg err">لازم ملف التحديث (SQL) الخاص بالأكواد يتشغّل على قاعدة البيانات الأول.</p></div>`;return}
+  if(CD.missing){$('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة الأسماء والأكواد</h2></div><div class="card"><p class="msg err">يجب تشغيل ملف التحديث (SQL) الخاص بالأكواد على قاعدة البيانات أولًا.</p></div>`;return}
   const T=cdTabs(),tab=T.some(t=>t[0]===CDP.tab)?CDP.tab:'con',m=CDP.msg&&Date.now()-(CDP.msg.at||0)<9000?CDP.msg:null;
+  const tabsBar=`<div class="seg cd-tabs" role="tablist">${T.map(([k,t,n])=>`<button role="tab" data-cdtab="${k}" aria-selected="${k===tab}">${t}${n?` <b class="neg">${n}</b>`:''}</button>`).join('')}</div>`;
+  /* «بانتظار التسجيل» بقت تبويب هنا (قرار 30 أكتوبر: دمج الأسماء وربطها في مكان واحد) */
+  if(tab==='pend'){prRenderPage();const h=$('#pane .pane-h');if(h){h.innerHTML='<h2>الأسماء والأكواد</h2>';h.insertAdjacentHTML('afterend',tabsBar)}return}
   let body='';
   if(tab==='con'||tab==='item'){const G=cdGroupsOf(tab);const al=tab==='con'&&APPU.owner&&typeof SP!=='undefined'?Object.entries(SP.alias||{}):[];
-    body=`${al.length?`<div class="card"><div class="sec-h">دمجات قديمة في «التقارير المختصرة» (${al.length})</div><p class="note">الأسماء دي اتدمجت في التقارير بس. «طبّقها على الحركات» بيغيّر الاسم في كل فواتير المخزن والمصروفات فعلًا.</p><button class="primary" type="button" data-cd="alias">طبّقها على الحركات</button></div>`:''}
-    <div class="card"><p class="note" style="margin-top:0">أسماء شبه بعض (همزة، تاء مربوطة، مسافات، أو مكتوبة بشكلين). اختر الاسم الصحيح وادمج، أو علّمهم «مختلفين». الدمج بينقل كل الحركات (مصروفات، فواتير مخزن، مستخلصات، عهد) على الاسم الصحيح ومينفعش يتراجع (فيه نسخة احتياطية على السيرفر).</p>
+    body=`${al.length?`<div class="card"><div class="sec-h">دمجات قديمة في «التقارير» (${al.length})</div><p class="note">هذه الأسماء مدموجة في التقارير فقط. «طبّقها على الحركات» يغيّر الاسم فعليًا في كل فواتير المخزن والمصروفات.</p><button class="primary" type="button" data-cd="alias">طبّقها على الحركات</button></div>`:''}
+    <div class="card"><p class="note" style="margin-top:0">أسماء متشابهة (همزة، تاء مربوطة، مسافات، أو مكتوبة بشكلين). اختر الاسم الصحيح وادمج، أو علّمها «مختلفة». ينقل الدمج كل الحركات (مصروفات، فواتير مخزن، مستخلصات، عهد) إلى الاسم الصحيح، ولا يمكن التراجع عنه (توجد نسخة احتياطية على السيرفر). الأسماء التي تختلف أرقامها (مقاسات، أوزان) لا تظهر كمتشابهة.</p>
     ${G.length?G.map((g,i)=>cdDupCard(tab,g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد أسماء متكررة.</p>'}</div>`}
-  else if(tab==='mat'){const G=cdMatGroups();body=cdOrphCard()+`<div class="card"><p class="note" style="margin-top:0">خامات مكتوبة بشكلين في كتالوج المخزن. الدمج بينقل كل التوريدات والجرد للخامة الصحيحة.</p>${G.length?G.map((g,i)=>cdMatCard(g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد خامات متكررة.</p>'}</div>`}
+  else if(tab==='mat'){const G=cdMatGroups();body=cdOrphCard()+`<div class="card"><p class="note" style="margin-top:0">خامات مكتوبة بشكلين في كتالوج المخزن. ينقل الدمج كل التوريدات والمرتجعات والجرد إلى الخامة الصحيحة. الخامات التي تختلف أرقامها (مقاسات، أوزان) لا تظهر كمتشابهة.</p>${G.length?G.map((g,i)=>cdMatCard(g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد خامات متكررة.</p>'}</div>`}
   else if(tab==='grp')body=cdGrpTab();else if(tab==='link')body=cdLinkTab();else body=cdListTab();
   const left=T.filter(t=>t[0]!=='list'&&t[2]).reduce((a,t)=>a+t[2],0);
-  $('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة الأسماء والأكواد</h2></div>
-  <div class="seg cd-tabs" role="tablist">${T.map(([k,t,n])=>`<button role="tab" data-cdtab="${k}" aria-selected="${k===tab}">${t}${n?` <b class="neg">${n}</b>`:''}</button>`).join('')}</div>
+  $('#pane').innerHTML=`<div class="pane-h"><h2>الأسماء والأكواد</h2></div>
+  ${tabsBar}
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
   ${body}
-  ${APPU.owner&&!cdOn()?`<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><span class="note grow">بعد ما تخلص المراجعة: بتتنزّل نسخة احتياطية على جهازك، وبعدين كل اسم ياخد كوده. الكود بيفضل ثابت.${left?' فاضل '+left+' للمراجعة (تقدر تكمّل من غيرها).':''}</span><button class="primary" type="button" data-cd="make" ${CDP.busy?'disabled':''}>عمل الأكواد</button></div></div>`:''}`;
+  ${APPU.owner&&!cdOn()?`<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><span class="note grow">بعد انتهاء المراجعة: تُنزَّل نسخة احتياطية على جهازك، ثم يأخذ كل اسم كوده. الكود يبقى ثابتًا.${left?' باقٍ '+left+' للمراجعة (يمكنك المتابعة من دونها).':''}</span><button class="primary" type="button" data-cd="make" ${CDP.busy?'disabled':''}>عمل الأكواد</button></div></div>`:''}`;
   const q=$('#cdQ');if(q){let t=null;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{CDP.q=q.value;const p=q.selectionStart;S.justSaved=true;render();const n=$('#cdQ');if(n){n.focus();try{n.setSelectionRange(p,p)}catch(e){}}},250)}}
 }
 document.addEventListener('change',async ev=>{
@@ -4613,9 +4645,9 @@ document.addEventListener('click',async ev=>{
     if(!navigator.onLine)return fail('الدمج يتطلب اتصالًا بالإنترنت.');CDP.busy=true;render();
     for(const s of g.filter(i=>i.id!==sel)){const e=soMergeErr(soItem(s.id),dst);if(e)return fail(e);soMergeQueue(soItem(s.id),dst)}
     await soFlush();CDP.busy=false;CDP.msg={ok:1,at:Date.now(),t:'تم دمج الخامات في «'+dst.name+'».'};render();return}
-  if(a==='orphfix'){if(!APPU.owner)return;const id=b.dataset.id,o=cdOrphans().find(x=>x.it.id===id),dst=CDP.orph[id]??(o&&o.t);if(!o||!dst)return fail('اختر الخامة اللي هتتنقل لها الحركات.');
+  if(a==='orphfix'){if(!APPU.owner)return;const id=b.dataset.id,o=cdOrphans().find(x=>x.it.id===id),dst=CDP.orph[id]??(o&&o.t);if(!o||!dst)return fail('اختر الخامة التي ستُنقل إليها الحركات.');
     if(!navigator.onLine)return fail('النقل يتطلب اتصالًا بالإنترنت.');CDP.busy=true;render();soMoveMoves(id,dst);await soFlush();
-    const left=cdOrphans().find(x=>x.it.id===id);CDP.busy=false;CDP.msg=left?{t:'اتنقل جزء، وفاضل '+left.n+' حركة ما اتنقلتش. اتأكد إن ملف تصليح 30 أكتوبر (SQL) اتشغّل.',at:Date.now()}:{ok:1,at:Date.now(),t:'اتنقلت حركات «'+soLabel(id)+'» إلى «'+soLabel(dst)+'».'};render();return}
+    const left=cdOrphans().find(x=>x.it.id===id);CDP.busy=false;CDP.msg=left?{t:'نُقل جزء، وبقيت '+left.n+' حركة لم تُنقل. تأكد من تشغيل ملف تصليح 30 أكتوبر (SQL).',at:Date.now()}:{ok:1,at:Date.now(),t:'نُقلت حركات «'+soLabel(id)+'» إلى «'+soLabel(dst)+'».'};render();return}
   if(a==='alias'){if(!APPU.owner)return;CDP.busy=true;render();const al=Object.entries(SP.alias||{});let n=0;
     const raw=new Set();for(const m of (SO.d&&SO.d.moves)||[])if((m.data||{}).supplier)raw.add(m.data.supplier.trim());for(const e of S.exp)if(e.contractor)raw.add(e.contractor.trim());
     for(const [from,to] of al)for(const r of raw)if(soNorm(r)===from&&r!==to){const e=await cdMerge('con',r,to);if(e)return fail(e);n++}
@@ -4624,13 +4656,13 @@ document.addEventListener('click',async ev=>{
   if(a==='newg'){const v=($('#cdNewG')||{}).value||'';const e=igCreate(v);if(e)return fail(e);render();return}
   if(a==='linkall'){for(const m of (SO.d.items||[]).filter(i=>!i.deleted&&!i.parent&&!i.sitem)){const s=cdMatSuggest(m);if(s)soQueue('store_items','put',m.id,{...soClean(m),sitem:s})}await soFlush();cdAutoSoon();CDP.msg={ok:1,at:Date.now(),t:'تم ربط الخامات المقترحة.'};render();return}
   if(a==='setcode'){if(!APPU.owner)return;const v=prompt('الكود الجديد لـ «'+(CD.rows.find(r=>r.kind===b.dataset.kind&&r.key===b.dataset.key)||{}).name+'»:',b.dataset.code);if(!v||v.trim().toUpperCase()===b.dataset.code)return;
-    const r=await SB.rpc('code_set',{k:b.dataset.kind,ky:b.dataset.key,new_code:v.trim().toUpperCase()});if(r.error)return fail(/taken/.test(r.error.message||'')?'الكود ده مستخدم.':/format/.test(r.error.message||'')?'شكل الكود مش مظبوط (مثال: C-012).':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100));
+    const r=await SB.rpc('code_set',{k:b.dataset.kind,ky:b.dataset.key,new_code:v.trim().toUpperCase()});if(r.error)return fail(/taken/.test(r.error.message||'')?'هذا الكود مستخدم.':/format/.test(r.error.message||'')?'صيغة الكود غير صحيحة (مثال: C-012).':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100));
     await cdLoad();CDP.msg={ok:1,at:Date.now(),t:'تم تعديل الكود.'};render();return}
   if(a==='xlsx'){const rows=[['الكود','الاسم','النوع','تحت']];const K={G:'بند عام',I:'بند',M:'خامة',C:'مقاول',S:'مورد'};for(const r of CD.rows.slice().sort((x,y)=>x.code.localeCompare(y.code)))rows.push([r.code,r.name,K[r.kind]||r.kind,r.parent||'']);
     try{await saveFile('ADC-الأكواد-'+today()+'.xlsx',XLSX_W.build([{name:'الأكواد',rows,styles:{0:1},widths:[16,34,12,14],freeze:1}]))}catch(e){}return}
   if(a==='make'){if(!APPU.owner)return;if(!navigator.onLine)return fail('عمل الأكواد يتطلب اتصالًا بالإنترنت.');
     const want={};for(const g of cdGroups()){const k=arNorm(g.name),w=(CDP.want[k]??(cdSuggest(g.name)||{}).c??'').toUpperCase();if(!cdG(g.name)){if(!/^[A-Z]{2,3}$/.test(w))return fail('اكتب اختصار «'+g.name+'» (حرفين أو ثلاثة بالإنجليزي) في تبويب «البنود العامة والاختصارات».');if(Object.values(want).includes(w)||cdTaken(w))return fail('الاختصار '+w+' مكرر.');want[k]=w}}
-    if(!confirm('عمل الأكواد لكل المقاولين والموردين والبنود والخامات؟\n\nهتتنزّل نسخة احتياطية على جهازك الأول. الأكواد بتفضل ثابتة بعد كده.'))return;
+    if(!confirm('عمل الأكواد لكل المقاولين والموردين والبنود والخامات؟\n\nستُنزَّل نسخة احتياطية على جهازك أولًا. تبقى الأكواد ثابتة بعد ذلك.'))return;
     CDP.busy=true;render();try{await saveBackup()}catch(e){}
     try{await Promise.all([typeof soLoad==='function'?soLoad():0]);let need=cdNeeded({want,all:true});for(let i=0;i<4&&need.length;i++){const r=await cdAlloc(need);if(r.err)return fail('تعذّر عمل الأكواد: '+String(r.err.message||'').slice(0,120));need=cdNeeded({want,all:true})}
       const z=await SB.from('app_settings').upsert({key:'codes_on',value:'1'},{onConflict:'key'});if(z.error)return fail('تعذّر الحفظ: '+String(z.error.message||'').slice(0,100));CD.on=true;appLs(LS_CD,{rows:CD.rows,on:true,dupOk:CD.dupOk,at:Date.now()})}
@@ -4721,8 +4753,8 @@ function supStoreCard(name){
    ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>الموقع</th><th class="num">الفواتير</th><th class="num">صافي الفواتير بالضريبة − المرتجعات</th><th class="num">المدفوع</th><th class="num">المتبقي</th></tr></thead><tbody>
    ${rows.map(r=>`<tr><td>${esc(siteNameOf(r.id))}</td><td class="num plain">${r.x.n}${r.x.noPrice?` <small class="neg">(${r.x.noPrice} من غير سعر)</small>`:''}</td><td class="num">${fmt(r.x.due)}</td><td class="num">${fmt(r.x.paid)}</td><td class="num strong${r.x.left<0?' neg':''}">${r.x.left<0?'('+fmt(-r.x.left)+') مقدم':fmt(r.x.left)}</td></tr>`).join('')}
    <tr class="sub"><td>الإجمالي</td><td class="num plain">${all.n}</td><td class="num">${fmt(all.due)}</td><td class="num">${fmt(all.paid)}</td><td class="num strong${all.left<0?' neg':''}">${all.left<0?'('+fmt(-all.left)+') مقدم':fmt(all.left)}</td></tr></tbody></table></div>`:'<p class="note">لا توجد فواتير مخزن بعد.</p>'}
-   <p class="note">الفواتير اللي من غير سعر أو «بانتظار التسجيل» مش داخلة لحد ما تكمل. المدفوع = المصروفات باسمه${k==='both'?' على بنود التوريد ودفعات «تحت الحساب»':''}.</p>
-   ${D&&D.loose.length?`<div class="warn-box">⚠ ${D.loose.length} ${D.loose.length===1?'دفعة':'دفعات'} باسمه (${fmt(D.looseAmt)}) على بنود مش من بنود فواتيره ولا من مستخلصاته: ${[...new Set(D.loose.map(e=>esc(e.item||'من دون بند')))].join('، ')} — مش محسوبة لا كمقاول ولا كمورد. صحّح بند الدفعة أو اجعلها «${PAY_ITEM}».</div>`:''}</div>`;
+   <p class="note">الفواتير التي ليس لها سعر أو «بانتظار التسجيل» غير محسوبة حتى تكتمل. المدفوع = المصروفات باسمه${k==='both'?' على بنود التوريد ودفعات «تحت الحساب»':''}.</p>
+   ${D&&D.loose.length?`<div class="warn-box">⚠ ${D.loose.length} ${D.loose.length===1?'دفعة':'دفعات'} باسمه (${fmt(D.looseAmt)}) على بنود ليست من بنود فواتيره ولا من مستخلصاته: ${[...new Set(D.loose.map(e=>esc(e.item||'من دون بند')))].join('، ')} — غير محسوبة له كمقاول ولا كمورد. صحّح بند الدفعة أو اجعلها «${PAY_ITEM}».</div>`:''}</div>`;
 }
 /* ---------- توزيع «دفعة مورد تحت الحساب» على البنود (الأقدم الأول) — للعرض بس، مش بيتخزن ----------
    لكل موقع ومورد: الدفعات المباشرة على البند تسدّ فواتير البند الأول، وبعدين الدفعات تحت الحساب تتوزع على
@@ -4750,8 +4782,8 @@ function payAlloc0(exps){
 /* ================= «سجل الاستيراد»: كل ملف Excel اتستورد — اللي اتسجل وتحت المراجعة واللي اتساب، والتراجع عن الملف =================
    تقرير الملف بيتحفظ في سجل التعديلات (log: action import، kind files، impId، rows) — وكل حركة من الملف عليها impId. */
 const IMPL={open:'',f:'all',site:'',mon:'',msg:null,busy:false};
-const IMPL_ST={ok:'اتسجل',rev:'تحت المراجعة',dup:'اتساب — مكرر',dup2:'اتساب — مكرر في الملف',err:'اتساب — ناقص',zero:'اتساب — من غير مبلغ'};
-/* الصف اللي هيتحفظ في التقرير (بيانات الصف اللي اتساب بتتحفظ كاملة علشان «سجّله برضه») */
+const IMPL_ST={ok:'سُجِّل',rev:'تحت المراجعة',dup:'تُرك — مكرر',dup2:'تُرك — مكرر في الملف',err:'تُرك — ناقص',zero:'تُرك — من دون مبلغ'};
+/* الصف اللي هيتحفظ في التقرير (بيانات الصف اللي اتساب بتتحفظ كاملة علشان «سجّله على أي حال») */
 function implRow(x,used,id){const r=x.rec||{},kept=used&&(x.st==='dup'||x.st==='dup2');
   const st=kept?'ok':x.st==='err'&&!(r.amount>0)?'zero':x.st;
   const o={line:x.line,st,kind:x.kind,amount:r.amount>0?r.amount:0,date:r.date||'',notes:r.notes||'',item:r.review?r.review.item||'':r.item||'',contractor:r.review?r.review.contractor||'':r.contractor||'',errs:x.errs||[]};
@@ -4780,7 +4812,7 @@ function implSum(x){
 }
 /* اللي اتغيّر في الحركة من وقت الاستيراد */
 function implDiff(r,e){
-  if(!e)return 'مش موجودة';if(e._del)return 'اتحذفت (في السلة)';const d=[];
+  if(!e)return 'غير موجودة';if(e._del)return 'حُذفت (في السلة)';const d=[];
   if(Math.abs((+r.amount||0)-amt(e))>0.004)d.push('المبلغ '+fmt(r.amount)+' ← '+fmt(amt(e)));
   if((r.date||'')!==(e.date||'')&&!(e.review&&e.review.tmpDate))d.push('التاريخ '+(r.date||'—')+' ← '+(e.date||'—'));
   const it=e.review&&e.review.hold?'':e.item||'',co=e.review&&e.review.hold?'':e.contractor||'';
@@ -4798,12 +4830,12 @@ function renderImports(){
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
   <div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><select id="implSite" style="width:auto"><option value="">كل المواقع</option>${sites.map(id=>`<option value="${esc(id)}" ${IMPL.site===id?'selected':''}>${esc(siteNameOf(id))}</option>`).join('')}</select>
    <select id="implMon" style="width:auto"><option value="">كل الشهور</option>${mons.map(v=>`<option ${IMPL.mon===v?'selected':''}>${v}</option>`).join('')}</select></div>
-  ${rows.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>التاريخ</th><th>الملف</th><th>الموقع</th><th>استورده</th><th class="num">إجمالي الملف</th><th class="num">اتسجل</th><th class="num">تحت المراجعة</th><th class="num">اتساب</th><th>المطابقة</th><th></th></tr></thead><tbody>
+  ${rows.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>التاريخ</th><th>الملف</th><th>الموقع</th><th>استورده</th><th class="num">إجمالي الملف</th><th class="num">سُجِّل</th><th class="num">تحت المراجعة</th><th class="num">تُرك</th><th>المطابقة</th><th></th></tr></thead><tbody>
   ${rows.map(({x,s})=>`<tr><td class="date">${esc(stamp(x.at))}</td><td class="tl"><b>${esc(x.file||'—')}</b></td><td>${esc(siteNameOf(x.siteId))}</td><td>${esc(who(x)||'—')}</td>
    <td class="num">${x.old?'—':fmt(x.fileTot||0)}</td><td class="num">${fmt(s.recT)} <small>(${s.nRec})</small></td><td class="num">${s.nRev?fmt(s.revT)+' <small>('+s.nRev+')</small>':'—'}</td><td class="num">${x.old?'؟':s.nSkip?fmt(s.skipT)+' <small>('+s.nSkip+')</small>':'—'}</td>
-   <td>${x.old?'<span class="chip dim">قبل السجل</span>':s.match?'<span class="chip ok">مطابق</span>':s.changed?`<span class="chip wait">اتعدّل ${s.changed}</span>`:'<span class="chip no">مختلف</span>'}</td>
+   <td>${x.old?'<span class="chip dim">قبل السجل</span>':s.match?'<span class="chip ok">مطابق</span>':s.changed?`<span class="chip wait">عُدِّل ${s.changed}</span>`:'<span class="chip no">مختلف</span>'}</td>
    <td><button class="ghost" type="button" data-impl="open" data-id="${esc(x.impId||String(x.at))}">افتح</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin-top:8px">لم يُستورد أي ملف بعد.</p>'}
-  <p class="note">المطابقة: إجمالي الملف = اللي اتسجل + اللي تحت المراجعة + اللي اتساب. الملفات اللي اتستوردت قبل «سجل الاستيراد» بيبان منها اللي اتسجل بس.</p></div>`;
+  <p class="note">المطابقة: إجمالي الملف = ما سُجِّل + ما تحت المراجعة + ما تُرك. الملفات المستوردة قبل «سجل الاستيراد» يظهر منها ما سُجِّل فقط.</p></div>`;
   const a=$('#implSite');if(a)a.onchange=()=>{IMPL.site=a.value;render()};const b=$('#implMon');if(b)b.onchange=()=>{IMPL.mon=b.value;render()};
 }
 function renderImport(x,m){
@@ -4814,18 +4846,18 @@ function renderImport(x,m){
   for(const r of rows){if(r._e&&!r._e._del&&typeof revOn==='function'&&revOn(r._e))r.cur='rev';else if(r._e&&!r._e._del)r.cur='ok';else if(r._e&&r._e._del)r.cur='del';else r.cur=r.st;r.diff=!x.old&&r.id?implDiff(r,r._e):''}
   const C={all:rows.length,rev:rows.filter(r=>r.cur==='rev').length,skip:rows.filter(r=>!r.id).length,chg:rows.filter(r=>r.diff).length};
   const vis=rows.filter(r=>f==='rev'?r.cur==='rev':f==='skip'?!r.id:f==='chg'?!!r.diff:true);
-  const chip=r=>r.cur==='rev'?'<span class="chip wait">تحت المراجعة</span>':r.cur==='ok'?'<span class="chip ok">اتسجل</span>':r.cur==='del'?'<span class="chip no">اتحذف</span>':r.cur==='zero'?'<span class="chip no">اتساب — من غير مبلغ</span>':`<span class="chip dim">${esc(IMPL_ST[r.cur]||r.cur)}</span>`;
-  const act=r=>!can?'':r.cur==='rev'?`<button class="ghost" type="button" data-impl="rev">أكمِله</button>`:r.cur==='ok'?`<button class="ghost" type="button" data-impl="go" data-id="${esc(r.id)}">فتح</button>`:(r.cur==='dup'||r.cur==='dup2')&&r.rec?`<button class="ghost" type="button" data-impl="add" data-line="${r.line}">سجّله برضه</button>`:'';
+  const chip=r=>r.cur==='rev'?'<span class="chip wait">تحت المراجعة</span>':r.cur==='ok'?'<span class="chip ok">سُجِّل</span>':r.cur==='del'?'<span class="chip no">حُذف</span>':r.cur==='zero'?'<span class="chip no">تُرك — من دون مبلغ</span>':`<span class="chip dim">${esc(IMPL_ST[r.cur]||r.cur)}</span>`;
+  const act=r=>!can?'':r.cur==='rev'?`<button class="ghost" type="button" data-impl="rev">أكمِله</button>`:r.cur==='ok'?`<button class="ghost" type="button" data-impl="go" data-id="${esc(r.id)}">فتح</button>`:(r.cur==='dup'||r.cur==='dup2')&&r.rec?`<button class="ghost" type="button" data-impl="add" data-line="${r.line}">سجّله على أي حال</button>`:'';
   const nLive=s.live.length;
   $('#pane').innerHTML=`<div class="pane-h"><div><button class="ghost back" type="button" data-impl="back">→ سجل الاستيراد</button><h2>${esc(x.file||'ملف')}</h2><p class="foot-note" style="margin:2px 0 0">${esc(siteNameOf(x.siteId))} · استورده ${esc(who(x)||'—')} · ${esc(stamp(x.at))}</p></div></div>
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
-  <div class="card"><div class="stat">${x.old?'':`<div>إجمالي الملف <b>${fmt(x.fileTot||0)}</b></div>`}<div>اتسجل <b>${fmt(s.recT)}</b></div><div>تحت المراجعة <b>${fmt(s.revT)}</b></div>${x.old?'':`<div>اتساب <b>${fmt(s.skipT)}</b></div><div>اتعدّل أو اتحذف بعد كده <b>${C.chg}</b></div>`}</div>
-  ${x.old?'<p class="note">ملف اتستورد قبل «سجل الاستيراد»: ظاهر منه الحركات اللي اتسجلت بس.</p>':''}
-  <div class="seg" role="tablist" style="margin-bottom:8px">${[['all','الكل',C.all],['rev','تحت المراجعة',C.rev],...(x.old?[]:[['skip','اتساب',C.skip],['chg','اتعدّل بعد كده',C.chg]])].map(([k,t,n])=>`<button role="tab" data-implf="${k}" aria-selected="${f===k}">${t} (${n})</button>`).join('')}</div>
+  <div class="card"><div class="stat">${x.old?'':`<div>إجمالي الملف <b>${fmt(x.fileTot||0)}</b></div>`}<div>سُجِّل <b>${fmt(s.recT)}</b></div><div>تحت المراجعة <b>${fmt(s.revT)}</b></div>${x.old?'':`<div>تُرك <b>${fmt(s.skipT)}</b></div><div>عُدِّل أو حُذف بعد ذلك <b>${C.chg}</b></div>`}</div>
+  ${x.old?'<p class="note">ملف استُورد قبل «سجل الاستيراد»: تظهر منه الحركات المسجّلة فقط.</p>':''}
+  <div class="seg" role="tablist" style="margin-bottom:8px">${[['all','الكل',C.all],['rev','تحت المراجعة',C.rev],...(x.old?[]:[['skip','تُرك',C.skip],['chg','عُدِّل بعد ذلك',C.chg]])].map(([k,t,n])=>`<button role="tab" data-implf="${k}" aria-selected="${f===k}">${t} (${n})</button>`).join('')}</div>
   <div class="tbl-wrap"><table><thead><tr><th class="num">سطر</th><th>الحالة</th><th>التاريخ</th><th class="num">المبلغ</th><th>البيان</th><th>البند</th><th>المقاول / المورد</th><th></th></tr></thead><tbody>
-  ${vis.map(r=>`<tr class="${r.id?'':'row-dim'}"><td class="num plain">${r.line}</td><td>${chip(r)}${r.errs&&r.errs.length&&!r.id?`<span class="note"> ناقص: ${esc(r.errs.join('، '))}</span>`:''}${r.cur==='rev'&&r._e&&r._e.review&&r._e.review.miss&&r._e.review.miss.length?`<span class="note"> ناقص: ${esc(r._e.review.miss.join('، '))}</span>`:''}${r.diff?`<span class="note"> اتعدّل بعد كده: ${esc(r.diff)}</span>`:''}</td>
+  ${vis.map(r=>`<tr class="${r.id?'':'row-dim'}"><td class="num plain">${r.line}</td><td>${chip(r)}${r.errs&&r.errs.length&&!r.id?`<span class="note"> ناقص: ${esc(r.errs.join('، '))}</span>`:''}${r.cur==='rev'&&r._e&&r._e.review&&r._e.review.miss&&r._e.review.miss.length?`<span class="note"> ناقص: ${esc(r._e.review.miss.join('، '))}</span>`:''}${r.diff?`<span class="note"> عُدِّل بعد ذلك: ${esc(r.diff)}</span>`:''}</td>
    <td class="date">${esc(r.date||'')||'—'}</td><td class="num">${r.amount?fmt(r.amount):'—'}</td><td class="tl">${esc(r.notes||'')||'—'}</td><td>${esc(r.item||'')||'—'}</td><td>${esc(r.contractor||'')||'—'}</td><td class="acts">${act(r)}</td></tr>`).join('')||'<tr><td colspan="8">—</td></tr>'}</tbody></table></div>
-  ${can&&nLive?`<div class="row" style="margin-top:10px;gap:8px;align-items:center">${IMPL.undo===x.impId+String(x.at)?`<span class="confirm"><span class="msg err">هتتنقل ${nLive} حركة من الملف ده لسلة المهملات.</span><button class="danger" type="button" data-impl="undoyes">تأكيد التراجع</button><button type="button" data-impl="undono">إلغاء</button></span>`:`<button class="danger" type="button" data-impl="undo">التراجع عن الملف</button>`}<span class="note">ينقل الـ${nLive} حركة اللي اتسجلت من الملف ده لسلة المهملات مرة واحدة (وتقدر ترجّعهم من السلة). صلّح الملف واستورده تاني.</span></div>`:''}</div>`;
+  ${can&&nLive?`<div class="row" style="margin-top:10px;gap:8px;align-items:center">${IMPL.undo===x.impId+String(x.at)?`<span class="confirm"><span class="msg err">ستُنقل ${nLive} حركة من هذا الملف إلى سلة المهملات.</span><button class="danger" type="button" data-impl="undoyes">تأكيد التراجع</button><button type="button" data-impl="undono">إلغاء</button></span>`:`<button class="danger" type="button" data-impl="undo">التراجع عن الملف</button>`}<span class="note">ينقل الحركات المسجّلة من هذا الملف (${nLive}) إلى سلة المهملات دفعة واحدة (ويمكنك استرجاعها من السلة). صحّح الملف واستورده مرة أخرى.</span></div>`:''}</div>`;
 }
 document.addEventListener('click',async ev=>{
   const tf=ev.target.closest('[data-implf]');if(tf){IMPL.f=tf.dataset.implf;render();return}
@@ -4844,8 +4876,8 @@ document.addEventListener('click',async ev=>{
   if(a==='undono'){IMPL.undo='';render();return}
   if(a==='undoyes'){IMPL.undo='';const live=implSum(x).live;let n=0;const nm=lsGet(LS_BY)||S.myName||'';
     for(const e of live){const col=e._c,rec=(S[COLS[col]]||[]).find(z=>z.id===e.id);if(!rec||!canEditRec(rec))continue;queue(col,e.id,{...clean(rec),deleted:true,deletedAt:Date.now(),deletedBy:nm,deletedById:S.uid||'',updated:Date.now()});n++}
-    logChange('delete','files',{siteId:x.siteId,details:'التراجع عن ملف «'+x.file+'»: '+n+' حركة اتنقلت لسلة المهملات'});
-    IMPL.msg={ok:1,at:Date.now(),t:'اتنقلت '+n+' حركة من «'+x.file+'» لسلة المهملات. تقدر ترجّعهم من «سلة المهملات».'};render();return}
+    logChange('delete','files',{siteId:x.siteId,details:'التراجع عن ملف «'+x.file+'»: نُقلت '+n+' حركة إلى سلة المهملات'});
+    IMPL.msg={ok:1,at:Date.now(),t:'نُقلت '+n+' حركة من «'+x.file+'» إلى سلة المهملات. يمكنك استرجاعها من «سلة المهملات».'};render();return}
 });
 
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
@@ -5323,7 +5355,7 @@ function moneyCheck(kind,rec,old){
     else if(rec.amount>=1000000)warn.push('المبلغ كبير.');
   }
   if(!warn.length)return true;
-  return confirm(warn.join('\n\n')+'\n\nالمبلغ: '+fmtPlain(rec.amount)+' '+CUR+'\n('+amtWords(rec.amount)+')\n\nتحفظ برضه؟');
+  return confirm(warn.join('\n\n')+'\n\nالمبلغ: '+fmtPlain(rec.amount)+' '+CUR+'\n('+amtWords(rec.amount)+')\n\nهل تحفظ على أي حال؟');
 }
 const myBy=()=>(OFF&&SEC.user?SEC.user.name:'')||S.myName||lsGet(LS_BY)||'';
 const moreBox=(inner,open)=>`<details class="more" id="moreBox" ${open?'open':''}><summary>تفاصيل أكثر (ملاحظات، صورة الإيصال)</summary><div class="more-in">${inner}</div></details>`;
@@ -5536,7 +5568,7 @@ function renderSite(){
     <div class="pop-wrap"><button type="button" class="more-btn" data-pop="siteMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">⋯</span> خيارات الموقع</button>
     <div class="pop pop-end" id="siteMenu" role="menu" hidden>
     ${S.canWrite&&canEntry(site)?'<button role="menuitem" id="impOpen">استيراد من Excel</button>':''}
-    <button role="menuitem" data-print="site">طباعة كشف الحساب / PDF</button>
+    ${APP?`<button role="menuitem" data-stmtsite="${esc(site.id)}" data-full="1">كشف الحساب (التقارير)</button>`:'<button role="menuitem" data-print="site">طباعة كشف الحساب / PDF</button>'}
     ${APP?`<button role="menuitem" data-sogo="${esc(site.id)}">مخزن الموقع</button>`:''}
     ${S.downloads&&hasAny?'<button role="menuitem" id="exportSite">Excel هذا الموقع</button>':''}
     ${canEditRec(site)&&!S.confirmSite?'<button role="menuitem" class="pop-danger" id="delSite">حذف الموقع</button>':''}
@@ -5618,7 +5650,7 @@ function bindSite(site){
     if(!(amount>0)){msg.className='msg err';msg.textContent='أدخل مبلغًا أكبر من صفر.';return}
     const miss=[];if(!rec.date)miss.push('التاريخ');if(kind==='exp'&&!rec.contractor&&!(old&&old.custodyId)&&!(APP&&itNameOpt(rec.item)))miss.push(APP&&(rec.item===PAY_ITEM||itNeedSup(rec.item))?'المورد':'المقاول');if(kind==='exp'&&!rec.item)miss.push('البند');if(!rec.notes)miss.push('البيان');dueRead('e',rec,miss);
     if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','المورد':'#e_contractor','البند':'#e_item','البيان':'#e_notes','تاريخ الاستحقاق':'#e_due'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
-    if(kind==='exp'&&APP&&rec.item===PAY_ITEM&&!conIsSup(rec.contractor)){msg.className='msg err';msg.textContent='«'+PAY_ITEM+'» لمورد مسجّل كمورد (أو مقاول ومورد) بس. اختر المورد.';return}
+    if(kind==='exp'&&APP&&rec.item===PAY_ITEM&&!conIsSup(rec.contractor)){msg.className='msg err';msg.textContent='«'+PAY_ITEM+'» لمورد مسجّل كمورد (أو مقاول ومورد) فقط. اختر المورد.';return}
     if(kind==='exp'){const w=preCertWarn(site.id,rec,old);if(w&&S.pcOk!==w.key){msg.className='msg';msg.innerHTML=`<span class="warn-box" style="display:block">⚠ ${w.html}<br><button type="button" class="primary" data-pcok="${esc(w.key)}">حفظ على أي حال</button> <button type="button" class="ghost" data-pcdate>تعديل التاريخ</button></span>`;return}}
     if(!moneyCheck(kind,rec,old)){msg.className='msg';msg.textContent='لم يُحفظ. راجع البيانات.';return}
     if(kind==='exp')commitNewRegs([['e_contractor','contractors'],['e_item','items']]);
@@ -5819,7 +5851,7 @@ function bindJournal(){
     if(type==='exp'){rec.contractor=regValue('j_contractor','contractors');rec.item=regValue('j_item','items')}
     const miss=[];if(!site)miss.push('الموقع');if(!(amount>0))miss.push('المبلغ');if(!rec.date)miss.push('التاريخ');if(!rec.notes)miss.push('البيان');if(type==='exp'&&!rec.item)miss.push('البند');if(type==='exp'&&!rec.contractor&&!(APP&&itNameOpt(rec.item)))miss.push(APP&&(rec.item===PAY_ITEM||itNeedSup(rec.item))?'المورد':'المقاول');dueRead('j',rec,miss);
     if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor','المورد':'#j_contractor','تاريخ الاستحقاق':'#j_due'}[miss[0]]);if(el)el.focus();return}
-    if(type==='exp'&&APP&&rec.item===PAY_ITEM&&!conIsSup(rec.contractor)){msg.className='msg err';msg.textContent='«'+PAY_ITEM+'» لمورد مسجّل كمورد (أو مقاول ومورد) بس. اختر المورد.';return}
+    if(type==='exp'&&APP&&rec.item===PAY_ITEM&&!conIsSup(rec.contractor)){msg.className='msg err';msg.textContent='«'+PAY_ITEM+'» لمورد مسجّل كمورد (أو مقاول ومورد) فقط. اختر المورد.';return}
     if(!moneyCheck(type,rec,null)){msg.className='msg';msg.textContent='لم يُحفظ. راجع البيانات.';return}
     if(type==='exp')commitNewRegs([['j_contractor','contractors'],['j_item','items']]);
     if(S.pickedFile){
@@ -6643,8 +6675,24 @@ async function svcSave(next){
 /* سجل البند: تقسيم صاحب الموقع الأول ثم قائمة المدير */
 function itRec(name){const n=regNormK(name);if(!n)return null;const L=regRecs('items').filter(r=>r&&!r.hidden&&regNormK(r.name)===n);if(!L.length)return null;
   const mine=S.isManager?'':(S.pfx||'');return L.find(r=>(r._p||'')===mine&&r.type)||L.find(r=>!(r._p||'')&&r.type)||L.find(r=>r.type)||L.find(r=>(r._p||'')===mine)||L[0]}
-const itType=name=>{const r=itRec(name);return r&&r.type||''};
-const itStype=name=>{const r=itRec(name);return r&&r.type==='srv'&&r.stype||''};
+/* نوع البند على السيرفر (جدول item_types) — للمهندس وأمين المخزن والمكتب الفني والمحاسب، وبيتزامن من المدير وصاحب الموقع */
+const ITS={m:(()=>{try{const v=typeof appLs==='function'?appLs('adc_ittypes_v1'):null;return v&&typeof v==='object'?v:{}}catch(e){return {}}})(),at:0,missing:false,busy:false,synced:{}};
+const itKey=n=>typeof arNorm==='function'?arNorm(n):regNormK(n);
+async function itsLoad(force){
+  if(!APP||!SB||!navigator.onLine||ITS.busy||(!force&&Date.now()-ITS.at<120000))return;ITS.busy=true;
+  try{const r=await netTO(SB.from('item_types').select('key,name,type,stype'),6000);if(r.error){if(/item_types|relation|does not exist|schema cache/i.test(r.error.message||''))ITS.missing=true}
+    else{ITS.missing=false;const m={};for(const x of r.data||[])m[x.key]={t:x.type,s:x.stype||''};const ch=JSON.stringify(m)!==JSON.stringify(ITS.m);ITS.m=m;appLs('adc_ittypes_v1',m);if(ch)try{render()}catch(e){}}}
+  catch(e){}finally{ITS.at=Date.now();ITS.busy=false}
+}
+/* المدير وصاحب الموقع: أي بند نوعه متحدد عندهم ومش زي اللي على السيرفر بيترفع (مرة كل شوية) */
+async function itsSync(){
+  if(!APP||!SB||!navigator.onLine||ITS.missing||!(S.isManager||(typeof myRole==='function'&&myRole()==='user'&&!(typeof isAcct==='function'&&isAcct()))))return;
+  const rows=[];for(const r of regRecs('items'))if(r&&!r.hidden&&r.type&&r.name){const k=itKey(r.name),c=ITS.m[k];if(!c||c.t!==r.type||(c.s||'')!==(r.type==='srv'?r.stype||'':'')){const sig=k+'|'+r.type+'|'+(r.stype||'');if(ITS.synced[sig])continue;ITS.synced[sig]=1;rows.push({name:r.name.trim(),type:r.type,stype:r.stype||''})}}
+  if(!rows.length)return;
+  try{const r=await SB.rpc('item_types_set',{rows});if(!r.error){for(const x of rows)ITS.m[itKey(x.name)]={t:x.type,s:x.type==='srv'?x.stype:''};appLs('adc_ittypes_v1',ITS.m)}else{for(const x of rows)delete ITS.synced[itKey(x.name)+'|'+x.type+'|'+(x.stype||'')];if(/item_types_set|function|does not exist|schema cache/i.test(r.error.message||''))ITS.missing=true}}catch(e){for(const x of rows)delete ITS.synced[itKey(x.name)+'|'+x.type+'|'+(x.stype||'')]}
+}
+const itType=name=>{const r=itRec(name);if(r&&r.type)return r.type;const c=ITS.m[itKey(name)];return c&&c.t||''};
+const itStype=name=>{const r=itRec(name);if(r&&r.type)return r.type==='srv'&&r.stype||'';const c=ITS.m[itKey(name)];return c&&c.t==='srv'&&c.s||''};
 /* محتاج مورد: نوعه توريدات، أو اسمه فيه «توريد» (زي القاعدة القديمة والسيرفر) */
 const itNeedSup=name=>!!name&&(itType(name)==='sup'||/توريد/.test(String(name)));
 /* الاسم (مقاول/مورد) اختياري: خدمات ومصاريف ومش اسمه «توريد» */
@@ -6802,6 +6850,15 @@ function regStats(col,name){
   return {n:l.length,total:sum(l),sites:new Set(l.map(e=>e.siteId)).size,last:l.map(e=>e.date).sort().pop()||''};
 }
 S.igOpen=S.igOpen||new Set();
+/* البنود متقسمة بالنوع جوه البند العام: [[نوع|null, [أسماء]]] — null لما مفيش أنواع خالص */
+function igByType(names){if(!APP||typeof itType!=='function'||!names.some(n=>itType(n)))return names.length?[[null,names]]:[];
+  return [...IT_TYPES.map(x=>x[0]),''].map(t=>[t,names.filter(n=>itType(n)===t)]).filter(x=>x[1].length)}
+/* بنود الخدمات والمصاريف اللي مش تحت بند عام: تحت الشغلانة لو اسمها فيها، غير كده «مصاريف عامة الموقع» */
+const IG_GEN='مصاريف عامة الموقع';
+function igSvcSuggest(pf){
+  if(!APP||typeof itType!=='function')return [];const G=igNames(pf),stem=g=>regNormK(g).replace(/^(اعمال|أعمال)\s+/,'').split(' ').map(w=>w.replace(/^ال/,'').replace(/[هة]$/,'')).filter(w=>w.length>=3);
+  return regNames('items').filter(x=>x.reg&&itType(x.name)==='srv'&&!igOf(x.name,pf)).map(x=>{const n=regNormK(x.name);const g=G.find(g=>regNormK(g)!==regNormK(IG_GEN)&&stem(g).some(w=>n.includes(w)));return {name:x.name,g:g||IG_GEN}});
+}
 function igCard(){
   const pf=igMyPf(),names=igNames(pf),items=regNames('items').filter(x=>!(typeof accIsPriv==='function'&&APP&&typeof isAcct==='function'&&isAcct()&&accIsPriv(x.name)));
   const by=new Map(names.map(n=>[regNormK(n),{name:n,items:[]}])),free=[];
@@ -6810,17 +6867,20 @@ function igCard(){
   const sel=(it,cur)=>`<select data-igitem="${esc(it)}" aria-label="البند العام لـ${esc(it)}"><option value="">— غير تابع لبند عام —</option>${[...by.values()].map(g=>`<option value="${esc(g.name)}" ${g.name===cur?'selected':''}>تحت: ${esc(g.name)}</option>`).join('')}</select>`;
   const m=S.igMsg;S.igMsg=null;
   const grp=g=>{const open=S.igOpen.has(regNormK(g.name));return `<div class="g-card"><div class="gh" data-igtog="${esc(regNormK(g.name))}">${open?'▾':'◂'} ${esc(g.name)} <span class="cnt">(بند عام · ${g.items.length} ${g.items.length===1||g.items.length>10?'بند':'بنود'})${!mineK.has(regNormK(g.name))&&pf?' · من المدير':''}</span>${mineK.has(regNormK(g.name))?`<span class="acts"><button type="button" class="ghost" data-igren="${esc(g.name)}">تعديل الاسم</button>${g.items.length?'':`<button type="button" class="ghost" data-igdel="${esc(g.name)}">حذف</button>`}</span>`:''}</div>
-    ${open?g.items.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,g.name)}</div>`).join('')||'<div class="gi"><span class="note">لا توجد بنود تابعة له حتى الآن. اختر البند العام أمام أي بند من «بنود غير تابعة لبند عام».</span></div>':''}</div>`};
+    ${open?igByType(g.items).map(([t,L])=>`${t!=null?`<div class="gi gt">${t?itTag(t):'<span class="note">من دون نوع</span>'}</div>`:''}${L.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,g.name)}</div>`).join('')}`).join('')||'<div class="gi"><span class="note">لا توجد بنود تابعة له حتى الآن. اختر البند العام أمام أي بند من «بنود غير تابعة لبند عام».</span></div>':''}</div>`};
   const fo=S.igOpen.has('__free');
+  const sug=igSvcSuggest(pf);
   return `<div class="card" id="igCard"><div class="sec-h">البنود العامة</div>
+  ${sug.length?`<div class="warn-box" style="margin-bottom:8px"><b>${sug.length} ${sug.length===1?'بند خدمات ومصاريف':'بنود خدمات ومصاريف'} من دون بند عام.</b> اقتراح التطبيق: ${sug.map(x=>esc(x.name)+' ← '+esc(x.g)).join('، ')}. <button type="button" class="primary" data-igsvc>طبّق الاقتراح</button><br><small>المصاريف التي تخص شغلانة (مثل نقل مواسير السباكة) تحت بندها العام، والباقي تحت «${IG_GEN}» (إيجار مكتب الموقع، إكراميات، مياه وكهرباء، نقل عام، حراسة…).</small></div>`:''}
   <p class="note">البند العام يجمع عدة بنود (مثال: «أعمال السباكة» = مصنعيات + توريدات أعمال السباكة) ويظهر بإجماليه في الكشوف. البند الواحد يتبع بندًا عامًا واحدًا فقط.${pf?' في مواقعك يُطبَّق تقسيمك، وإذا لم يكن البند مقسّمًا عندك يُطبَّق تقسيم المدير.':''}</p>
   <div class="row" style="gap:8px;flex-wrap:wrap"><input id="ig_new" maxlength="80" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:220px"><button type="button" class="primary" data-igadd>إضافة بند عام</button></div>
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
   ${[...by.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(grp).join('')}
-  <div class="g-card g-free"><div class="gh" data-igtog="__free">${fo?'▾':'◂'} بنود غير تابعة لبند عام <span class="cnt">(${free.length})</span></div>${fo?free.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,'')}</div>`).join('')||'<div class="gi"><span class="note">كل البنود تابعة لبنود عامة.</span></div>':''}</div></div>`;
+  <div class="g-card g-free"><div class="gh" data-igtog="__free">${fo?'▾':'◂'} بنود غير تابعة لبند عام <span class="cnt">(${free.length})</span></div>${fo?igByType(free).map(([t,L])=>`${t!=null?`<div class="gi gt">${t?itTag(t):'<span class="note">من دون نوع</span>'}</div>`:''}${L.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,'')}</div>`).join('')}`).join('')||'<div class="gi"><span class="note">كل البنود تابعة لبنود عامة.</span></div>':''}</div></div>`;
 }
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-igtog]');if(t&&!ev.target.closest('button,select,input')){const k=t.dataset.igtog;if(S.igOpen.has(k))S.igOpen.delete(k);else S.igOpen.add(k);render();return}
+  if(ev.target.closest('[data-igsvc]')){const L=igSvcSuggest(igMyPf());for(const x of L)igAssign(x.name,x.g);S.igMsg={ok:1,t:'وُضع '+L.length+' '+(L.length===1?'بند':'بنود')+' تحت بنودها العامة.'};for(const x of L)S.igOpen.add(regNormK(x.g));render();return}
   if(ev.target.closest('[data-igadd]')){const n=(($('#ig_new')||{}).value||'').trim(),e=igCreate(n);S.igMsg=e?{t:e}:{ok:1,t:'أُضيف البند العام «'+n+'». اختره أمام البنود التابعة له.'};if(!e){S.igOpen.add(regNormK(n));S.igOpen.add('__free')}render();return}
   const r=ev.target.closest('[data-igren]');if(r){const old=r.dataset.igren,g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(old));if(!g)return;const n=(prompt('الاسم الجديد للبند العام',old)||'').trim();if(!n||n===old)return;if(igGroups(igMyPf()).some(x=>x.id!==g.id&&regNormK(x.name)===regNormK(n))){S.igMsg={t:'هذا الاسم موجود.'};render();return}igSave(g,{name:n});S.igMsg={ok:1,t:'تغيّر الاسم.'};render();return}
   const d=ev.target.closest('[data-igdel]');if(d){const g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(d.dataset.igdel));if(g){igSave(g,{hidden:true});S.igMsg={ok:1,t:'حُذف البند العام.'};render()}return}
@@ -6850,7 +6910,7 @@ function renderRegister(col){
     <div class="f c2"><label for="r_phone">الهاتف (اختياري)</label><input id="r_phone" maxlength="30" inputmode="tel" dir="ltr"></div>
     ${APP?'':`<div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>`}
     <div class="f c2"><label for="r_item">البند الأساسي (اختياري)</label><select id="r_item"><option value="">— بدون —</option>${regNames('items').map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`
-    :`${APP?`<div class="f c2"><label for="r_type">نوع البند</label><select id="r_type"><option value="">— لم يُحدَّد —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div><div class="f c2" id="r_stype_w" hidden><label for="r_stype">نوع الخدمة</label><select id="r_stype"><option value="">— اختر —</option>${svcList().map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`:''}<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div><div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
+    :`${APP?`<div class="f c2"><label for="r_type">نوع البند</label><select id="r_type"><option value="">— لم يُحدَّد —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div><div class="f c2" id="r_stype_w" hidden><label for="r_stype">نوع الخدمة</label><select id="r_stype"><option value="">— اختر —</option>${svcList().map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`:''}${APP&&typeof cdOn==='function'&&cdOn()?'':`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div>`}<div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
   ${col==='items'?itTypeCard():''}${col==='items'&&canReg()?igCard():''}${col==='items'?svcCard():''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
@@ -6868,7 +6928,7 @@ function renderRegister(col){
   </div>`;
   const f=$('#regForm');if(f)f.onsubmit=ev=>{ev.preventDefault();const m=$('#regMsg'),name=$('#r_name').value.trim();
     if(!name){m.className='msg err';m.textContent='أدخل الاسم.';return}
-    const data={name};if(col==='contractors'){data.kind=($('#r_kind')||{}).value||'';data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();data.item=($('#r_item')||{}).value||'';if($('#r_claim')){const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}}else{data.code=$('#r_code').value.trim();data.desc=$('#r_desc').value.trim();if($('#r_type')){data.type=$('#r_type').value||'';data.stype=data.type==='srv'?(($('#r_stype')||{}).value||''):'';if(!data.stype)delete data.stype}}
+    const data={name};if(col==='contractors'){data.kind=($('#r_kind')||{}).value||'';data.spec=$('#r_spec').value.trim();data.phone=$('#r_phone').value.trim();data.item=($('#r_item')||{}).value||'';if($('#r_claim')){const c=parseFloat($('#r_claim').value);data.claim=c>0?c:0}}else{data.desc=$('#r_desc').value.trim();if($('#r_code'))data.code=$('#r_code').value.trim();else if(S.regEdit){const o=regRecsK(R).find(r=>r.id===S.regEdit.id);if(o&&o.code){data.desc=[data.desc,'كود قديم: '+o.code].filter(Boolean).join(' · ');data.code=''}}if($('#r_type')){data.type=$('#r_type').value||'';data.stype=data.type==='srv'?(($('#r_stype')||{}).value||''):'';if(!data.stype)delete data.stype}}
     if(S.regEdit){const old=regRecsK(R).find(r=>r.id===S.regEdit.id);if(!old)return;
       if(name!==old.name.trim()&&regRecsK(R).some(r=>r.id!==old.id&&!r.hidden&&r.name.trim()===name)){m.className='msg err';m.textContent='هذا الاسم موجود بالفعل.';return}
       const upd={...clean(old),...data,updated:Date.now()};delete upd.id;queue(col,old.id,upd);
@@ -6883,7 +6943,7 @@ function renderRegister(col){
   {const d=document.querySelector('.qs-multi');if(d)d.ontoggle=()=>{S.qsOpen=d.open}}
   document.querySelectorAll('[data-qsm]').forEach(c=>c.onchange=()=>{S.qsSel=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value)});
   const qm=$('#qsMulti');if(qm)qm.onclick=()=>{const v=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value);if(v.length<2){const m=$('#qsMsg');m.className='msg err';m.textContent='اختر اثنين على الأقل.';return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
-  const qg=$('#qsGo');if(qg)qg.onclick=()=>{const v=$('#qsName').value;if(!v){$('#qsName').focus();return}S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
+  const qg=$('#qsGo');if(qg)qg.onclick=()=>{const v=$('#qsName').value;if(!v){$('#qsName').focus();return}if(spOpenStmt(col,v))return;S.stmt={col,name:v};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0})};
   const rc=$('#regCancel');if(rc)rc.onclick=()=>{S.regEdit=null;S.justSaved=true;render()};
   if(S.flash&&S.flash.until>Date.now()&&$('#regMsg')){$('#regMsg').className='msg ok';$('#regMsg').textContent=S.flash.text}
 }
@@ -7108,7 +7168,7 @@ function buildImport(){
 function impSim(list,v){
   const c=t=>regNormK(t).replace(/\s+/g,'').replace(/^ال/,'').toLowerCase(),cv=c(v);if(!cv)return '';
   const lev=(a,b)=>{if(Math.abs(a.length-b.length)>2)return 9;const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]};
-  let best='',bd=9;for(const n of list){const cn=c(n);if(!cn)continue;let d=cn===cv?0:(cn.length>=4&&cv.length>=4&&(cn.includes(cv)||cv.includes(cn)))?1:lev(cn,cv);if(cv.length<5&&d>1)continue;if(d<bd){bd=d;best=n}}
+  let best='',bd=9;for(const n of list){const cn=c(n);if(!cn||(typeof nmNumsDiff==='function'&&nmNumsDiff(n,v)))continue;let d=cn===cv?0:(cn.length>=4&&cv.length>=4&&(cn.includes(cv)||cv.includes(cn)))?1:lev(cn,cv);if(cv.length<5&&d>1)continue;if(d<bd){bd=d;best=n}}
   return bd<=2?best:'';
 }
 /* what goes in: ready rows, plus the duplicates when the user ticks «سجّلها برضه» */
@@ -7366,7 +7426,7 @@ async function printReport(kind){
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
-const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','r_type','r_stype','r_kind','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
 /* ---------- post-dated cheques: what is coming due ---------- */
 function dueSoon(days){
   const t=today(),lim=addDays(t,days);
@@ -7568,8 +7628,9 @@ function render(){
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
-  S.sel==='__wait'&&APP?renderWaiting():S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?prRenderPage():S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
+  S.sel==='__wait'&&APP?renderWaiting():S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?(typeof cdCan==='function'&&cdCan()?(CDP.tab='pend',S.sel='__codes',renderCodes()):prRenderPage()):S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
   if(APP&&!appIsEngineer()&&(S.conflicts||[]).length)$('#pane').insertAdjacentHTML('afterbegin',cfCard());
+  if(APP&&typeof itsLoad==='function'){itsLoad().then(()=>itsSync()).catch(()=>{})}
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   {const eng=APP&&appIsEngineer(),bar=eng?'':excelBar();if(bar&&bar.includes('xbar ok'))$('#pane').insertAdjacentHTML('afterbegin',bar);uiNoticeBtn(eng?[]:uiNotices());uiBottom();if(APP&&typeof backBar==='function'){const bb=backBar();if(bb)$('#pane').insertAdjacentHTML('afterbegin',bb);else if(S.back&&S.back.at!==navAt()){S.back=null;navClear()}}}
@@ -7577,7 +7638,7 @@ function render(){
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
   navTrack();{const bb=$('#backBtn');if(bb)bb.hidden=!NAV.stack.length}if(NAV.stack.length&&document.body.classList.contains('eng-mode'))$('#pane').insertAdjacentHTML('afterbegin','<div class="nav-back"><button type="button" class="ghost" data-navback aria-label="رجوع للشاشة السابقة">→ رجوع</button></div>');
-  for(const id in keep){const el=document.getElementById(id);if(el)el.value=keep[id]}
+  for(const id in keep){const el=document.getElementById(id);if(el){el.value=keep[id];if(id==='r_type'&&el.onchange)el.onchange()}}
   dueToggle('e');dueToggle('j');
   for(const p of ['en','ca']){const c=document.getElementById(p+'_con'),w=document.getElementById(p+'_conw');if(c&&w)w.hidden=c.value!=='__oth'}
   {const c=document.getElementById('so_sup'),w=document.getElementById('so_supnw');if(c&&w)w.hidden=!(c.value==='__new'||c.value==='__pend')}
@@ -7589,8 +7650,8 @@ document.addEventListener('click',ev=>{
   if(ev.target.closest('[data-navback]')){navBack();return}
   const sb=ev.target.closest('[data-site]');
   if(sb){S.imp=null;if(sb.dataset.site==='__journal')S.jKeep.type='exp';S.stmt=null;S.regEdit=null;S.sf={site:'',from:'',to:''};S.confirmReg='';S.editing=null;S.pickedFile=null;S.flash=null;S.cflash=null;S.sel=sb.dataset.site;S.siteLim=20;touchRecent(S.sel);S.filt={c:'',i:'',from:'',to:'',q:''};S.confirmDel=null;S.confirmSite=false;S.note='';S.justSaved=true;render();window.scrollTo({top:0});return}
-  const sg=ev.target.closest('[data-stmtgo]');if(sg){S.sel=sg.dataset.stmtgo==='contractors'?'__contractors':'__items';S.stmt={col:sg.dataset.stmtgo,name:sg.dataset.name};S.sf={site:'',from:'',to:''};S.editing=null;render();window.scrollTo({top:0});return}
-  const st=ev.target.closest('[data-stmt]');if(st){S.stmt={col:st.dataset.stmt,name:st.dataset.name};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0});return}
+  const sg=ev.target.closest('[data-stmtgo]');if(sg){if(spOpenStmt(sg.dataset.stmtgo,sg.dataset.name))return;S.sel=sg.dataset.stmtgo==='contractors'?'__contractors':'__items';S.stmt={col:sg.dataset.stmtgo,name:sg.dataset.name};S.sf={site:'',from:'',to:''};S.editing=null;render();window.scrollTo({top:0});return}
+  const st=ev.target.closest('[data-stmt]');if(st){if(spOpenStmt(st.dataset.stmt,st.dataset.name))return;S.stmt={col:st.dataset.stmt,name:st.dataset.name};S.sf={site:'',from:'',to:''};render();window.scrollTo({top:0});return}
   const ra=ev.target.closest('[data-regadd]');if(ra){addReg(ra.dataset.regadd,{name:ra.dataset.name});render();return}
   const re=ev.target.closest('[data-regedit]');if(re){const R=REG[re.dataset.regedit],r=regRecsK(R).find(x=>x.name.trim()===re.dataset.name&&!x.hidden);if(r&&canEditRec(r)){S.regEdit={id:r.id,name:r.name};S.regFill=true;S.justSaved=true;render();const c=$('#regCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})}return}
   const rd=ev.target.closest('[data-regdel]');if(rd){S.confirmReg=rd.dataset.regdel+'|'+rd.dataset.name;render();return}
@@ -7599,7 +7660,7 @@ document.addEventListener('click',ev=>{
     if(r&&canEditRec(r)){queue(col,r.id,{...clean(r),hidden:true,updated:Date.now()});logChange('delete',col,{name:r.name})}S.confirmReg='';render();return}
   const pb=ev.target.closest('[data-print]');if(pb){printReport(pb.dataset.print);return}
   const hb=ev.target.closest('[data-home]');if(hb){closePops();if(APP&&appIsEngineer()){CT.tab='';CT.form=null;if(typeof SO!=='undefined')SO.form=null}else{S.sel=isUserView()&&!S.isManager&&S.sites.length===1?S.sites[0].id:'__all';S.stmt=null;S.regEdit=null;S.editing=null;S.entryOpen='';if(typeof SO!=='undefined'){SO.form=null;SO.imp=null}if(typeof CT!=='undefined')CT.form=null}S.justSaved=true;render();window.scrollTo({top:0});return}
-  const ssg=ev.target.closest('[data-stmtsite]');if(ssg&&APP){closePops();S.sel='__stmts';S.stmt=null;SP.type='site';SP.site=ssg.dataset.stmtsite;SP.name='';S.justSaved=true;render();window.scrollTo({top:0});return}
+  const ssg=ev.target.closest('[data-stmtsite]');if(ssg&&APP){closePops();S.sel='__stmts';S.stmt=null;SP.type='site';SP.site=ssg.dataset.stmtsite;SP.name='';if(ssg.dataset.full)SP.shape='full';S.justSaved=true;render();window.scrollTo({top:0});return}
   const sgo=ev.target.closest('[data-sogo]');if(sgo&&APP){closePops();S.sel='__store';SO.want=sgo.dataset.sogo;SO.site=sgo.dataset.sogo;SO.form=null;S.justSaved=true;render();window.scrollTo({top:0});return}
   if(ev.target.closest('[data-xlsx]')){exportExcel(null);return}
   const eb=ev.target.closest('[data-edit]');
