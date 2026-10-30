@@ -3,6 +3,7 @@ const num = v => (+v || 0);
 const r2 = v => Math.round(num(v) * 100) / 100;
 const fmt = v => r2(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const PAY_ITEM = 'دفعة مورد تحت الحساب';
 const norm = v => String(v ?? '').replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
 const ts = m => m.created_at ? Date.parse(m.created_at) : num((m.data || {}).at);
 const taxV = (v, rate) => num(rate) > 0 ? r2(num(v) * num(rate) / 100) : 0;
@@ -43,9 +44,10 @@ export function siteDues({ siteId, moves, exps, certs, boq, kindOf }) {
   const sup = new Map();
   for (const x of invoices(ms)) { if (!x.sup || x.pend || x.bad) continue; const k = norm(x.sup); const y = sup.get(k) || { name: x.sup, due: 0, n: 0 }; y.due += x.due; y.n++; sup.set(k, y); }
   for (const m of ms) if ((m.kind === 'ret' || m.kind === 'cn') && !(m.data || {}).supPend) { const k = norm((m.data || {}).supplier); const y = sup.get(k); if (y) y.due -= crVal(m); }
-  /* «مقاول ومورد»: دفعاته على بنود مستخلصاته في الموقع بتتحسب كمقاول مش كمورد */
-  const certItems = new Map(); for (const c of certs) if (c.site_id === siteId && c.status === 'approved') { const k = norm(c.contractor); if (!certItems.has(k)) certItems.set(k, new Set()); certItems.get(k).add(norm((c.data || {}).item || '')); }
-  for (const [k, y] of sup) { const ci = certItems.get(k) || new Set(); const paid = r2(ex.filter(e => norm(e.contractor) === k && !ci.has(norm(e.item || ''))).reduce((a, e) => a + num(e.amount), 0)); rows.push({ name: y.name, kind: 'مورد', item: '', due: r2(y.due), paid, left: r2(y.due - paid), note: y.n === 1 ? 'فاتورة واحدة' : y.n === 2 ? 'فاتورتان' : y.n + ' فواتير' }); }
+  /* المدفوع للمورد — نفس قاعدة التطبيق (supPaySide): المورد كل دفعاته؛ «مقاول ومورد» دفعات «تحت الحساب» وبنود توريد فواتيره (أو بند فيه «توريد») بس */
+  const sitemsOf = new Map(); for (const x of invoices(ms)) if (x.sup && !x.pend) { const k = norm(x.sup); if (!sitemsOf.has(k)) sitemsOf.set(k, new Set()); if (x.sitem) sitemsOf.get(k).add(norm(x.sitem)); }
+  const supSide = (e, y, k) => { if (e.item === PAY_ITEM || kindOf(y.name) !== 'both') return true; const it = norm(e.item || ''); return (sitemsOf.get(k) || new Set()).has(it) || /توريد/.test(e.item || ''); };
+  for (const [k, y] of sup) { const paid = r2(ex.filter(e => norm(e.contractor) === k && supSide(e, y, k)).reduce((a, e) => a + num(e.amount), 0)); rows.push({ name: y.name, kind: 'مورد', item: '', due: r2(y.due), paid, left: r2(y.due - paid), note: y.n === 1 ? 'فاتورة واحدة' : y.n === 2 ? 'فاتورتان' : y.n + ' فواتير' }); }
   const site = certs.filter(c => c.site_id === siteId), g = new Map();
   for (const c of site) { const k = c.contractor + '|' + String((c.data || {}).item || '').trim(); if (!g.has(k)) g.set(k, []); g.get(k).push(c); }
   for (const [k, L] of g) { const ap = L.filter(c => c.status === 'approved').sort((a, b) => b.no - a.no)[0]; if (!ap) continue; const it = String((ap.data || {}).item || '').trim();
@@ -64,7 +66,7 @@ export function duesTable(rows, siteName) {
 export function shortStatement({ name, sites, moves, exps, certs, boq, siteName }) {
   const k = norm(name), ids = new Set(sites), rows = [];
   for (const x of invoices(moves.filter(m => ids.has(m.site_id)))) if (norm(x.sup) === k && !x.pend && !x.bad) rows.push({ d: x.date, t: (x.inv ? 'فاتورة رقم ' + x.inv : 'فاتورة مخزن') + (x.disc ? ' (خصم ' + fmt(x.disc) + ')' : '') + (x.tax ? ' (ضريبة ' + fmt(x.rate) + '%)' : ''), s: x.site, due: x.due, paid: 0 });
-  for (const m of moves) if (ids.has(m.site_id) && !m.deleted && (m.kind === 'ret' || m.kind === 'cn') && norm((m.data || {}).supplier) === k) rows.push({ d: m.date, t: m.kind === 'ret' ? '↩ مرتجع' : '− إشعار خصم', s: m.site_id, due: -crVal(m), paid: 0 });
+  for (const m of moves) if (ids.has(m.site_id) && !m.deleted && (m.kind === 'ret' || m.kind === 'cn') && !(m.data || {}).supPend && norm((m.data || {}).supplier) === k) rows.push({ d: m.date, t: m.kind === 'ret' ? '↩ مرتجع' : '− إشعار خصم', s: m.site_id, due: -crVal(m), paid: 0 });
   const g = new Map(); for (const c of certs) if (ids.has(c.site_id) && norm(c.contractor) === k && c.status === 'approved') { const kk = c.site_id + '|' + String((c.data || {}).item || '').trim(); const o = g.get(kk); if (!o || c.no > o.no) g.set(kk, c); }
   for (const c of g.values()) rows.push({ d: (c.data || {}).date || '', t: 'آخر مستخلص معتمد رقم ' + c.no + ' — ' + String((c.data || {}).item || ''), s: c.site_id, due: certAfter(c, certs, boq), paid: 0 });
   for (const e of exps) if (ids.has(e.siteId) && norm(e.contractor) === k) rows.push({ d: e.date || '', t: 'دفعة' + (e.item ? ' — ' + e.item : '') + (e.notes ? ' · ' + e.notes : ''), s: e.siteId, due: 0, paid: num(e.amount) });
