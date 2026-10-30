@@ -437,7 +437,7 @@ table.reg-t td.rp,table.reg-t th.rp{width:1%;white-space:nowrap;font-size:13px}
 .dg{border:1px solid var(--line);border-radius:8px;margin-top:10px;overflow:hidden}.dg .dh{display:flex;align-items:center;gap:8px;background:#fff6e0;padding:8px 10px;font-weight:700;flex-wrap:wrap}.dg .dh .cnt{font-weight:400;font-size:12px;color:var(--muted)}
 .dg table{margin:0}.dg .df{display:flex;gap:8px;align-items:center;padding:8px 10px;border-top:1px solid var(--line);flex-wrap:wrap}.dg tr.cd-pick td{background:var(--accent-soft)}
 .cd-tabs{flex-wrap:wrap;margin-bottom:10px}.stat{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 8px}.stat div{border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:13px}.stat b{font-size:16px}
-.chip.ok{background:#e3f1e3;color:#2e6b2e}.chip.wait{background:#fff0d6;color:#8a5a00}.chip.no{background:#f6e0e0;color:#8a2a2a}
+.chip.ok{background:#e3f1e3;color:#2e6b2e}.chip.wait{background:#fff0d6;color:#8a5a00}.chip.no{background:#f6e0e0;color:#8a2a2a}.chip.dim{background:#ececea;color:#666}
 .tree{border:1px solid var(--line);border-radius:8px;overflow:hidden}.tree .r{display:flex;align-items:center;gap:10px;padding:6px 12px;border-top:1px solid var(--line)}.tree .r:first-child{border-top:0}
 .tree .l0{background:var(--accent-soft);font-weight:700}.tree .l1{padding-inline-start:30px;font-weight:600}.tree .l2{padding-inline-start:54px}.tree .l3{padding-inline-start:78px;font-size:13px;color:var(--muted)}.tree .grow{flex:1}.tree .m{color:var(--muted);font-size:12px}
 @media (prefers-color-scheme:dark){.dg .dh{background:#3a3220}}
@@ -4646,6 +4646,107 @@ function payAlloc(exps){
   return out;
 }
 
+/* ================= «سجل الاستيراد»: كل ملف Excel اتستورد — اللي اتسجل وتحت المراجعة واللي اتساب، والتراجع عن الملف =================
+   تقرير الملف بيتحفظ في سجل التعديلات (log: action import، kind files، impId، rows) — وكل حركة من الملف عليها impId. */
+const IMPL={open:'',f:'all',site:'',mon:'',msg:null,busy:false};
+const IMPL_ST={ok:'اتسجل',rev:'تحت المراجعة',dup:'اتساب — مكرر',dup2:'اتساب — مكرر في الملف',err:'اتساب — ناقص',zero:'اتساب — من غير مبلغ'};
+/* الصف اللي هيتحفظ في التقرير (بيانات الصف اللي اتساب بتتحفظ كاملة علشان «سجّله برضه») */
+function implRow(x,used,id){const r=x.rec||{},kept=used&&(x.st==='dup'||x.st==='dup2');
+  const st=kept?'ok':x.st==='err'&&!(r.amount>0)?'zero':x.st;
+  const o={line:x.line,st,kind:x.kind,amount:r.amount>0?r.amount:0,date:r.date||'',notes:r.notes||'',item:r.review?r.review.item||'':r.item||'',contractor:r.review?r.review.contractor||'':r.contractor||'',errs:x.errs||[]};
+  if(id)o.id=id;
+  if(!used&&r.amount>0){const k={};for(const f of ['siteId','amount','date','method','notes','remarks','item','contractor','bank','due','chq'])if(r[f]!=null&&r[f]!=='')k[f]=r[f];o.rec=k}
+  return o}
+const implCan=siteId=>APP&&typeof revCan==='function'&&revCan(siteId);
+/* كل الاستيرادات اللي ظاهرة لي (الجديدة بتقرير، والقديمة من غير) */
+function implList(){
+  const L=(S.log||[]).filter(l=>l&&l.action==='import'&&l.kind==='files'&&l.siteId&&implCan(l.siteId));
+  return L.map(l=>{const file=l.file||String(l.details||'').replace(/^.*?من Excel:\s*/,'').trim();return {...l,file,old:!Array.isArray(l.rows)}}).sort((a,b)=>(b.at||0)-(a.at||0));
+}
+/* حركات الملف دلوقتي (بما فيها اللي اتحذفت) */
+function implRecs(x){
+  const all=[...(S.exp||[]).map(e=>({...e,_c:'expenses'})),...(S.dep||[]).map(e=>({...e,_c:'deposits'})),...(S.trash||[]).filter(t=>t.col==='expenses'||t.col==='deposits').map(t=>({...t,_c:t.col,_del:true}))];
+  if(!x.old)return all.filter(e=>e.impId===x.impId);
+  return all.filter(e=>e.siteId===x.siteId&&e.imported===x.file&&(+e.created||0)>=(x.at||0)-300000&&(+e.created||0)<=(x.at||0)+600000);
+}
+function implSum(x){
+  const recs=implRecs(x),live=recs.filter(e=>!e._del),rev=live.filter(e=>typeof revOn==='function'&&revOn(e)),rows=x.rows||[];
+  const skip=rows.filter(r=>r.st!=='ok'&&r.st!=='rev'),S2=a=>Math.round(a.reduce((t,v)=>t+(+v||0),0)*100)/100;
+  const recT=S2(live.filter(e=>!rev.includes(e)).map(amt)),revT=S2(rev.map(amt)),skipT=S2(skip.map(r=>r.amount));
+  const changed=rows.filter(r=>r.id&&implDiff(r,recs.find(e=>e.id===r.id))).length;
+  const match=x.old?null:Math.abs(S2([recT,revT,skipT])-(+x.fileTot||0))<0.01&&!changed;
+  return {recs,live,rev,skip,recT,revT,skipT,nRec:live.length-rev.length,nRev:rev.length,nSkip:skip.length,changed,match};
+}
+/* اللي اتغيّر في الحركة من وقت الاستيراد */
+function implDiff(r,e){
+  if(!e)return 'مش موجودة';if(e._del)return 'اتحذفت (في السلة)';const d=[];
+  if(Math.abs((+r.amount||0)-amt(e))>0.004)d.push('المبلغ '+fmt(r.amount)+' ← '+fmt(amt(e)));
+  if((r.date||'')!==(e.date||'')&&!(e.review&&e.review.tmpDate))d.push('التاريخ '+(r.date||'—')+' ← '+(e.date||'—'));
+  const it=e.review&&e.review.hold?'':e.item||'',co=e.review&&e.review.hold?'':e.contractor||'';
+  if(r.st==='ok'&&(r.item||'')!==it)d.push('البند '+(r.item||'—')+' ← '+(it||'—'));
+  if(r.st==='ok'&&(r.contractor||'')!==co)d.push('المقاول '+(r.contractor||'—')+' ← '+(co||'—'));
+  return d.join(' · ');
+}
+function renderImports(){
+  const all=implList(),sites=[...new Set(all.map(x=>x.siteId))],mons=[...new Set(all.map(x=>new Date(x.at||0).toISOString().slice(0,7)))].sort().reverse();
+  const m=IMPL.msg&&Date.now()-(IMPL.msg.at||0)<9000?IMPL.msg:null;
+  if(IMPL.open){const x=all.find(z=>(z.impId||String(z.at))===IMPL.open);if(x)return renderImport(x,m);IMPL.open=''}
+  const L=all.filter(x=>(!IMPL.site||x.siteId===IMPL.site)&&(!IMPL.mon||new Date(x.at||0).toISOString().slice(0,7)===IMPL.mon));
+  const st=x=>{const s=implSum(x);return {x,s}};const rows=L.map(st);
+  $('#pane').innerHTML=`<div class="pane-h"><h2>سجل الاستيراد</h2></div>
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
+  <div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><select id="implSite" style="width:auto"><option value="">كل المواقع</option>${sites.map(id=>`<option value="${esc(id)}" ${IMPL.site===id?'selected':''}>${esc(siteNameOf(id))}</option>`).join('')}</select>
+   <select id="implMon" style="width:auto"><option value="">كل الشهور</option>${mons.map(v=>`<option ${IMPL.mon===v?'selected':''}>${v}</option>`).join('')}</select></div>
+  ${rows.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>التاريخ</th><th>الملف</th><th>الموقع</th><th>استورده</th><th class="num">إجمالي الملف</th><th class="num">اتسجل</th><th class="num">تحت المراجعة</th><th class="num">اتساب</th><th>المطابقة</th><th></th></tr></thead><tbody>
+  ${rows.map(({x,s})=>`<tr><td class="date">${esc(stamp(x.at))}</td><td class="tl"><b>${esc(x.file||'—')}</b></td><td>${esc(siteNameOf(x.siteId))}</td><td>${esc(who(x)||'—')}</td>
+   <td class="num">${x.old?'—':fmt(x.fileTot||0)}</td><td class="num">${fmt(s.recT)} <small>(${s.nRec})</small></td><td class="num">${s.nRev?fmt(s.revT)+' <small>('+s.nRev+')</small>':'—'}</td><td class="num">${x.old?'؟':s.nSkip?fmt(s.skipT)+' <small>('+s.nSkip+')</small>':'—'}</td>
+   <td>${x.old?'<span class="chip dim">قبل السجل</span>':s.match?'<span class="chip ok">مطابق</span>':s.changed?`<span class="chip wait">اتعدّل ${s.changed}</span>`:'<span class="chip no">مختلف</span>'}</td>
+   <td><button class="ghost" type="button" data-impl="open" data-id="${esc(x.impId||String(x.at))}">افتح</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin-top:8px">لم يُستورد أي ملف بعد.</p>'}
+  <p class="note">المطابقة: إجمالي الملف = اللي اتسجل + اللي تحت المراجعة + اللي اتساب. الملفات اللي اتستوردت قبل «سجل الاستيراد» بيبان منها اللي اتسجل بس.</p></div>`;
+  const a=$('#implSite');if(a)a.onchange=()=>{IMPL.site=a.value;render()};const b=$('#implMon');if(b)b.onchange=()=>{IMPL.mon=b.value;render()};
+}
+function renderImport(x,m){
+  const s=implSum(x),can=implCan(x.siteId),f=IMPL.f;
+  let rows;
+  if(x.old)rows=s.recs.map((e,i)=>({line:i+1,st:revOn(e)?'rev':'ok',amount:amt(e),date:e.date,notes:e.notes,item:e.item,contractor:e.contractor,id:e.id,_e:e}));
+  else rows=(x.rows||[]).map(r=>({...r,_e:r.id?s.recs.find(e=>e.id===r.id):null}));
+  for(const r of rows){if(r._e&&!r._e._del&&typeof revOn==='function'&&revOn(r._e))r.cur='rev';else if(r._e&&!r._e._del)r.cur='ok';else if(r._e&&r._e._del)r.cur='del';else r.cur=r.st;r.diff=!x.old&&r.id?implDiff(r,r._e):''}
+  const C={all:rows.length,rev:rows.filter(r=>r.cur==='rev').length,skip:rows.filter(r=>!r.id).length,chg:rows.filter(r=>r.diff).length};
+  const vis=rows.filter(r=>f==='rev'?r.cur==='rev':f==='skip'?!r.id:f==='chg'?!!r.diff:true);
+  const chip=r=>r.cur==='rev'?'<span class="chip wait">تحت المراجعة</span>':r.cur==='ok'?'<span class="chip ok">اتسجل</span>':r.cur==='del'?'<span class="chip no">اتحذف</span>':r.cur==='zero'?'<span class="chip no">اتساب — من غير مبلغ</span>':`<span class="chip dim">${esc(IMPL_ST[r.cur]||r.cur)}</span>`;
+  const act=r=>!can?'':r.cur==='rev'?`<button class="ghost" type="button" data-impl="rev">أكمِله</button>`:r.cur==='ok'?`<button class="ghost" type="button" data-impl="go" data-id="${esc(r.id)}">فتح</button>`:(r.cur==='dup'||r.cur==='dup2')&&r.rec?`<button class="ghost" type="button" data-impl="add" data-line="${r.line}">سجّله برضه</button>`:'';
+  const nLive=s.live.length;
+  $('#pane').innerHTML=`<div class="pane-h"><div><button class="ghost back" type="button" data-impl="back">→ سجل الاستيراد</button><h2>${esc(x.file||'ملف')}</h2><p class="foot-note" style="margin:2px 0 0">${esc(siteNameOf(x.siteId))} · استورده ${esc(who(x)||'—')} · ${esc(stamp(x.at))}</p></div></div>
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
+  <div class="card"><div class="stat">${x.old?'':`<div>إجمالي الملف <b>${fmt(x.fileTot||0)}</b></div>`}<div>اتسجل <b>${fmt(s.recT)}</b></div><div>تحت المراجعة <b>${fmt(s.revT)}</b></div>${x.old?'':`<div>اتساب <b>${fmt(s.skipT)}</b></div><div>اتعدّل أو اتحذف بعد كده <b>${C.chg}</b></div>`}</div>
+  ${x.old?'<p class="note">ملف اتستورد قبل «سجل الاستيراد»: ظاهر منه الحركات اللي اتسجلت بس.</p>':''}
+  <div class="seg" role="tablist" style="margin-bottom:8px">${[['all','الكل',C.all],['rev','تحت المراجعة',C.rev],...(x.old?[]:[['skip','اتساب',C.skip],['chg','اتعدّل بعد كده',C.chg]])].map(([k,t,n])=>`<button role="tab" data-implf="${k}" aria-selected="${f===k}">${t} (${n})</button>`).join('')}</div>
+  <div class="tbl-wrap"><table><thead><tr><th class="num">سطر</th><th>الحالة</th><th>التاريخ</th><th class="num">المبلغ</th><th>البيان</th><th>البند</th><th>المقاول / المورد</th><th></th></tr></thead><tbody>
+  ${vis.map(r=>`<tr class="${r.id?'':'row-dim'}"><td class="num plain">${r.line}</td><td>${chip(r)}${r.errs&&r.errs.length&&!r.id?`<span class="note"> ناقص: ${esc(r.errs.join('، '))}</span>`:''}${r.cur==='rev'&&r._e&&r._e.review&&r._e.review.miss&&r._e.review.miss.length?`<span class="note"> ناقص: ${esc(r._e.review.miss.join('، '))}</span>`:''}${r.diff?`<span class="note"> اتعدّل بعد كده: ${esc(r.diff)}</span>`:''}</td>
+   <td class="date">${esc(r.date||'')||'—'}</td><td class="num">${r.amount?fmt(r.amount):'—'}</td><td class="tl">${esc(r.notes||'')||'—'}</td><td>${esc(r.item||'')||'—'}</td><td>${esc(r.contractor||'')||'—'}</td><td class="acts">${act(r)}</td></tr>`).join('')||'<tr><td colspan="8">—</td></tr>'}</tbody></table></div>
+  ${can&&nLive?`<div class="row" style="margin-top:10px;gap:8px;align-items:center">${IMPL.undo===x.impId+String(x.at)?`<span class="confirm"><span class="msg err">هتتنقل ${nLive} حركة من الملف ده لسلة المهملات.</span><button class="danger" type="button" data-impl="undoyes">تأكيد التراجع</button><button type="button" data-impl="undono">إلغاء</button></span>`:`<button class="danger" type="button" data-impl="undo">التراجع عن الملف</button>`}<span class="note">ينقل الـ${nLive} حركة اللي اتسجلت من الملف ده لسلة المهملات مرة واحدة (وتقدر ترجّعهم من السلة). صلّح الملف واستورده تاني.</span></div>`:''}</div>`;
+}
+document.addEventListener('click',async ev=>{
+  const tf=ev.target.closest('[data-implf]');if(tf){IMPL.f=tf.dataset.implf;render();return}
+  const b=ev.target.closest('[data-impl]');if(!b)return;const a=b.dataset.impl;
+  if(a==='open'){IMPL.open=b.dataset.id;IMPL.f='all';IMPL.undo='';render();window.scrollTo({top:0});return}
+  if(a==='back'){IMPL.open='';render();return}
+  if(a==='rev'){S.sel='__review';render();window.scrollTo({top:0});return}
+  const x=implList().find(z=>(z.impId||String(z.at))===IMPL.open);if(!x||!implCan(x.siteId))return;
+  if(a==='go'){const e=(S.exp||[]).find(z=>z.id===b.dataset.id)||(S.dep||[]).find(z=>z.id===b.dataset.id);if(!e)return;S.sel=e.siteId;S.tab=(S.dep||[]).includes(e)?'dep':'exp';S.filt={c:'',i:'',from:e.date||'',to:e.date||'',q:e.notes||''};S.editing=null;render();window.scrollTo({top:0});return}
+  if(a==='add'){const r=(x.rows||[]).find(z=>String(z.line)===b.dataset.line);if(!r||!r.rec)return;const by=lsGet(LS_BY)||S.myName||'',id=newId();
+    queue(r.kind==='dep'?'deposits':'expenses',id,{...r.rec,by,byId:S.uid||'',created:Date.now(),imported:x.file,impId:x.impId});
+    /* التقرير نفسه يتحدّث: السطر بقى «اتسجل» */
+    const lg=(S.log||[]).find(l=>l.impId===x.impId);if(lg){const rows=lg.rows.map(z=>z.line===r.line?{...z,st:'ok',id,rec:undefined}:z);const d={...clean(lg),rows};delete d.id;queue('log',lg.id,d)}
+    IMPL.msg={ok:1,at:Date.now(),t:'تم تسجيل سطر '+r.line+'.'};render();return}
+  if(a==='undo'){IMPL.undo=x.impId+String(x.at);render();return}
+  if(a==='undono'){IMPL.undo='';render();return}
+  if(a==='undoyes'){IMPL.undo='';const live=implSum(x).live;let n=0;const nm=lsGet(LS_BY)||S.myName||'';
+    for(const e of live){const col=e._c,rec=(S[COLS[col]]||[]).find(z=>z.id===e.id);if(!rec||!canEditRec(rec))continue;queue(col,e.id,{...clean(rec),deleted:true,deletedAt:Date.now(),deletedBy:nm,deletedById:S.uid||'',updated:Date.now()});n++}
+    logChange('delete','files',{siteId:x.siteId,details:'التراجع عن ملف «'+x.file+'»: '+n+' حركة اتنقلت لسلة المهملات'});
+    IMPL.msg={ok:1,at:Date.now(),t:'اتنقلت '+n+' حركة من «'+x.file+'» لسلة المهملات. تقدر ترجّعهم من «سلة المهملات».'};render();return}
+});
+
 const EDITION='app'; const OFF=EDITION==='offline'; const APP=EDITION==='app';
 const CUR='ج.م';
 const LS_CACHE='adc_cache_v1',LS_PEND='adc_pending_v1',LS_BACKUP='adc_last_backup',LS_BY='adc_by';
@@ -4854,7 +4955,7 @@ function renderSites(){
   if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'');
   if(APP&&tm&&!appIsEngineer()){const n=ctBadgeCount();tm.insertAdjacentHTML('beforeend','');const t=tool('__certs','المستخلصات',n?`<b class="neg">${n} للاعتماد</b>`:'')+tool('__store','المخزن',typeof SO!=='undefined'&&SO.d?(SO.d.sites.filter(x=>ctMySites().some(s=>s.id===x.site_id)).length||''):'')+tool('__stmts','التقارير المختصرة','مورد · موقع · دفعات');const anchor=tm.querySelector('[data-site="__custody"]');if(anchor)anchor.insertAdjacentHTML('beforebegin',t);else tm.insertAdjacentHTML('beforeend',t)}
   {const sb=$('#setBtn');if(sb){sb.classList.toggle('on',cur==='__settings');sb.setAttribute('aria-current',String(cur==='__settings'))}}
-  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__certs:'المستخلصات',__pendregs:'أسماء بانتظار التسجيل',__stmts:'التقارير المختصرة',__review:'مصروفات تحت المراجعة',__codes:'الأسماء والأكواد',__store:'المخزن',__custody:APP&&typeof isAcct==='function'&&isAcct()?'تصفية العهد':'العُهد',__trash:'سلة المهملات',__search:'بحث'};
+  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__certs:'المستخلصات',__pendregs:'أسماء بانتظار التسجيل',__stmts:'التقارير المختصرة',__review:'مصروفات تحت المراجعة',__codes:'الأسماء والأكواد',__imports:'سجل الاستيراد',__store:'المخزن',__custody:APP&&typeof isAcct==='function'&&isAcct()?'تصفية العهد':'العُهد',__trash:'سلة المهملات',__search:'بحث'};
   const mb=$('#menuBtn');if(mb){const pend=APP&&!appIsEngineer()&&typeof custMine==='function'?custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length+ctBadgeCount():0;
     mb.innerHTML=`<span aria-hidden="true">☰</span> <span class="ml">${TOOLS[cur]&&!(typeof uiMobile==='function'&&window.innerWidth<=560)?esc(TOOLS[cur]):'القائمة'}</span>${pend?`<span class="badge" title="بانتظار مراجعتك">${pend}</span>`:''}`;mb.classList.toggle('on',!!TOOLS[cur])}
   const am=$('#addMenu');
@@ -5796,8 +5897,8 @@ function diffText(a,b){
   return out.length?out.join(' · '):'بدون تغيير في القيم';
 }
 const fmtPlain=n=>(Math.round(n*100)/100).toLocaleString('en-US',{maximumFractionDigits:2});
-function logChange(action,col,r,old){
-  const isReg=col==='contractors'||col==='items';const e={at:Date.now(),action,kind:col,byId:S.uid||'',siteId:col==='sites'?(r.id||''):(r.siteId||''),siteName:col==='sites'?(r.name||''):isReg?'':siteNameOf(r.siteId),amount:col==='counts'?(+r.cash||0)+(+r.bank||0):(col==='sites'||isReg?null:amt(r)),date:r.date||'',details:old?diffText(old,r):logDetails(col,r),by:(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||r.by||S.myName||'',source:OFF?'الكمبيوتر':'الإنترنت'};
+function logChange(action,col,r,old,extra){
+  const isReg=col==='contractors'||col==='items';const e={at:Date.now(),action,kind:col,byId:S.uid||'',siteId:col==='sites'?(r.id||''):(r.siteId||''),siteName:col==='sites'?(r.name||''):isReg?'':siteNameOf(r.siteId),amount:col==='counts'?(+r.cash||0)+(+r.bank||0):(col==='sites'||isReg?null:amt(r)),date:r.date||'',details:old?diffText(old,r):logDetails(col,r),by:(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||r.by||S.myName||'',source:OFF?'الكمبيوتر':'الإنترنت',...(extra||{})};
   S.pending.push({col:'log',id:newId(),data:e});savePending();merge();
   flush();
   if(OFF&&lsGet(LS_AUTOX)){clearTimeout(S.autoT);S.autoT=setTimeout(()=>exportExcel(null,true),1200)}
@@ -6911,9 +7012,12 @@ function bindImport(site){
     const I=S.imp,ok=impUse(I);if(!ok.length)return;
     let t=Date.now();const by=(OFF&&SEC.user?SEC.user.name:'')||lsGet(LS_BY)||S.myName||'';
     for(const x of I.newNames||[]){const k=x.col+':'+x.name;if(I.nm[k]==='new'&&canReg())addReg(x.col,x.col==='contractors'?{name:x.name,kind:(I.nk||{})[k]==='supplier'?'supplier':'contractor'}:{name:x.name})}
-    for(const x of ok){const rec={...x.rec,by,byId:S.uid||'',created:t++,imported:I.name};if(rec.review)rec.review={...rec.review,by,byId:S.uid||'',at:Date.now()};queue(x.kind==='exp'?'expenses':'deposits',newId(),rec)}
+    const impId=newId(),ids=new Map();
+    for(const x of ok){const rec={...x.rec,by,byId:S.uid||'',created:t++,imported:I.name,impId};if(rec.review)rec.review={...rec.review,by,byId:S.uid||'',at:Date.now()};const id=newId();ids.set(x,id);queue(x.kind==='exp'?'expenses':'deposits',id,rec)}
     const nRev=ok.filter(x=>x.rec.review).length;
-    logChange('import','files',{siteId:site.id,details:'استيراد '+ok.length+' حركة من Excel: '+I.name});
+    /* تقرير الملف كامل في «سجل الاستيراد» */
+    const rpt=APP&&typeof implRow==='function'?{impId,file:I.name,fileTot:I.fileTot||0,rows:(I.list||[]).map(x=>implRow(x,ids.has(x),ids.get(x)))}:{impId,file:I.name};
+    logChange('import','files',{siteId:site.id,details:'استيراد '+ok.length+' حركة من Excel: '+I.name},null,rpt);
     const addT=Math.round(ok.reduce((t,x)=>t+x.rec.amount,0)*100)/100,dif=Math.round(((I.fileTot||0)-addT)*100)/100;
     S.imp=null;S.flash={text:'أُضيف '+ok.length+' حركة بـ '+fmt(addT)+' من الملف للموقع. إجمالي الملف '+fmt(I.fileTot||0)+(Math.abs(dif)>0.004?' — الفرق '+fmt(dif)+' تُرك (مكرر أو ناقص).':' — مطابق.')+(nRev?' منها '+nRev+' تحت المراجعة — أكمِلها من «تحت المراجعة».':''),until:Date.now()+15000};S.justSaved=true;render();window.scrollTo({top:0});
   });
@@ -7123,6 +7227,7 @@ const UIC={
   __custody:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h2M3 10h18"/>',
   __trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   __review:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  __imports:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
   __codes:'<path d="M4 7h4M4 12h4M4 17h4M11 7h9M11 12h9M11 17h9"/>',
   __search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',
   __stmts:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h4"/>',
@@ -7138,6 +7243,7 @@ function uiDecorateMenu(){
   const tr=tm.querySelector('[data-site="__trash"]');
   {const R=revMine(),n=R.reduce((a,x)=>a+x.list.length,0),ex=tm.querySelector('[data-site="__review"]');if(ex&&!n)ex.remove();
    if(n&&!ex)(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__review" aria-current="${S.sel==='__review'}">${uiIcon('__review')}<span class="n">تحت المراجعة</span><span class="t cnt">${n}</span></button>`)}
+  if(APP&&typeof implList==='function'&&implList().length&&!tm.querySelector('[data-site="__imports"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__imports" aria-current="${S.sel==='__imports'}">${uiIcon('__imports')}<span class="n">سجل الاستيراد</span></button>`);
   if(APP&&typeof cdCan==='function'&&cdCan()&&!tm.querySelector('[data-site="__codes"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__codes" aria-current="${S.sel==='__codes'}">${uiIcon('__codes')}<span class="n">الأسماء والأكواد</span></button>`);
   if(!tm.querySelector('[data-site="__search"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__search" aria-current="${S.sel==='__search'}">${uiIcon('__search')}<span class="n">بحث</span></button>`);
 }
@@ -7266,7 +7372,7 @@ function render(){
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
-  S.sel==='__codes'&&APP?renderCodes():S.sel==='__pendregs'&&APP?prRenderPage():S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
+  S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?prRenderPage():S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
   if(APP&&!appIsEngineer()&&(S.conflicts||[]).length)$('#pane').insertAdjacentHTML('afterbegin',cfCard());
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
