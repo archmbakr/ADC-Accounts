@@ -366,6 +366,7 @@ details.fold[open]>summary{margin-bottom:10px}
 .hf-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}.hf-row:last-child{border-bottom:0}
 .hf-row .nm{font-weight:600;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:start;cursor:pointer}.hf-row small{display:block;color:var(--muted);font-size:12px}
 .hf-row.low .nm,.hf-row.low b{color:var(--danger)}
+.sp-subj{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}.sp-s{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--fg);cursor:pointer;font:inherit}.sp-s b{font-size:15px}.sp-s small{color:var(--muted);font-size:11.5px}.sp-s[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.sp-s[aria-pressed=true] small{color:var(--on-accent);opacity:.85}.sp-s.go{border-style:dashed}.sp-shape button[aria-selected=true]{font-weight:700}
 .kind-tag{display:inline-block;margin-inline-start:6px;font-size:11px;padding:0 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600;vertical-align:middle}.kind-tag.it-sup{background:var(--accent-soft);color:var(--accent)}.kind-tag.it-lab{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}.kind-tag.it-srv{background:color-mix(in srgb,var(--money) 16%,transparent);color:var(--money)}.kind-tag[class*=it-]{margin-inline-start:0}
 .split-t{min-width:0}.split-t td{padding:7px 10px}.split-t tr.ct-sec td{background:var(--sunk)}.split-t tr.sub td{font-weight:600;color:var(--muted)}.split-t tr.grand td{font-weight:700;border-top:2px solid var(--line)}
 .reg-tools{align-items:center;gap:8px;flex-wrap:wrap}.reg-tools .grow{flex:1}.reg-tools .seg{margin:0}
@@ -4012,7 +4013,7 @@ function engNotices(){
 
 
 /* ===================== التقارير المختصرة (مورد · موقع · دفعات) ===================== */
-const SP={type:'site',mode:'now',site:'',owner:'',name:'',item:'',gname:'',iname:'',mmain:'',msub:'',party:'con',from:'',to:'',alias:{},aliasMsg:null,xl:null};
+const SP={shape:(()=>{try{return localStorage.getItem('adc_sp_shape')==='full'?'full':'short'}catch(e){return 'short'}})(),type:'site',mode:'now',site:'',owner:'',name:'',item:'',gname:'',iname:'',mmain:'',msub:'',party:'con',from:'',to:'',alias:{},aliasMsg:null,xl:null};
 /* دمج أسماء الموردين: app_settings «name_alias» = {الاسم المكتوب (مطبّع): الاسم في القائمة} */
 function spAliasFrom(rows){const x=(rows||[]).find(z=>z.key==='name_alias');try{SP.alias=x&&x.value?JSON.parse(x.value):{}}catch(e){SP.alias={}}}
 const spN=v=>{const n=soNorm(v);const a=SP.alias[n];return a?soNorm(a):n};
@@ -4049,8 +4050,8 @@ function spSupplier(){
   const rows=[...invs.map(x=>({d:x.date,k:'inv',x})),...crs.map(c=>({d:c.date,k:'cr',c})),...pays.map(e=>({d:e.date||'',k:'pay',e}))].sort((a,b)=>a.d.localeCompare(b.d)||(a.k==='inv'?-1:1));
   let run=0;const NOS={};const tr=rows.map(r=>{
     if(r.k==='inv'){const x=r.x;const no=(NOS[x.site]||(NOS[x.site]=soInvNos(x.site))).get(x.k),lab=(x.sitem&&no?esc(soInvTitle(x,no))+(x.inv?' · فاتورة المورد '+esc(x.inv):''):x.inv?'فاتورة رقم '+esc(x.inv):'بون')+(x.disc?' (خصم '+money0(x.disc)+')':'')+(x.tax?' (ضريبة '+fmt(x.rate)+'% = '+money0(x.tax)+')':'');
-      if(x.bad)return `<tr class="warn-row"><td class="d">${esc(x.date)}</td><td class="tl">${lab} <b class="neg">· ${x.bad} ${x.bad===1?'صنف':'أصناف'} من دون سعر</b></td><td class="tl">${esc(spSiteName(x.site))}</td><td class="n">—</td><td></td><td class="n b">${money0(run)}</td></tr>`;
-      run+=x.net;return `<tr><td class="d">${esc(x.date)}</td><td class="tl">${lab}</td><td class="tl">${esc(spSiteName(x.site))}</td><td class="n">${money0(x.net)}</td><td></td><td class="n b">${money0(run)}</td></tr>`}
+      if(x.bad)return `<tr class="warn-row"><td class="d">${esc(x.date)}</td><td class="tl">${lab} <b class="neg">· ${x.bad} ${x.bad===1?'صنف':'أصناف'} من دون سعر</b></td><td class="tl">${esc(spSiteName(x.site))}</td><td class="n">—</td><td></td><td class="n b">${money0(run)}</td></tr>`+spInvLines(x);
+      run+=x.net;return `<tr><td class="d">${esc(x.date)}</td><td class="tl">${lab}</td><td class="tl">${esc(spSiteName(x.site))}</td><td class="n">${money0(x.net)}</td><td></td><td class="n b">${money0(run)}</td></tr>`+spInvLines(x)}
     if(r.k==='cr'){const c=r.c,lab=c.k==='ret'?'↩ مرتجع'+(c.inv?' '+esc(c.inv):'')+(c.ref?' (على فاتورة '+esc(c.ref)+')':''):'− إشعار خصم'+(c.inv?' '+esc(c.inv):'')+(c.notes?' · '+esc(c.notes):'');
       if(c.bad)return `<tr class="warn-row"><td class="d">${esc(c.date)}</td><td class="tl">${lab} <b class="neg">· ${c.bad} ${c.bad===1?'صنف':'أصناف'} من دون سعر</b></td><td class="tl">${esc(spSiteName(c.site))}</td><td class="n">—</td><td></td><td class="n b">${money0(run)}</td></tr>`;
       run-=c.val;return `<tr class="cr"><td class="d">${esc(c.date)}</td><td class="tl">${lab}</td><td class="tl">${esc(spSiteName(c.site))}</td><td class="n neg-v">(${money0(c.val)})</td><td></td><td class="n b">${money0(run)}</td></tr>`}
@@ -4071,6 +4072,8 @@ function spSupplier(){
     if(L.length>1||(L[0]&&L[0].g))gsum=`<h3>حسب البند العام</h3><table style="width:auto;min-width:60%"><thead><tr><th>البند العام</th><th>الفواتير</th><th>مرتجعات وخصومات</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${L.map(x=>`<tr class="${x.g?'':'grp-free'}"><td class="tl">${x.g?esc(x.g):'بنود غير تابعة لبند عام'}</td><td class="n">${money0(x.inv)}</td><td class="n">${x.cr?'('+money0(x.cr)+')':'—'}</td><td class="n in">${money0(x.paid)}</td><td class="n b">${money0(r2(x.inv-x.cr-x.paid))}</td></tr>`).join('')}</tbody></table>`}
   return {title:'تقرير مختصر — مورد: '+spShow(nm)+(it?' — '+it:''),sub:spScopeTxt(sites)+' · حتى '+to,body:body+gsum+extra};
 }
+/* أصناف الفاتورة في التقرير التفصيلي للمورد */
+function spInvLines(x){if(SP.shape!=='full')return '';return x.lines.map(m=>{const d=m.data||{},q=+d.qty||0,pr=+d.price||0;return `<tr class="sub-l"><td></td><td class="tl" style="padding-inline-start:18px">↳ ${esc(typeof soLabel==='function'?soLabel(d.item):'')} — ${fmt(q)} ${esc(typeof soUnit==='function'?soUnit(d.item):'')} × ${pr?money0(pr):'<b class="neg">من دون سعر</b>'}</td><td></td><td class="n" style="opacity:.75">${pr?money0(r2(q*pr)):'—'}</td><td></td><td></td></tr>`}).join('')}
 const money0=v=>fmt(v).replace(/[⁦⁩]/g,'');
 function spScopeTxt(sites){return sites.length===1?'موقع: '+sites[0].name:(S.isManager?'مواقع '+spOwnerName(spOwnerKey(sites[0])):'كل مواقعك')+' ('+sites.length+')'}
 function spScopeNote(sites){return (APP&&typeof isAcct==='function'&&isAcct()?' <b>هذا الكشف لا يشمل البنود الخاصة.</b>':'')+(spTech()?' الدفعات بالمبلغ والتاريخ والبند فقط (من دون طريقة الدفع والملاحظات)، والشيكات التي لم يحن موعدها محسوبة مدفوعة.':'')}
@@ -4240,7 +4243,50 @@ function spMat(){
   SP.xl={rows:xl,tot,title:'كشف خامة - '+label,sheet:'كشف خامة',widths:[12,...(multi?[18]:[]),...(pick.length>1?[22]:[]),22,30,12,10,12,14]};
   return {title:'كشف خامة — '+label,sub:spScopeTxt(sites)+' · '+(from?'من '+from+' ':'من البداية ')+'إلى '+to,body};
 }
-function spDoc(){return SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite()}
+/* ---------- كشف مقاول (المرة التالتة من تنظيم 30 أكتوبر): من محرك الحساب الواحد (accConRows) — جانب المقاول بس ---------- */
+function spConNames(){
+  const ids=new Set(spScope().map(s=>s.id)),m=new Map(),add=n=>{n=String(n||'').trim();if(!n)return;const k=accN(n);if(!m.has(k))m.set(k,spShow(n))};
+  if(typeof CT!=='undefined')for(const c of CT.rows||[])if(ids.has(c.site_id))add(c.contractor);
+  for(const e of spExp())if(ids.has(e.siteId)&&e.contractor&&typeof conIsCon==='function'&&conIsCon(e.contractor)&&conKind(e.contractor)!=='supplier')add(e.contractor);
+  return [...m.values()].sort((a,b)=>a.localeCompare(b,'ar'));
+}
+function spContractor(){
+  const sites=spScope(),ids=new Set(sites.map(s=>s.id)),to=spTo(),nm=SP.name,multi=sites.length>1,full=SP.shape==='full';if(!nm)return null;
+  const k=accN(nm),R=accConRows({ids,name:nm,to}).sort((a,b)=>spSiteName(a.c.site_id).localeCompare(spSiteName(b.c.site_id),'ar')||ctItem(a.c).localeCompare(ctItem(b.c),'ar'));
+  const certs=(typeof CT!=='undefined'?CT.rows:[]).filter(c=>ids.has(c.site_id)&&accN(c.contractor)===k&&((c.data||{}).date||'')<=to);
+  const keys=new Set(R.map(x=>x.c.site_id+'|'+ctItem(x.c)));
+  const pend=certs.filter(c=>c.status!=='approved'&&!R.some(x=>ctKey(x.c)===ctKey(c)&&x.c.no>c.no));
+  const exps=spExp().filter(e=>!e._priv&&ids.has(e.siteId)&&(e.date||'')<=to&&e.contractor&&accN(e.contractor)===k);
+  const onCert=exps.filter(e=>keys.has(e.siteId+'|'+String(e.item||'').trim())),other=exps.filter(e=>!keys.has(e.siteId+'|'+String(e.item||'').trim()));
+  const T=f=>r2(R.reduce((a,x)=>a+f(x),0)),W=T(x=>x.k.works),RET=T(x=>x.k.ret),DED=T(x=>x.k.dedCum),AF=T(x=>x.k.after),PD=T(x=>x.paid),LF=r2(AF-PD),nd=spSum(onCert.filter(e=>notDue(e,to)));
+  const code=n=>typeof cdTxt==='function'&&cdTxt(n,'item')?' <span class="code">'+esc(cdTxt(n,'item'))+'</span>':'';
+  let body=`<div class="tiles"><div><span>الأعمال حتى تاريخه</span><b>${money0(W)}</b></div><div><span>تأمين الأعمال المحجوز</span><b>${money0(RET)}</b>${DED?`<small>والخصومات ${money0(DED)}</small>`:''}</div><div><span>الصافي المستحق</span><b>${money0(AF)}</b></div><div><span>المدفوع على بنود مستخلصاته</span><b class="in">${money0(PD)}</b>${nd?`<small>منها شيكات لم تستحق ${money0(nd)}</small>`:''}</div><div><span>${LF<0?'مدفوع بالزيادة (مقدم)':'المتبقي للمقاول'}</span><b class="${LF>0?'neg':''}">${money0(Math.abs(LF))}</b></div></div>
+  <table><thead><tr>${multi?'<th>الموقع</th>':''}<th>البند</th><th>آخر مستخلص معتمد</th><th>الأعمال حتى تاريخه</th><th>التأمين</th><th>الخصومات</th><th>الصافي المستحق</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>
+  ${R.map(x=>`<tr>${multi?`<td class="tl">${esc(spSiteName(x.c.site_id))}</td>`:''}<td class="tl">${esc(ctItem(x.c))||'—'}${code(ctItem(x.c))}</td><td class="tl">رقم ${x.c.no}${x.k.fin?' (ختامي)':''} — ${esc((x.c.data||{}).date||'')}</td><td class="n">${money0(x.k.works)}</td><td class="n">${money0(x.k.ret)}</td><td class="n">${x.k.dedCum?money0(x.k.dedCum):'—'}</td><td class="n">${money0(x.k.after)}</td><td class="n in">${money0(x.paid)}</td><td class="n b">${x.left<0?'('+money0(-x.left)+') مقدم':money0(x.left)}</td></tr>`).join('')||`<tr><td colspan="${multi?9:8}">لا توجد مستخلصات معتمدة لهذا المقاول${to!==today()?' حتى هذا التاريخ':''}.</td></tr>`}
+  </tbody>${R.length?`<tfoot><tr><td colspan="${multi?3:2}">الإجمالي</td><td class="n">${money0(W)}</td><td class="n">${money0(RET)}</td><td class="n">${DED?money0(DED):'—'}</td><td class="n">${money0(AF)}</td><td class="n">${money0(PD)}</td><td class="n">${LF<0?'('+money0(-LF)+') مقدم':money0(LF)}</td></tr></tfoot>`:''}</table>`;
+  if(pend.length)body+=`<p class="warn-box">ℹ️ ${pend.map(c=>'مستخلص رقم '+c.no+' — '+esc(ctItem(c))+(multi?' ('+esc(spSiteName(c.site_id))+')':'')+(c.status==='submitted'?' قيد الاعتماد':' مسودة')).join('، ')} — غير محسوب حتى يُعتمد.</p>`;
+  if(other.length)body+=`<p class="warn-box">⚠ ${other.length} ${other.length===1?'دفعة':'دفعات'} باسمه (${money0(spSum(other))}) على بنود ليس لها مستخلص معتمد: ${[...new Set(other.map(e=>esc(e.item||'من دون بند')))].join('، ')} — غير محسوبة في المتبقي.${conKind(nm)==='both'?' (هو «مقاول ومورد»: دفعات التوريد تظهر في تقرير المورد.)':''}</p>`;
+  if(full){
+    const P=onCert.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>طريقة الدفع</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(e.item||'')}</td><td>${esc(spMethTxt(e))}</td><td class="tl">${esc(e.notes||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')||`<tr><td colspan="${multi?6:5}">لا توجد دفعات.</td></tr>`}</tbody>${P.length?`<tfoot><tr><td colspan="${multi?5:4}">الإجمالي</td><td class="n">${money0(spSum(P))}</td></tr></tfoot>`:''}</table>`;
+    const A=certs.filter(c=>c.status==='approved').sort((a,b)=>ctKey(a).localeCompare(ctKey(b))||a.no-b.no);
+    body+=`<h3>المستخلصات المعتمدة</h3><table><thead><tr>${multi?'<th>الموقع</th>':''}<th>البند</th><th>رقم</th><th>التاريخ</th><th>الأعمال حتى تاريخه</th><th>الصافي بعد التأمين والخصومات</th></tr></thead><tbody>${A.map(c=>{const kc=ctCalc(c);return `<tr>${multi?`<td class="tl">${esc(spSiteName(c.site_id))}</td>`:''}<td class="tl">${esc(ctItem(c))}</td><td class="n">${c.no}${kc.fin?' (ختامي)':''}</td><td class="d">${esc((c.data||{}).date||'')}</td><td class="n">${money0(kc.works)}</td><td class="n">${money0(kc.after)}</td></tr>`}).join('')||`<tr><td colspan="${multi?6:5}">—</td></tr>`}</tbody></table>`;
+  }
+  body+=`<p class="note">المستحق = «إجمالي الأعمال بعد التأمين والخصومات» في آخر مستخلص معتمد لكل بند في كل موقع، والمدفوع = المصروفات باسمه على البند نفسه في الموقع نفسه.${spScopeNote(sites)}</p>`;
+  return {title:'تقرير مختصر — مقاول: '+spShow(nm),sub:spScopeTxt(sites)+' · حتى '+to,body};
+}
+/* التقرير التفصيلي للموقع: كل المصروفات والإيداعات */
+function spSiteFull(){
+  const sites=spScope(),ids=new Set(sites.map(s=>s.id)),to=spTo(),multi=sites.length>1;
+  const E=spExp().filter(e=>!e._priv&&ids.has(e.siteId)&&(e.date||'')<=to).sort((a,b)=>(a.date||'').localeCompare(b.date||'')),Dp=(S.dep||[]).filter(d=>ids.has(d.siteId)&&(d.date||'')<=to).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  return `<h3>المصروفات (${E.length})</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>المقاول / المورد</th><th>البيان</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${E.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(e.item||'')}</td><td class="tl">${esc(spShow(e.contractor||''))||'—'}</td><td class="tl">${esc(e.notes||'')}</td><td>${esc(spMethTxt(e))}</td><td class="n">${money0(amt(e))}</td></tr>`).join('')||`<tr><td colspan="${multi?7:6}">—</td></tr>`}</tbody>${E.length?`<tfoot><tr><td colspan="${multi?6:5}">الإجمالي</td><td class="n">${money0(spSum(E))}</td></tr></tfoot>`:''}</table>
+  <h3>دفعات المالك (${Dp.length})</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البيان</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${Dp.map(d=>`<tr><td class="d">${esc(d.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(d.siteId))}</td>`:''}<td class="tl">${esc(d.notes||'')}</td><td>${esc(spMethTxt(d))}</td><td class="n in">${money0(amt(d))}</td></tr>`).join('')||`<tr><td colspan="${multi?5:4}">—</td></tr>`}</tbody>${Dp.length?`<tfoot><tr><td colspan="${multi?4:3}">الإجمالي</td><td class="n">${money0(spSum(Dp))}</td></tr></tfoot>`:''}</table>`;
+}
+/* المواضيع في صفحة «التقارير» */
+const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['go:__store','المخزن','أرصدة وحركات'],['go:__journal','اليومية','حركة يوم أو فترة'],['go:__all','ملخص المواقع','كل المواقع']];
+const SP_SHAPED=['site','sup','con'];
+function spDoc(){const d=SP.type==='con'?spContractor():SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite();
+  if(d&&SP.shape==='full'&&SP_SHAPED.includes(SP.type)){d.title=d.title.replace('تقرير مختصر','تقرير تفصيلي');if(SP.type==='site')d.body+=spSiteFull()}return d}
 
 /* ---------- الصفحة ---------- */
 function spNames(kind){
@@ -4252,13 +4298,14 @@ function spNames(kind){
 }
 function spRenderPage(){
   if(spTech()){if(SP.type==='site')SP.type='sup';SP.party='con'}
-  const owners=spOwners(),sc=spScope(),names=SP.type==='site'?[]:spNames(SP.type==='sup'?'sup':'all');
+  const owners=spOwners(),sc=spScope(),names=SP.type==='site'?[]:SP.type==='con'?spConNames():spNames(SP.type==='sup'?'sup':'all');
   if(SP.name&&!names.some(n=>spN(n)===spN(SP.name)))SP.name='';
   const d=spDoc();
   const opt=(v,t,cur)=>`<option value="${esc(v)}" ${v===cur?'selected':''}>${esc(t)}</option>`;
-  $('#pane').innerHTML=`<div class="pane-h"><h2>التقارير المختصرة</h2></div>
-  <div class="card"><form class="entry" id="spForm" onsubmit="return false">
-    <div class="f fw"><label>نوع الكشف</label><div class="seg">${(spTech()?[['sup','كشف مورد'],['pay','كشف دفعات مقاول أو مورد']]:[['site','كشف موقع'],['sup','كشف مورد'],['pay','كشف دفعات'],['grp','كشف بند عام'],['item','كشف بند'],['mat','كشف خامة']]).map(([v,t])=>`<button type="button" data-sp="type" data-v="${v}" aria-selected="${SP.type===v}">${t}</button>`).join('')}</div></div>
+  $('#pane').innerHTML=`<div class="pane-h"><h2>التقارير</h2></div>
+  <div class="card"><div class="sec-h">1. اختر الموضوع</div><div class="sp-subj">${SP_SUBJ.filter(([v])=>spTech()?['con','sup','pay'].includes(v):true).map(([v,t,h])=>v.startsWith('go:')?`<button type="button" class="sp-s go" data-sp="go" data-v="${v.slice(3)}"><b>${t}</b><small>${h} ↗</small></button>`:`<button type="button" class="sp-s" data-sp="type" data-v="${v}" aria-pressed="${SP.type===v}"><b>${t}</b><small>${h}</small></button>`).join('')}</div></div>
+  <div class="card"><div class="sec-h">2. الفلاتر والشكل</div><form class="entry" id="spForm" onsubmit="return false">
+    ${SP_SHAPED.includes(SP.type)?`<div class="f fw"><label>شكل التقرير</label><div class="seg sp-shape">${[['short','مختصر'],['full','عادي (تفصيلي)']].map(([v,t])=>`<button type="button" data-sp="shape" data-v="${v}" aria-selected="${SP.shape===v}">${t}</button>`).join('')}</div></div>`:''}
     ${(S.isManager||spTech())&&owners.length>1&&!SP.site?`<div class="f c2"><label for="sp_owner">${spTech()?'مجموعة المواقع (الحسابات منفصلة لكل صاحب موقع)':'مواقع من (الحسابات منفصلة)'}</label><select id="sp_owner">${owners.map(([k])=>opt(k,spOwnerName(k),spOwnerKey(sc[0]))).join('')}</select></div>`:''}
     <div class="f c2"><label for="sp_site">الموقع</label><select id="sp_site">${opt('',S.isManager?'كل مواقع صاحب الموقع':spTech()&&spOwners().length>1?'كل مواقع المجموعة':'كل مواقعك',SP.site)}${spAllSites().map(s=>opt(s.id,s.name,SP.site)).join('')}</select></div>
     ${SP.type==='grp'?(()=>{const G=spGroupNames();if(SP.gname&&!G.some(n=>regNormK(n)===regNormK(SP.gname)))SP.gname='';return `<div class="f c2"><label for="sp_grp">البند العام</label><select id="sp_grp">${opt('','اختر…',SP.gname)}${G.map(n=>opt(n,n,SP.gname)).join('')}</select></div>${G.length?'':'<p class="note fw">لا توجد بنود عامة حتى الآن. أنشئها من صفحة «البنود».</p>'}<div class="f fw"><label>الشكل</label><div class="seg">${[['now','المنصرف الفعلي'],['debts','بالمديونيات']].map(([v,t])=>`<button type="button" data-sp="mode" data-v="${v}" aria-selected="${SP.mode===v}">${t}</button>`).join('')}</div></div>`})():''}
@@ -4266,7 +4313,7 @@ function spRenderPage(){
     ${SP.type==='mat'?(()=>{const M=typeof soMains==='function'?soMains():[];if(SP.mmain&&!M.some(m=>m.id===SP.mmain)){SP.mmain='';SP.msub=''}const sb=SP.mmain?soSubs(SP.mmain):[];if(SP.msub&&!sb.some(x=>x.id===SP.msub))SP.msub='';return `<div class="f c2"><label for="sp_mmain">البند الرئيسي</label><select id="sp_mmain">${opt('','اختر…',SP.mmain)}${M.map(m=>opt(m.id,m.name,SP.mmain)).join('')}</select></div>${sb.length?`<div class="f c2"><label for="sp_msub">الخامة (البند الفرعي)</label><select id="sp_msub">${opt('','كل الخامات التابعة لـ«'+soItem(SP.mmain).name+'»',SP.msub)}${sb.map(x=>opt(x.id,x.name+(x.unit?' ('+x.unit+')':''),SP.msub)).join('')}</select></div>`:''}${M.length?'':'<p class="note fw">قائمة خامات المخزن فارغة.</p>'}`})():''}
     ${SP.type==='site'?`<div class="f fw"><label>الشكل</label><div class="seg">${[['now','الموقف الحالي'],['debts','بالمديونيات']].map(([v,t])=>`<button type="button" data-sp="mode" data-v="${v}" aria-selected="${SP.mode===v}">${t}</button>`).join('')}</div></div>`:''}
     ${SP.type==='pay'&&!spTech()?`<div class="f c2"><label for="sp_party">دفعات لمين</label><select id="sp_party">${opt('con','مقاول أو مورد',SP.party)}${opt('owner','المالك (الإيداعات)',SP.party)}</select></div>`:''}
-    ${SP.type==='sup'||(SP.type==='pay'&&SP.party!=='owner')?`<div class="f c2"><label for="sp_name">${SP.type==='sup'?'المورد':'الاسم'}</label><select id="sp_name">${opt('','اختر…',SP.name)}${names.map(n=>opt(n,n,SP.name)).join('')}</select></div>`:''}
+    ${SP.type==='sup'||SP.type==='con'||(SP.type==='pay'&&SP.party!=='owner')?`<div class="f c2"><label for="sp_name">${SP.type==='sup'?'المورد':SP.type==='con'?'المقاول':'الاسم'}</label><select id="sp_name">${opt('','اختر…',SP.name)}${names.map(n=>opt(n,n,SP.name)).join('')}</select></div>`:''}
     ${SP.type==='sup'&&SP.name?(()=>{const L=spSupItems();if(SP.item&&!L.some(n=>soNorm(n)===soNorm(SP.item)))SP.item='';return `<div class="f c2"><label for="sp_item">البند</label><select id="sp_item">${opt('','كل البنود',SP.item)}${L.map(n=>opt(n,n,SP.item)).join('')}</select></div>`})():''}
     ${SP.type==='pay'||SP.type==='mat'||((SP.type==='grp'||SP.type==='item')&&SP.mode!=='debts')?`<div class="f c1"><label for="sp_from">من تاريخ</label><input id="sp_from" type="date" value="${esc(SP.from)}"></div>`:''}
     <div class="f c1"><label for="sp_to">حتى تاريخ</label><input id="sp_to" type="date" value="${esc(SP.to||today())}"></div>
@@ -4281,7 +4328,9 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-sp]');if
   if(a==='type'){SP.type=b.dataset.v;SP.name='';SP.item='';render()}else if(a==='mode'){SP.mode=b.dataset.v;render()}
   else if(a==='alias'){spAliasSave(b.dataset.from,(document.getElementById('spa_'+b.dataset.i)||{}).value||'')}
   else if(a==='unalias'){spAliasSave(b.dataset.from,'')}
-  else if(a==='xl'){spGroupXl()}});
+  else if(a==='xl'){spGroupXl()}
+  else if(a==='shape'){SP.shape=b.dataset.v==='full'?'full':'short';try{localStorage.setItem('adc_sp_shape',SP.shape)}catch(e){}render()}
+  else if(a==='go'){const v=b.dataset.v;if(v==='__store'&&typeof SO!=='undefined')SO.tab='rep';S.sel=v;S.stmt=null;render();window.scrollTo({top:0})}});
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-iggo]');if(!b)return;const site=S.sites.some(s=>s.id===S.sel)?S.sel:'';SP.type='grp';SP.gname=b.dataset.iggo;SP.mode='now';SP.site=site;SP.from='';S.sel='__stmts';render();window.scrollTo({top:0})});
 
 /* ---------- دمج أسماء الموردين (المدير) ---------- */
@@ -5005,9 +5054,9 @@ function renderSites(){
   const tool=(id,name,t)=>`<button class="site-btn jbtn" role="menuitem" data-site="${id}" aria-current="${cur===id}"><span class="n">${name}</span><span class="t">${t}</span></button>`;
   const tm=$('#toolMenu');
   if(tm)tm.innerHTML=tool('__all',isUserView()?'ملخص مواقعك':'ملخص كل المواقع',`<span class="${negCls(all.total).trim()}">${fmt(all.total)}</span>`)+tool('__journal','دفتر اليومية',(S.exp.length+S.dep.length)+' حركة')+tool('__contractors','المقاولين',regMine('contractors').length)+tool('__items','البنود',regMine('items').length)+(APP?appCustNavBtn().replace('class="site-btn jbtn"','class="site-btn jbtn" role="menuitem"'):'');
-  if(APP&&tm&&!appIsEngineer()){const n=ctBadgeCount();tm.insertAdjacentHTML('beforeend','');const t=tool('__certs','المستخلصات',n?`<b class="neg">${n} للاعتماد</b>`:'')+tool('__store','المخزن',typeof SO!=='undefined'&&SO.d?(SO.d.sites.filter(x=>ctMySites().some(s=>s.id===x.site_id)).length||''):'')+tool('__stmts','التقارير المختصرة','مورد · موقع · دفعات');const anchor=tm.querySelector('[data-site="__custody"]');if(anchor)anchor.insertAdjacentHTML('beforebegin',t);else tm.insertAdjacentHTML('beforeend',t)}
+  if(APP&&tm&&!appIsEngineer()){const n=ctBadgeCount();tm.insertAdjacentHTML('beforeend','');const t=tool('__certs','المستخلصات',n?`<b class="neg">${n} للاعتماد</b>`:'')+tool('__store','المخزن',typeof SO!=='undefined'&&SO.d?(SO.d.sites.filter(x=>ctMySites().some(s=>s.id===x.site_id)).length||''):'')+tool('__stmts','التقارير','موقع · مقاول · مورد · بند');const anchor=tm.querySelector('[data-site="__custody"]');if(anchor)anchor.insertAdjacentHTML('beforebegin',t);else tm.insertAdjacentHTML('beforeend',t)}
   {const sb=$('#setBtn');if(sb){sb.classList.toggle('on',cur==='__settings');sb.setAttribute('aria-current',String(cur==='__settings'))}}
-  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__certs:'المستخلصات',__pendregs:'أسماء بانتظار التسجيل',__stmts:'التقارير المختصرة',__review:'مصروفات تحت المراجعة',__codes:'الأسماء والأكواد',__imports:'سجل الاستيراد',__store:'المخزن',__custody:APP&&typeof isAcct==='function'&&isAcct()?'تصفية العهد':'العُهد',__trash:'سلة المهملات',__search:'بحث'};
+  const TOOLS={__all:isUserView()?'ملخص مواقعك':'ملخص كل المواقع',__journal:'دفتر اليومية',__contractors:'المقاولين',__items:'البنود',__banks:'الحسابات البنكية',__certs:'المستخلصات',__pendregs:'أسماء بانتظار التسجيل',__stmts:'التقارير',__wait:'بانتظارك',__review:'مصروفات تحت المراجعة',__codes:'الأسماء والأكواد',__imports:'سجل الاستيراد',__store:'المخزن',__custody:APP&&typeof isAcct==='function'&&isAcct()?'تصفية العهد':'العُهد',__trash:'سلة المهملات',__search:'بحث'};
   const mb=$('#menuBtn');if(mb){const pend=APP&&!appIsEngineer()&&typeof custMine==='function'?custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length+ctBadgeCount():0;
     mb.innerHTML=`<span aria-hidden="true">☰</span> <span class="ml">${TOOLS[cur]&&!(typeof uiMobile==='function'&&window.innerWidth<=560)?esc(TOOLS[cur]):'القائمة'}</span>${pend?`<span class="badge" title="بانتظار مراجعتك">${pend}</span>`:''}`;mb.classList.toggle('on',!!TOOLS[cur])}
   const am=$('#addMenu');
@@ -5483,7 +5532,7 @@ function renderSite(){
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${esc(site.name)}</h2><div class="actions">
     ${canEditRec(site)&&S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'يجب حذف إيداعات ومصروفات وجرد الموقع أولًا.':'نقل الموقع إلى سلة المهملات؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:''}
-    ${APP&&typeof SO!=='undefined'&&SO.d&&(SO.d.sites||[]).some(x=>x.site_id===site.id)?`<button type="button" class="more-btn store-btn" data-sogo="${esc(site.id)}">📦 المخزن</button>`:''}${APP&&typeof spRenderPage==='function'?`<button type="button" class="more-btn store-btn" data-stmtsite="${esc(site.id)}">🧾 التقارير المختصرة</button>`:''}
+    ${APP&&typeof SO!=='undefined'&&SO.d&&(SO.d.sites||[]).some(x=>x.site_id===site.id)?`<button type="button" class="more-btn store-btn" data-sogo="${esc(site.id)}">📦 المخزن</button>`:''}${APP&&typeof spRenderPage==='function'?`<button type="button" class="more-btn store-btn" data-stmtsite="${esc(site.id)}">🧾 التقارير</button>`:''}
     <div class="pop-wrap"><button type="button" class="more-btn" data-pop="siteMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">⋯</span> خيارات الموقع</button>
     <div class="pop pop-end" id="siteMenu" role="menu" hidden>
     ${S.canWrite&&canEntry(site)?'<button role="menuitem" id="impOpen">استيراد من Excel</button>':''}
@@ -7360,6 +7409,7 @@ const UIC={
   __search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',
   __stmts:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h4"/>',
   home:'<path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/>',
+  __wait:'<path d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 21h4"/>',
   bell:'<path d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 21h4"/>'
 };
 const uiIcon=k=>`<svg class="ui-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UIC[k]||''}</svg>`;
@@ -7369,6 +7419,7 @@ function uiDecorateMenu(){
   tm.querySelectorAll('.site-btn').forEach(b=>{const id=b.dataset.site;if(!id||b.querySelector('.ui-ic'))return;
     b.insertAdjacentHTML('afterbegin',uiIcon(id));const t=b.querySelector('.t');if(t){if(!t.textContent.trim())t.remove();else t.classList.add('cnt')}});
   const tr=tm.querySelector('[data-site="__trash"]');
+  if(APP&&!appIsEngineer()){const n=waitAll().n,ex=tm.querySelector('[data-site="__wait"]');if(ex&&!n)ex.remove();if(n){const h=`<button class="site-btn jbtn wait-m" role="menuitem" data-site="__wait" aria-current="${S.sel==='__wait'}">${uiIcon('__wait')}<span class="n">بانتظارك</span><span class="t cnt">${n}</span></button>`;if(ex)ex.outerHTML=h;else tm.insertAdjacentHTML('afterbegin',h)}}
   {const R=revMine(),n=R.reduce((a,x)=>a+x.list.length,0),ex=tm.querySelector('[data-site="__review"]');if(ex&&!n)ex.remove();
    if(n&&!ex)(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__review" aria-current="${S.sel==='__review'}">${uiIcon('__review')}<span class="n">تحت المراجعة</span><span class="t cnt">${n}</span></button>`)}
   if(APP&&typeof implList==='function'&&implList().length&&!tm.querySelector('[data-site="__imports"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__imports" aria-current="${S.sel==='__imports'}">${uiIcon('__imports')}<span class="n">سجل الاستيراد</span></button>`);
@@ -7403,8 +7454,24 @@ function uiNotices(){
   if(NT.repNew)out.push(`<div class="xbar"><span>يوجد كشف أسبوعي جديد.</span><button class="primary" data-site="__settings">احفظه من الإعدادات</button></div>`);
   return out;
 }
+/* ===== «بانتظارك» في مكان واحد (المرة التالتة من تنظيم 30 أكتوبر): كل اللي محتاج قرار في كل المواقع + التنبيهات العامة.
+   الجرس فوق = العدد بس، والضغط بيفتح الصفحة دي. كارت «بانتظارك في هذا الموقع» في صفحة الموقع زي ما هو. ===== */
+function waitAll(){
+  if(!APP||appIsEngineer())return {groups:[],gen:[],n:0};
+  const groups=S.sites.map(s=>({site:s,items:waitList(s.id)})).filter(g=>g.items.length),gen=[];{const bar=excelBar();if(bar&&!bar.includes('xbar ok'))gen.push(bar)}if(typeof quNotices==='function')gen.push(...quNotices());if(NT.repNew)gen.push(`<div class="xbar"><span>يوجد كشف أسبوعي جديد.</span><button class="primary" data-site="__settings">احفظه من الإعدادات</button></div>`);
+  return {groups,gen,n:groups.reduce((a,g)=>a+g.items.length,0)+gen.length};
+}
+function renderWaiting(){
+  const W=waitAll();
+  const li=x=>`<li>${x.nav?`<button type="button" class="linkish" data-nav="${esc(JSON.stringify(x.nav))}">${esc(x.t)} ←</button>`:x.sogo?`<button type="button" class="linkish" data-sogo="${esc(x.sogo)}">${esc(x.t)} ←</button>`:x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)} ←</button>`:esc(x.t)}</li>`;
+  $('#pane').innerHTML=`<div class="pane-h"><h2>بانتظارك ${W.n?`<span class="cnt">(${W.n})</span>`:''}</h2></div>
+  ${W.gen.length?`<div class="card"><div class="sec-h">عام</div>${W.gen.join('')}</div>`:''}
+  ${W.groups.map(g=>`<div class="card wait-card"><div class="sec-h"><button type="button" class="linkish" data-site="${esc(g.site.id)}"><b>${esc(g.site.name)}</b></button> <span class="cnt">(${g.items.length})</span></div><ul>${g.items.map(li).join('')}</ul></div>`).join('')}
+  ${W.n?'':'<div class="blank" style="padding:28px"><h3>لا يوجد شيء بانتظارك الآن.</h3><p>كل ما يحتاج قرارك (اعتماد، طلبات حذف، أسماء بانتظار التسجيل، فواتير من دون سعر، مصروفات تحت المراجعة…) يظهر هنا.</p></div>'}`;
+}
 function uiNoticeBtn(list){
   const b=$('#ntBtn'),p=$('#ntPop');if(!b||!p)return;
+  if(APP&&!appIsEngineer()){const n=waitAll().n;b.removeAttribute('data-pop');b.dataset.site='__wait';b.title='بانتظارك';b.hidden=!n;b.querySelector('.bd').textContent=n||'';p.hidden=true;return}
   b.hidden=!list.length;b.querySelector('.bd').textContent=list.length||'';
   p.innerHTML=list.length?list.join(''):'<p class="note">لا توجد تنبيهات.</p>';
 }
@@ -7501,7 +7568,7 @@ function render(){
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal')}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
-  S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?prRenderPage():S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
+  S.sel==='__wait'&&APP?renderWaiting():S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?prRenderPage():S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
   if(APP&&!appIsEngineer()&&(S.conflicts||[]).length)$('#pane').insertAdjacentHTML('afterbegin',cfCard());
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
