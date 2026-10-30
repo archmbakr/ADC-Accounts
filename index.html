@@ -3329,7 +3329,7 @@ function cxTemplate(site){
 const IMPX_N=300,IMPX_FIRST=6;
 function impTemplate(site){
   const C=SOX.col,LS="'القوائم'",rev=typeof revCan==='function'&&revCan(site.id);
-  const its=cxItems(site.id).filter(n=>n!==REV_ITEM),regs=(typeof regsFor==='function'?regsFor(site.id):[]).slice().sort((a,b)=>(a.kind===b.kind?0:a.kind==='supplier'?1:-1)||a.name.localeCompare(b.name,'ar'));
+  const its=[...(typeof PAY_ITEM!=='undefined'?[PAY_ITEM]:[]),...cxItems(site.id).filter(n=>n!==REV_ITEM&&n!==(typeof PAY_ITEM!=='undefined'?PAY_ITEM:''))],regs=(typeof regsFor==='function'?regsFor(site.id):[]).slice().sort((a,b)=>(a.kind===b.kind?0:a.kind==='supplier'?1:-1)||a.name.localeCompare(b.name,'ar'));
   const banks=(typeof bankList==='function'?bankList():[]).map(b=>b.name);
   const put=(sh,ref,v,s)=>{sh.cells[ref]={v,s}};
   const cdx=typeof cdOn==='function'&&cdOn();
@@ -3352,7 +3352,7 @@ function impTemplate(site){
     put(sh,'B'+r,'',5);put(sh,'C'+r,'',8);put(sh,'D'+r,'',8);put(sh,'E'+r,'',8);put(sh,'F'+r,'',9);put(sh,'G'+r,'',8);put(sh,'H'+r,'',8);put(sh,'I'+r,'',5);put(sh,'J'+r,'',8);put(sh,'K'+r,'',8);if(rev)put(sh,'L'+r,'',8);
     const miss=`TRIM(IF(B${r}="","التاريخ ","")&IF(C${r}="","البند ","")&IF(D${r}="","المقاول/المورد ","")&IF(E${r}="","البيان ","")&IF(N(F${r})<=0,"المبلغ ","")&IF(AND(G${r}="آجل",I${r}=""),"تاريخ الاستحقاق",""))`;
     const dfr=rev?`${DC}${r}="نعم"`:'FALSE';
-    sh.cells[C(NC-1)+r]={f:`IF(${empty},"",TRIM(IF(${miss}<>"","⚠ ناقص: "&${miss}&IF(N(F${r})<=0," — لن يُسجَّل",${rev?'" — سيُسجَّل تحت المراجعة"':'" — لن يُسجَّل"'})&"  ","")&IF(AND(C${r}<>"",ISNA(MATCH(C${r},${LS}!$A$2:$A$3000,0))),"⚠ بند جديد  ","")&IF(AND(D${r}<>"",ISNA(MATCH(D${r},${LS}!$C$2:$C$3000,0))),"⚠ اسم جديد — يُراجَع في التطبيق  ","")&IF(AND(${dfr},${miss}=""),"⏳ مؤجَّل — سيُسجَّل تحت المراجعة","")))`,s:13};
+    sh.cells[C(NC-1)+r]={f:`IF(${empty},"",TRIM(IF(${miss}<>"","⚠ ناقص: "&${miss}&IF(N(F${r})<=0," — لن يُسجَّل",${rev?'" — سيُسجَّل تحت المراجعة"':'" — لن يُسجَّل"'})&"  ","")&IF(AND(C${r}<>"",ISNA(MATCH(C${r},${LS}!$A$2:$A$3000,0))),"⚠ بند جديد  ","")&IF(AND(D${r}<>"",ISNA(MATCH(D${r},${LS}!$C$2:$C$3000,0))),"⚠ اسم جديد — يُراجَع في التطبيق  ","")&IF(AND(C${r}="${typeof PAY_ITEM!=='undefined'?PAY_ITEM:''}",D${r}=""),"⚠ دفعة تحت الحساب من غير اسم المورد  ","")&IF(AND(${dfr},${miss}=""),"⏳ مؤجَّل — سيُسجَّل تحت المراجعة","")))`,s:13};
   }
   put(sh,'A'+T,'الإجمالي',14);for(const c of 'BCDE')put(sh,c+T,'',14);sh.cells['F'+T]={f:`SUM(F${F}:F${L})`,s:14};for(let i=6;i<NC;i++)put(sh,C(i)+T,'',14);
   sh.dv=[{type:'date',op:'greaterThan',sqref:`B${F}:B${L}`,f1:'36526',title:'التاريخ',msg:'اكتب تاريخًا صحيحًا، مثال 2026-10-15'},
@@ -3368,6 +3368,7 @@ function impTemplate(site){
    '1) هذا النموذج لموقع «'+site.name+'». كل مصروف في سطر: التاريخ، والبند، والمقاول/المورد، والبيان، والمبلغ. طريقة الدفع إذا تُركت فارغة تُسجَّل «نقدي».',
    '2) القوائم المنسدلة من التطبيق وقت تنزيل النموذج. إذا كتبت بندًا أو اسمًا غير موجود فسيظهر لك عند الاستيراد لتسجّله أو تختار اسمًا مسجّلًا يشبهه.',
    '3) للشيك الآجل اختر «آجل» واكتب «تاريخ الاستحقاق» و«رقم الشيك».',
+   '3ب) دفعة لمورد على كل فواتيره (من غير بند): اختر «'+(typeof PAY_ITEM!=='undefined'?PAY_ITEM:'')+'» في البند واكتب اسم المورد. التطبيق بيحسبها على المورد في الموقع ويوزّعها على بنود فواتيره (الأقدم الأول).',
    rev?'4) الحاجة غير الكاملة: اكتب «نعم» في عمود «تأجيل»، أو اترك الخانة الناقصة فارغة. ستُسجَّل «تحت المراجعة»: تدخل في رصيد الموقع ولا تدخل في حساب أي مقاول أو بند حتى تُكملها من صفحة «تحت المراجعة» في التطبيق، وتظهر لك في «بانتظارك». السطر الذي ليس فيه مبلغ لا يُسجَّل.':'4) السطر الناقص لا يُسجَّل. تسجيل الحاجات غير الكاملة متاح للمدير وصاحب الموقع فقط.',
    '5) عمود «تنبيه» يوضح الناقص والأسماء الجديدة قبل الرفع، والتطبيق يراجع كل سطر مرة أخرى عند الاستيراد.',
    '6) لا تعدّل ورقة «القوائم».'].forEach((t,i)=>put(how,'A'+(i+1),t,i?0:15));
@@ -6885,7 +6886,7 @@ function buildImport(){
   const seen=new Set();const out=[];let fileTot=0,mEmpty=0;
   const revOK=I.kind!=='dep'&&revCan(site);if(!revCan(site)||I.kind!=='dep')I.fill=false;I.revOK=revOK;
   const NEW=new Map();const known={contractors:regNames('contractors').filter(x=>x.reg).map(x=>x.name),items:regNames('items').filter(x=>x.reg).map(x=>x.name)};
-  const impName=(col,v)=>{if(!v)return '';const hit=known[col].find(n=>regNormK(n)===regNormK(v));if(hit)return hit;const k=col+':'+v;let x=NEW.get(k);if(!x)NEW.set(k,x={col,name:v,n:0,sim:impSim(known[col],v)});x.n++;
+  const impName=(col,v)=>{if(!v)return '';if(col==='items'&&APP&&typeof PAY_ITEM!=='undefined'&&regNormK(v)===regNormK(PAY_ITEM))return PAY_ITEM;const hit=known[col].find(n=>regNormK(n)===regNormK(v));if(hit)return hit;const k=col+':'+v;let x=NEW.get(k);if(!x)NEW.set(k,x={col,name:v,n:0,sim:impSim(known[col],v)});x.n++;
     const d=(I.nm||{})[k];if(d&&d.startsWith('use:'))return d.slice(4);return v};
   rows.forEach((row,i)=>{
     const g=k=>m[k]!==undefined&&m[k]!==''?row[m[k]]:'';
@@ -6911,6 +6912,8 @@ function buildImport(){
     if(kind==='exp'&&!rec.item&&rec.contractor)rec.item=defItemOf(rec.contractor);
     if(rec.method==='deferred'&&!rec.due)errs.push('تاريخ الاستحقاق');
     if(kind==='exp'){for(const [k,l] of [['item','البند'],['contractor','المقاول']])if(!rec[k]){if(I.fill)rec[k]=fillTxt;else errs.push(l)}}
+    /* «دفعة مورد تحت الحساب»: لازم اسم مسجّل كمورد (أو مقاول ومورد)، أو اسم جديد هيتسجّل كمورد */
+    if(kind==='exp'&&APP&&typeof PAY_ITEM!=='undefined'&&rec.item===PAY_ITEM&&rec.contractor&&!conIsSup(rec.contractor)&&!(I.nm&&I.nm['contractors:'+rec.contractor]==='new'&&(I.nk||{})['contractors:'+rec.contractor]==='supplier'))errs.push('مورد مسجّل كمورد للدفعة');
     let st=errs.length?'err':'ok';
     if(kind==='exp'&&amount>0&&(errs.length||defer)){
       if(revOK){rec.review={hold:true,why:defer&&!errs.length?'defer':'file',miss:errs.slice(),item:rec.item||'',contractor:rec.contractor||'',tmpDate:!rec.date};
@@ -7005,7 +7008,7 @@ function bindImport(site){
   document.querySelectorAll('[data-imap]').forEach(sel=>sel.onchange=()=>{const v=sel.value;S.imp.map[sel.dataset.imap]=v===''?undefined:+v;buildImport();render()});
   on('#impFill','onchange',e=>{S.imp.fill=e.target.checked;buildImport();render()});
   document.querySelectorAll('[data-impnm]').forEach(sel=>sel.onchange=()=>{S.imp.nm[sel.dataset.impnm]=sel.value;buildImport();render()});
-  document.querySelectorAll('[data-impnk]').forEach(sel=>sel.onchange=()=>{(S.imp.nk=S.imp.nk||{})[sel.dataset.impnk]=sel.value});
+  document.querySelectorAll('[data-impnk]').forEach(sel=>sel.onchange=()=>{(S.imp.nk=S.imp.nk||{})[sel.dataset.impnk]=sel.value;buildImport();render()});
   on('#impDup','onchange',e=>{S.imp.keepDup=e.target.checked;render()});
   on('#impDefM','onchange',e=>{S.imp.defM=e.target.value;buildImport();render()});
   on('#impGo','onclick',()=>{
