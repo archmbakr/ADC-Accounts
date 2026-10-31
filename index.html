@@ -369,6 +369,7 @@ details.fold[open]>summary{margin-bottom:10px}
 .sp-subj{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}.sp-s{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--fg);cursor:pointer;font:inherit}.sp-s b{font-size:15px}.sp-s small{color:var(--muted);font-size:11.5px}.sp-s[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.sp-s[aria-pressed=true] small{color:var(--on-accent);opacity:.85}.sp-s.go{border-style:dashed}.sp-shape button[aria-selected=true]{font-weight:700}
 .gi.gt{padding:8px 4px 2px;border:0;background:transparent}
 .cdt-n{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);margin:4px 0}.cdt-n[draggable=true]{cursor:grab}.cdt-n.l0{background:var(--accent-soft);font-weight:700}.cdt-n.l1{margin-inline-start:22px}.cdt-n.l2{margin-inline-start:48px;background:var(--sunk)}.cdt-n.l3{margin-inline-start:74px;background:var(--sunk);font-size:13px}.cdt-loose .cdt-n.l1{margin-inline-start:0}.cdt-t{border:0;background:transparent;color:var(--muted);width:18px;padding:0;cursor:pointer;font:inherit}.cdt-mv{padding:2px 10px;font-size:12px}.cdt-over{outline:2px dashed var(--ok);outline-offset:2px;background:color-mix(in srgb,var(--ok) 12%,var(--surface))}.cdt-drag{opacity:.5}.cdt-box{margin:4px 0 8px 22px;padding:10px;border:1px solid var(--hl-line);border-radius:8px;background:var(--hl-bg);color:var(--hl-fg);display:flex;flex-direction:column;gap:6px}.cdt-opts{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto}.cdt-o{text-align:start;border:0;background:var(--surface);color:var(--fg);padding:6px 8px;border-radius:6px;cursor:pointer;font:inherit}.cdt-o:hover{background:var(--accent-soft)}.cdt-sg{display:block;margin:-2px 30px 4px}.cdt-code{padding:0}
+.ck-h{cursor:pointer;user-select:none}.ck-a{color:var(--muted)}.ck-s{color:var(--muted);font-weight:400;font-size:.9em}.ck-closed>*:not(.sec-h){display:none!important}.ck-closed>.sec-h{margin-bottom:0}.site-tabs,.lists-tabs{margin:0 0 12px}.pop-tools .mh{font-size:11.5px;color:var(--muted);font-weight:700;padding:8px 10px 2px}
 .kind-tag{display:inline-block;margin-inline-start:6px;font-size:11px;padding:0 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600;vertical-align:middle}.kind-tag.it-sup{background:var(--accent-soft);color:var(--accent)}.kind-tag.it-lab{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}.kind-tag.it-srv{background:color-mix(in srgb,var(--money) 16%,transparent);color:var(--money)}.kind-tag[class*=it-]{margin-inline-start:0}
 .split-t{min-width:0}.split-t td{padding:7px 10px}.split-t tr.ct-sec td{background:var(--sunk)}.split-t tr.sub td{font-weight:600;color:var(--muted)}.split-t tr.grand td{font-weight:700;border-top:2px solid var(--line)}
 .reg-tools{align-items:center;gap:8px;flex-wrap:wrap}.reg-tools .grow{flex:1}.reg-tools .seg{margin:0}
@@ -3926,7 +3927,7 @@ function delNotices(){
 function waitBadge(siteId){const n=waitList(siteId).length;return n?`<span class="wait-b" title="بانتظارك ${n}">${n}</span>`:''}
 function waitCard(siteId){
   const L=waitList(siteId);if(!L.length)return '';
-  return `<div class="card wait-card"><b>بانتظارك في هذا الموقع (${L.length}):</b><ul>${L.map(x=>`<li>${x.nav?`<button type="button" class="linkish" data-nav="${esc(JSON.stringify(x.nav))}">${esc(x.t)} ←</button>`:x.sogo?`<button type="button" class="linkish" data-sogo="${esc(x.sogo)}">${esc(x.t)}</button>`:x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)}</button>`:esc(x.t)}</li>`).join('')}</ul></div>`;
+  return `<div class="card wait-card" data-ck="wait-site"><div class="sec-h">🔔 بانتظارك في هذا الموقع (${L.length})</div><ul>${L.map(x=>`<li>${x.nav?`<button type="button" class="linkish" data-nav="${esc(JSON.stringify(x.nav))}">${esc(x.t)} ←</button>`:x.sogo?`<button type="button" class="linkish" data-sogo="${esc(x.sogo)}">${esc(x.t)}</button>`:x.go?`<button type="button" class="linkish" data-site="${x.go}">${esc(x.t)}</button>`:esc(x.t)}</li>`).join('')}</ul></div>`;
 }
 
 /* ===================== أسماء بانتظار التسجيل (موردين/مقاولين اتكتبوا بإيد) ===================== */
@@ -4317,7 +4318,7 @@ function spNames(kind){
 }
 function spRenderPage(){
   const SUBJ=spSubjects();if(!SUBJ.includes(SP.type))SP.type=SUBJ[0]||'site';if(spTech())SP.party='con';
-  const tiles=`<div class="card"><div class="sec-h">1. اختر الموضوع</div><div class="sp-subj">${SP_SUBJ.filter(([v])=>SUBJ.includes(v)).map(([v,t,h])=>`<button type="button" class="sp-s" data-sp="type" data-v="${v}" aria-pressed="${SP.type===v}"><b>${t}</b><small>${h}</small></button>`).join('')}</div></div>`;
+  const tiles=`<div class="card" data-ck="sp-subj" data-ckd="1" data-cks="${esc((SP_SUBJ.find(x=>x[0]===SP.type)||[])[1]||'')}"><div class="sec-h">1. اختر الموضوع</div><div class="sp-subj">${SP_SUBJ.filter(([v])=>SUBJ.includes(v)).map(([v,t,h])=>`<button type="button" class="sp-s" data-sp="type" data-v="${v}" aria-pressed="${SP.type===v}"><b>${t}</b><small>${h}</small></button>`).join('')}</div></div>`;
   /* المخزن واليومية وملخص المواقع: نفس شاشاتهم جوه صفحة التقارير */
   if(SP.type==='journal'||SP.type==='all'){SP.type==='journal'?renderJournal():renderOverview();$('#pane').insertAdjacentHTML('afterbegin',`<div class="pane-h"><h2>التقارير</h2></div>`+tiles);return}
   if(SP.type==='store'){const L=spStoreSites();if(!L.some(s=>s.id===SO.site))SO.site=(L[0]||{}).id||'';const site=L.find(s=>s.id===SO.site);SO.repOpen=true;
@@ -4331,7 +4332,7 @@ function spRenderPage(){
   const opt=(v,t,cur)=>`<option value="${esc(v)}" ${v===cur?'selected':''}>${esc(t)}</option>`;
   $('#pane').innerHTML=`<div class="pane-h"><h2>التقارير</h2></div>
   ${tiles}
-  <div class="card"><div class="sec-h">2. الفلاتر والشكل</div><form class="entry" id="spForm" onsubmit="return false">
+  <div class="card" data-ck="sp-filt" data-ckd="1" data-cks="${esc([SP.site?(spAllSites().find(x=>x.id===SP.site)||{}).name:'كل المواقع',SP.name||SP.iname||SP.gname||'','حتى '+(SP.to||today()),SP_SHAPED.includes(SP.type)?(SP.shape==='full'?'تفصيلي':'مختصر'):''].filter(Boolean).join(' · '))}"><div class="sec-h">2. الفلاتر والشكل</div><form class="entry" id="spForm" onsubmit="return false">
     ${SP_SHAPED.includes(SP.type)?`<div class="f fw"><label>شكل التقرير</label><div class="seg sp-shape">${[['short','مختصر'],['full','عادي (تفصيلي)']].map(([v,t])=>`<button type="button" data-sp="shape" data-v="${v}" aria-selected="${SP.shape===v}">${t}</button>`).join('')}</div></div>`:''}
     ${(S.isManager||spTech())&&owners.length>1&&!SP.site?`<div class="f c2"><label for="sp_owner">${spTech()?'مجموعة المواقع (الحسابات منفصلة لكل صاحب موقع)':'مواقع من (الحسابات منفصلة)'}</label><select id="sp_owner">${owners.map(([k])=>opt(k,spOwnerName(k),spOwnerKey(sc[0]))).join('')}</select></div>`:''}
     <div class="f c2"><label for="sp_site">الموقع</label><select id="sp_site">${opt('',S.isManager?'كل مواقع صاحب الموقع':spTech()&&spOwners().length>1?'كل مواقع المجموعة':'كل مواقعك',SP.site)}${spAllSites().map(s=>opt(s.id,s.name,SP.site)).join('')}</select></div>
@@ -4641,7 +4642,8 @@ function cdTreeTab(){
   const sug=D.loose.map(m=>({m,s:cdMatSuggest(m)})).filter(x=>x.s);
   const freeB=D.free.map(item).join(''),looseB=D.loose.filter(m=>!q||matHit(m)).map(m=>mat(m,'l1')+(cdMatSuggest(m)?`<small class="note cdt-sg">الاقتراح: ← ${esc(cdMatSuggest(m))}</small>`:'')).join('');
   return `<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><input id="cdtQ" placeholder="بحث بالاسم${cdOn()?' أو الكود':''}، مثال: طوب" value="${esc(CDP.tq||'')}" style="flex:1;min-width:200px" autocomplete="off"><span class="note">اضغط «نقل» أو اسحب ⋮ على الكمبيوتر وأفلت على المكان الجديد.</span></div></div>
-  ${D.free.length||D.loose.length?`<div class="card cdt-loose" data-drop="g|"><div class="sec-h">لسه مش متحطين في مكانهم</div>
+  ${(()=>{const sg=igSvcSuggest(D.pf);return sg.length?`<div class="warn-box" style="margin-bottom:10px"><b>${sg.length} ${sg.length===1?'بند خدمات ومصاريف':'بنود خدمات ومصاريف'} من دون بند عام.</b> اقتراح التطبيق: ${sg.map(x=>esc(x.name)+' ← '+esc(x.g)).join('، ')}. <button type="button" class="primary" data-igsvc>طبّق الاقتراح</button><br><small>المصاريف التي تخص شغلانة تحت بندها العام، والباقي تحت «${IG_GEN}».</small></div>`:''})()}
+  ${D.free.length||D.loose.length?`<div class="card cdt-loose" data-drop="g|" data-ck="cdt-loose" data-cks="${D.free.length} بند · ${D.loose.length} خامة"><div class="sec-h">لسه مش متحطين في مكانهم</div>
     ${D.free.length?`<div class="note">بنود من غير بند عام (${D.free.length})</div>${freeB||'<p class="note">—</p>'}`:''}
     ${D.loose.length?`<div class="note" style="margin-top:8px" data-drop="s|">خامات من غير بند توريد (${D.loose.length})</div>${looseB||'<p class="note">—</p>'}${sug.length&&cdtCanMat()?`<div class="row" style="margin-top:6px"><button type="button" class="primary" data-cd="linkall">أكّد الاقتراحات (${sug.length})</button><span class="note">الاقتراح من «بند التوريد» المكتوب على فواتير الخامة.</span></div>`:''}`:''}</div>`:''}
   <div class="card cdt"><div class="sec-h">الشجرة</div>${D.groups.map(group).join('')||'<p class="note">لا توجد بنود عامة. أنشئها من صفحة «البنود» أو من تبويب «البنود العامة والاختصارات».</p>'}
@@ -4673,8 +4675,8 @@ function cdListTab(){
     if(q&&!hit(gr)&&!L.some(hit)&&!mats.some(m=>hit(m)&&m.code.startsWith(gr.code+'-')))return '';
     return `<div class="r l0">${cdTag(gr.code)}<span class="grow">${esc(gr.name)}</span><span class="m">بند عام</span></div>${rows.join('')}`}).join('');
   const cons=CD.rows.filter(r=>r.kind==='C'||r.kind==='S').filter(hit).sort((a,b)=>a.code.localeCompare(b.code));
-  return `<div class="card"><div class="row" style="gap:8px"><input id="cdQ" placeholder="بحث بالاسم أو الكود، مثال: PL-01" value="${esc(CDP.q||'')}" style="flex:1" autocomplete="off"><button class="ghost" type="button" data-cd="xlsx">Excel</button></div>
-   <div class="sec-h" style="margin-top:12px">أكواد المقاولين والموردين</div><div class="tbl-wrap"><table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th>${APPU.owner?'<th></th>':''}</tr></thead><tbody>${cons.map(r=>`<tr><td>${cdTag(r.code)}</td><td class="tl">${esc(r.name)}</td><td>${r.kind==='C'?'مقاول':'مورد'}</td>${APPU.owner?`<td><button class="ghost" type="button" data-cd="setcode" data-kind="${r.kind}" data-key="${esc(r.key)}" data-code="${esc(r.code)}">تعديل الكود</button></td>`:''}</tr>`).join('')||'<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
+  return `<div class="card" data-ck="cd-codes" data-cks="${cons.length}"><div class="sec-h">أكواد المقاولين والموردين وملف Excel</div><div class="row" style="gap:8px"><input id="cdQ" placeholder="بحث بالاسم أو الكود، مثال: PL-01" value="${esc(CDP.q||'')}" style="flex:1" autocomplete="off"><button class="ghost" type="button" data-cd="xlsx">Excel</button></div>
+   <div class="tbl-wrap"><table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th>${APPU.owner?'<th></th>':''}</tr></thead><tbody>${cons.map(r=>`<tr><td>${cdTag(r.code)}</td><td class="tl">${esc(r.name)}</td><td>${r.kind==='C'?'مقاول':'مورد'}</td>${APPU.owner?`<td><button class="ghost" type="button" data-cd="setcode" data-kind="${r.kind}" data-key="${esc(r.key)}" data-code="${esc(r.code)}">تعديل الكود</button></td>`:''}</tr>`).join('')||'<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
    ${APPU.owner?'<p class="note">الأكواد ثابتة. تعديل الكود يدويًا للمدير فقط، ويجب ألا يتكرر.</p>':''}</div>`;
 }
 function renderCodes(){
@@ -4683,7 +4685,7 @@ function renderCodes(){
   if(typeof CT!=='undefined'&&!CT.loaded&&typeof ctLoad==='function'){ctLoad().then(()=>{if(S.sel==='__codes')render()}).catch(()=>{})}
   if(CD.missing){$('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة الأسماء والأكواد</h2></div><div class="card"><p class="msg err">يجب تشغيل ملف التحديث (SQL) الخاص بالأكواد على قاعدة البيانات أولًا.</p></div>`;return}
   const T=cdTabs(),tab=T.some(t=>t[0]===CDP.tab)?CDP.tab:'con',m=CDP.msg&&Date.now()-(CDP.msg.at||0)<9000?CDP.msg:null;
-  const tabsBar=`<div class="seg cd-tabs" role="tablist">${T.map(([k,t,n])=>`<button role="tab" data-cdtab="${k}" aria-selected="${k===tab}">${t}${n?` <b class="neg">${n}</b>`:''}</button>`).join('')}</div>`;
+  const tabsBar=tab==='list'?'':`<div class="seg cd-tabs" role="tablist">${T.filter(t=>t[0]!=='list').map(([k,t,n])=>`<button role="tab" data-cdtab="${k}" aria-selected="${k===tab}">${t}${n?` <b class="neg">${n}</b>`:''}</button>`).join('')}</div>`;
   /* «بانتظار التسجيل» بقت تبويب هنا (قرار 30 أكتوبر: دمج الأسماء وربطها في مكان واحد) */
   if(tab==='pend'){prRenderPage();const h=$('#pane .pane-h');if(h){h.innerHTML='<h2>الأسماء والأكواد</h2>';h.insertAdjacentHTML('afterend',tabsBar)}return}
   let body='';
@@ -5642,6 +5644,8 @@ function renderSite(){
   const depTable=()=>`<table><thead><tr><th class="num">المبلغ (${CUR})</th><th>البيان</th><th>التاريخ</th><th>أُودع في</th><th>ملاحظات</th>${S.canWrite?'<th></th>':''}</tr></thead><tbody>
     ${shownL.map(e=>`<tr class="${ed&&ed.id===e.id?'row-edit':''}"><td class="num in">${fmt(amt(e))}</td><td>${esc(e.notes)||'إيداع من المالك'}${e.pending?`<span class="pend">${PEND}</span>`:''}</td><td class="date">${esc(e.date)}</td><td><span class="chip">${mlabel(e)}</span></td><td>${esc(e.remarks)||'—'}${e.by?`<span class="note">سجّله: ${esc(e.by)}</span>`:''}${e.updated?`<span class="note">عُدِّل ${esc(stamp(e.updated))}</span>`:''}${rcpt(e)}</td>${delBtn('deposits',e)}</tr>`).join('')}
     </tbody><tfoot><tr><td class="num in">${fmt(ftot)}</td><td colspan="${S.canWrite?5:4}">${filtOn?`إجمالي النتائج (${list.length})`:'إجمالي الإيداعات'}</td></tr></tfoot></table>`;
+  /* صفحة الموقع بتبويبات (قرار 31 أكتوبر): الحركات / الملخص / العهد والجرد */
+  const st=ed||S.entryOpen===site.id||S.imp?'mov':(['mov','sum','cus'].includes(S.siteTab)?S.siteTab:'mov'),hid=k=>st!==k?' hidden':'';
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${esc(site.name)}</h2><div class="actions">
     ${canEditRec(site)&&S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'يجب حذف إيداعات ومصروفات وجرد الموقع أولًا.':'نقل الموقع إلى سلة المهملات؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:''}
@@ -5655,6 +5659,8 @@ function renderSite(){
     ${canEditRec(site)&&!S.confirmSite?'<button role="menuitem" class="pop-danger" id="delSite">حذف الموقع</button>':''}
     </div></div>
   </div></div>
+  <div class="seg site-tabs" role="tablist">${[['mov','الحركات'],['sum','الملخص'],['cus','العهد والجرد']].map(([k,t])=>`<button role="tab" data-stabgo="${k}" aria-selected="${st===k}">${t}</button>`).join('')}</div>
+  <div data-stab="mov"${hid('mov')}>
   ${importCard(site)}
   ${S.canWrite&&!canEntry(site)?`<div class="card"><p class="note" style="margin:0"><b>اطلاع فقط:</b> هذا الموقع يخص صاحبه، ويمكنك عرض حساباته وطباعتها دون تعديل.</p></div>`:''}
   ${S.canWrite&&!canEditRec(site)&&canEntry(site)?`<div class="card"><p class="note" style="margin:0">هذا الموقع يخص صاحبه. يمكنك تسجيل مصروفات وإيداعات فيه، وتعديل ما سجّلته أنت فقط.</p></div>`:''}
@@ -5663,10 +5669,15 @@ function renderSite(){
     ${ed?`<div class="edit-h"><b>تعديل ${ed.col==='expenses'?'مصروف':'إيداع'}</b><span class="note">سُجِّل ${esc(edRec?stamp(edRec.created):'')}${edRec&&edRec.by?' بواسطة '+esc(edRec.by):''}${edRec&&edRec.updated?' · آخر تعديل '+esc(stamp(edRec.updated)):''}. سيُسجَّل التعديل في سجل التعديلات بالقيمة القديمة والجديدة.</span></div>`
     :`<div class="seg" role="tablist" aria-label="نوع الحركة"><button role="tab" data-kind="exp" aria-selected="${kind==='exp'}">تسجيل مصروف</button><button role="tab" data-kind="dep" aria-selected="${kind==='dep'}">تسجيل إيداع من المالك</button></div>${uiMobile()?'<button type="button" class="ghost entry-x" data-entry="close" aria-label="إغلاق">إغلاق ✕</button>':''}`}
     <form class="entry" id="entryForm" autocomplete="off" novalidate>${form}</form></div>`:''}
-  ${balTiles(b)}${APP&&typeof custOpenCard==='function'?custOpenCard(site):''}
-  ${itemSummary(exps)}
-  ${countCard(site)}
-  <div class="card" style="display:flex;flex-direction:column;gap:12px">
+  ${balTiles(b)}
+  </div>
+  <div data-stab="cus"${hid('cus')}>${APP&&typeof custOpenCard==='function'?custOpenCard(site):''}
+  ${countCard(site)}</div>
+  <div data-stab="sum"${hid('sum')}>${itemSummary(exps)}
+  ${exps.length?`<div class="breakdowns one">
+    <div class="card"><div class="sec-h">المصروف حسب المقاول والمورد</div>${conSplitHTML(exps)}</div>
+  </div>`:'<p class="note">لا توجد مصروفات بعد.</p>'}</div>
+  <div class="card" data-stab="mov"${hid('mov')} style="display:flex;flex-direction:column;gap:12px">
     <div class="seg" role="tablist" aria-label="السجل"><button role="tab" data-tab="exp" aria-selected="${tab==='exp'}">المصروفات (${exps.length})</button><button role="tab" data-tab="dep" aria-selected="${tab==='dep'}">الإيداعات (${deps.length})</button></div>
     <div class="filters">
       ${tab==='exp'?`<div class="f"><label for="f_k">النوع</label><select id="f_k"><option value="">الكل</option><option value="contractor" ${f.k==='contractor'?'selected':''}>مقاولين باطن</option><option value="supplier" ${f.k==='supplier'?'selected':''}>موردين</option><option value="none" ${f.k==='none'?'selected':''}>بدون مقاول</option></select></div><div class="f"><label for="f_c">المقاول</label><select id="f_c"><option value="">الكل</option>${cons.map(c=>`<option ${f.c===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
@@ -5680,10 +5691,7 @@ function renderSite(){
       :`<div class="xbar"><span>فيه <b>${rvAll.length}</b> مصروف سُجّلت طريقة دفعه «نقدي» تلقائيًا لأنها كانت فارغة في ملف الاستيراد.</span><button class="ghost" id="rvOn">راجعهم</button></div>`):''}
     ${list.length?`<div class="tbl-wrap">${tab==='exp'?expTable():depTable()}</div>${list.length>LIM?`<div class="row more-row"><span class="note">معروض آخر ${LIM} حركة من ${list.length}. الإجمالي في آخر الجدول لكل الحركات.</span><button class="ghost" id="siteMore">عرض ${Math.min(50,list.length-LIM)} حركة أقدم</button><button class="ghost" id="siteAll">عرض الكل</button></div>`:''}`
     :`<div class="blank" style="padding:28px 8px"><h3>${(tab==='exp'?exps:deps).length?'لا توجد نتائج لهذا الفلتر':(tab==='exp'?'لا توجد مصروفات في هذا الموقع بعد':'لا توجد إيداعات في هذا الموقع بعد')}</h3><p>${(tab==='exp'?exps:deps).length?'غيّر الفلتر أو امسحه.':(S.canWrite?(tab==='exp'?'سجّل أول مصروف من «تسجيل مصروف» في الأعلى.':'سجّل أول إيداع من «تسجيل إيداع من المالك» في الأعلى.'):'')}</p></div>`}
-  </div>
-  ${exps.length?`<div class="breakdowns one">
-    <div class="card"><div class="sec-h">المصروف حسب المقاول والمورد</div>${conSplitHTML(exps)}</div>
-  </div>`:''}`;
+  </div>`;
   bindSite(site);bindCount(site);bindImport(site);
   const io=$('#impOpen');if(io)io.onclick=()=>{S.imp={siteId:site.id,fill:false};render();const c=$('#impCard');if(c)c.scrollIntoView({block:'start'})};
 }
@@ -6308,7 +6316,7 @@ function setFold(){
 }
 function renderSettings(){
   const tools=`<div class="card set-tools"><div class="sec-h">أدوات</div><div class="row">${canBanks()||bankList().length?`<button type="button" class="ghost" data-site="__banks">الحسابات البنكية${bankList().length?' ('+bankList().length+')':''}</button>`:''}<button type="button" class="ghost" data-site="__trash">سلة المهملات${(S.trash||[]).length?' ('+S.trash.length+')':''}</button></div></div>`;
-  $('#pane').innerHTML=`<div class="pane-h"><h2>الإعدادات</h2></div>`+tools+backupHTML()+storageCard()+securityCard()+logCard();
+  $('#pane').innerHTML=`<div class="pane-h"><h2>الإعدادات</h2></div>`+tools+(APP&&S.isManager&&typeof svcCard==='function'?svcCard(true):'')+backupHTML()+storageCard()+securityCard()+logCard();
   bindOverview();setFold();
 }
 function bindOverview(){
@@ -6810,10 +6818,10 @@ function itTypeCard(){
   ${un.length>ed.length?`<p class="note">${un.length-ed.length} ${un.length-ed.length===1?'بند':'بنود'} من قائمة المدير من دون نوع — يحدّدها المدير.</p>`:''}`:''}</div>`;
 }
 /* كارت أنواع الخدمات والمصاريف (المدير يضيف ويعدّل؛ النوع المستخدم يتقفل ومايتحذفش) */
-function svcCard(){
+function svcCard(inSet){
   if(!APP||!S.isManager)return '';
-  const open=!!S.svcOpen,L=svcList(true),used=new Set(regRecs('items').filter(r=>!r.hidden&&r.type==='srv'&&r.stype).map(r=>regNormK(r.stype)));const m=S.svcMsg;S.svcMsg=null;
-  return `<div class="card" id="svcCard"><div class="sec-h" data-svctog style="cursor:pointer">${open?'▾':'◂'} أنواع الخدمات والمصاريف <span class="cnt">(${svcList().length})</span></div>
+  const open=inSet||!!S.svcOpen,L=svcList(true),used=new Set(regRecs('items').filter(r=>!r.hidden&&r.type==='srv'&&r.stype).map(r=>regNormK(r.stype)));const m=S.svcMsg;S.svcMsg=null;
+  return `<div class="card" id="svcCard">${inSet?'<div class="sec-h">أنواع الخدمات والمصاريف</div>':`<div class="sec-h" data-svctog style="cursor:pointer">${open?'▾':'◂'} أنواع الخدمات والمصاريف <span class="cnt">(${svcList().length})</span></div>`}
   ${open?`<p class="note">القائمة التي تظهر في «نوع الخدمة» لبنود الخدمات والمصاريف. يمكنك الإضافة إليها في أي وقت.</p>${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
   ${L.map((x,i)=>`<div class="gi"><span class="nm">${esc(x.name)}${x.off?' <span class="pend">مقفول</span>':''}</span><span class="acts"><button type="button" class="ghost" data-svcren="${i}">تعديل الاسم</button>${x.off?`<button type="button" class="ghost" data-svcon="${i}">تفعيل</button>`:used.has(regNormK(x.name))?`<button type="button" class="ghost" data-svcoff="${i}" title="عليه بنود">قفل</button>`:`<button type="button" class="ghost" data-svcdel="${i}">حذف</button>`}</span></div>`).join('')}
   <div class="row" style="gap:8px;margin-top:8px"><input id="svc_new" maxlength="60" placeholder="نوع جديد، مثال: حراسة" style="flex:1;min-width:180px"><button type="button" class="primary" data-svcadd>+ إضافة نوع</button></div>`:''}</div>`;
@@ -6961,7 +6969,7 @@ function igCard(){
 }
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-igtog]');if(t&&!ev.target.closest('button,select,input')){const k=t.dataset.igtog;if(S.igOpen.has(k))S.igOpen.delete(k);else S.igOpen.add(k);render();return}
-  if(ev.target.closest('[data-igsvc]')){const L=igSvcSuggest(igMyPf());for(const x of L)igAssign(x.name,x.g);S.igMsg={ok:1,t:'وُضع '+L.length+' '+(L.length===1?'بند':'بنود')+' تحت بنودها العامة.'};for(const x of L)S.igOpen.add(regNormK(x.g));render();return}
+  if(ev.target.closest('[data-igsvc]')){const L=igSvcSuggest(igMyPf());for(const x of L)igAssign(x.name,x.g);S.igMsg={ok:1,t:'وُضع '+L.length+' '+(L.length===1?'بند':'بنود')+' تحت بنودها العامة.'};if(typeof CDP!=='undefined')CDP.msg={ok:1,at:Date.now(),t:S.igMsg.t};for(const x of L)S.igOpen.add(regNormK(x.g));render();return}
   if(ev.target.closest('[data-igadd]')){const n=(($('#ig_new')||{}).value||'').trim(),e=igCreate(n);S.igMsg=e?{t:e}:{ok:1,t:'أُضيف البند العام «'+n+'». اختره أمام البنود التابعة له.'};if(!e){S.igOpen.add(regNormK(n));S.igOpen.add('__free')}render();return}
   const r=ev.target.closest('[data-igren]');if(r){const old=r.dataset.igren,g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(old));if(!g)return;const n=(prompt('الاسم الجديد للبند العام',old)||'').trim();if(!n||n===old)return;if(igGroups(igMyPf()).some(x=>x.id!==g.id&&regNormK(x.name)===regNormK(n))){S.igMsg={t:'هذا الاسم موجود.'};render();return}igSave(g,{name:n});S.igMsg={ok:1,t:'تغيّر الاسم.'};render();return}
   const d=ev.target.closest('[data-igdel]');if(d){const g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(d.dataset.igdel));if(g){igSave(g,{hidden:true});S.igMsg={ok:1,t:'حُذف البند العام.'};render()}return}
@@ -6979,29 +6987,29 @@ function renderRegister(col){
   const totalAll=list.reduce((a,x)=>a+regStats(col,x.name).total,0);
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${R.title}</h2></div>
-  ${list.length?`<div class="card qs"><div class="sec-h">كشف حساب ${R.one}</div><div class="row"><select id="qsName" aria-label="اختر ال${R.one}"><option value="">اختر ال${R.one}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><button class="primary" id="qsGo">استخرج كشف الحساب</button></div>
+  ${list.length?`<div class="card qs" data-ck="qs-${col}"><div class="sec-h">كشف حساب ${R.one}</div><div class="row"><select id="qsName" aria-label="اختر ال${R.one}"><option value="">اختر ال${R.one}</option>${list.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select><button class="primary" id="qsGo">استخرج كشف الحساب</button></div>
     ${list.length>1?`<details class="qs-multi"${S.qsOpen?' open':''}><summary>كشف مجمّع لأكثر من ${R.one}</summary>
       <div class="qs-checks">${list.map(x=>`<label class="chk"><input type="checkbox" data-qsm value="${esc(x.name)}"${(S.qsSel||[]).includes(x.name)?' checked':''}> ${esc(x.name)}</label>`).join('')}</div>
       <div class="row"><button class="primary" id="qsMulti">استخرج الكشف المجمّع</button><span class="msg" id="qsMsg"></span></div></details>`:''}</div>`:''}
   <p class="foot-note" style="margin:-8px 0 0">${col==='contractors'?'سجّل المقاولين هنا مرة واحدة، وبعد ذلك اخترهم من القائمة أثناء تسجيل المصروف.':'سجّل بنود الصرف هنا مرة واحدة، وبعد ذلك اخترها من القائمة أثناء تسجيل المصروف.'}</p>
-  ${canReg()?`<div class="card${S.regEdit?' entry-card editing':''}" id="regCard">${S.regEdit?`<div class="edit-h"><b>تعديل ${R.one}: ${esc(S.regEdit.name)}</b></div>`:''}<form class="entry" id="regForm" autocomplete="off" novalidate>
+  ${canReg()?`<div class="card${S.regEdit?' entry-card editing':''}" id="regCard" data-ck="reg-${col}"${S.regEdit||S.regAdd===col?' data-ckforce="1"':''}>${S.regEdit?`<div class="sec-h"><b>تعديل ${R.one}: ${esc(S.regEdit.name)}</b></div>`:`<div class="sec-h">+ إضافة ${R.one}</div>`}<form class="entry" id="regForm" autocomplete="off" novalidate>
     <div class="f c2"><label for="r_name">اسم ال${R.one}</label><input id="r_name" maxlength="100" placeholder="${col==='contractors'?'مثال: مؤسسة الفتح للمباني':'مثال: خرسانة مسلحة'}"></div>
     ${col==='contractors'?`<div class="f c2"><label for="r_spec">التخصص (اختياري)</label><input id="r_spec" maxlength="80" placeholder="مباني، كهرباء، نجارة…"></div>
     <div class="f c2"><label for="r_kind">النوع</label><select id="r_kind"><option value="">مقاول باطن</option><option value="supplier">مورد</option><option value="both">مقاول ومورد (مقاول في بند ومورد في بند)</option></select></div>
     <div class="f c2"><label for="r_phone">الهاتف (اختياري)</label><input id="r_phone" maxlength="30" inputmode="tel" dir="ltr"></div>
     ${APP?'':`<div class="f c2"><label for="r_claim">إجمالي المستخلص (اختياري)</label><input id="r_claim" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>`}
     <div class="f c2"><label for="r_item">البند الأساسي (اختياري)</label><select id="r_item"><option value="">— بدون —</option>${regNames('items').map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`
-    :`${APP?`<div class="f c2"><label for="r_type">نوع البند</label><select id="r_type"><option value="">— لم يُحدَّد —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div><div class="f c2" id="r_stype_w" hidden><label for="r_stype">نوع الخدمة</label><select id="r_stype"><option value="">— اختر —</option>${svcList().map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`:''}${APP&&typeof cdOn==='function'&&cdOn()?'':`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div>`}<div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
+    :`${APP?`<div class="f c2"><label for="r_type">نوع البند</label><select id="r_type"><option value="">— لم يُحدَّد —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div><div class="f c2"><label for="r_grp">البند العام</label><select id="r_grp"><option value="">— غير تابع لبند عام —</option>${igNames(igMyPf()).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select></div><div class="f c2" id="r_stype_w" hidden><label for="r_stype">نوع الخدمة</label><select id="r_stype"><option value="">— اختر —</option>${svcList().map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`:''}${APP&&typeof cdOn==='function'&&cdOn()?'':`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div>`}<div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
-  ${col==='items'?itTypeCard():''}${col==='items'&&canReg()?igCard():''}${col==='items'?svcCard():''}
+  ${col==='items'?itTypeCard():''}${col==='items'&&APP&&typeof cdCan==='function'&&cdCan()?`<div class="row" style="gap:8px;margin:-4px 0 4px"><button type="button" class="ghost" data-listgo="__codes|list">رتّب البنود في الشجرة (البنود العامة والخامات) ↗</button></div>`:col==='items'&&canReg()?igCard():''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
     ${isC?`<div class="row reg-tools"><div class="seg" role="tablist" aria-label="النوع">${[['','الكل'],['contractor','مقاولين باطن'],['supplier','موردين']].map(([v,t])=>`<button role="tab" data-regkind="${v}" aria-selected="${rk===v}">${t}</button>`).join('')}</div><span class="grow"></span>${list.length?'<button class="ghost" data-regx="xlsx">Excel</button><button class="ghost" data-regx="print">طباعة / PDF</button>':''}</div>`:''}
     ${col==='items'&&APP?`<div class="row reg-tools"><div class="seg" role="tablist" aria-label="نوع البند">${[['','الكل'],...IT_TYPES,['none','بدون نوع']].map(([v,t])=>`<button role="tab" data-itkind="${v}" aria-selected="${ik===v}">${t}</button>`).join('')}</div></div>`:''}
     <div class="sec-h">${list.length} ${R.one==='بند'?'بند':(rk==='supplier'?'مورد':rk==='contractor'?'مقاول باطن':'مقاول ومورد')} · إجمالي المصروف عليهم ${fmt(totalAll)} ${CUR}</div>
     ${isC&&canReg()&&pick.size?`<div class="xbar"><span>اخترت <b>${pick.size}</b></span><button class="primary" data-regconv="supplier">تحويل إلى مورد</button><button data-regconv="">تحويل إلى مقاول باطن</button><button class="ghost" data-regconv="clear">إلغاء الاختيار</button></div>`:''}
-    ${list.length?`<div class="tbl-wrap"><table class="reg-t"><thead><tr>${isC&&canReg()?`<th class="pk"><input type="checkbox" data-regall aria-label="اختيار الكل" ${list.length&&list.every(x=>pick.has(x.name))?'checked':''}></th>`:''}${isC&&cdOn()?'<th>الكود</th>':''}<th>الاسم</th>${col==='contractors'?'<th>النوع</th><th>البند الأساسي</th>':(APP?'<th>النوع</th>':'')+'<th>الكود</th>'}${col==='contractors'?(APP?'<th class="num">المستحق (مستخلصات / فواتير المخزن)</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>'):'<th class="num">إجمالي المصروف ('+CUR+')</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th><th>آخر صرف</th>${col==='contractors'?'<th>التخصص</th><th class="rp">الهاتف</th>':''}<th></th></tr></thead><tbody>
+    ${list.length?`<div class="tbl-wrap"><table class="reg-t"><thead><tr>${isC&&canReg()?`<th class="pk"><input type="checkbox" data-regall aria-label="اختيار الكل" ${list.length&&list.every(x=>pick.has(x.name))?'checked':''}></th>`:''}${isC&&cdOn()?'<th>الكود</th>':''}<th>الاسم</th>${col==='contractors'?'<th>النوع</th><th>البند الأساسي</th>':(APP?'<th>النوع</th><th>البند العام</th>':'')+'<th>الكود</th>'}${col==='contractors'?(APP?'<th class="num">المستحق (مستخلصات / فواتير المخزن)</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>':'<th class="num">إجمالي المستخلص</th><th class="num">المدفوع ('+CUR+')</th><th class="num">المتبقي</th>'):'<th class="num">إجمالي المصروف ('+CUR+')</th>'}<th class="num">عدد الحركات</th><th class="num">عدد المواقع</th><th>آخر صرف</th>${col==='contractors'?'<th>التخصص</th><th class="rp">الهاتف</th>':''}<th></th></tr></thead><tbody>
     ${list.map(x=>{const st=regStats(col,x.name),r=recs.get(x.name)||{};const delKey=col+'|'+x.name;
-      return `<tr>${isC&&canReg()?`<td class="pk"><input type="checkbox" data-regpick="${esc(x.name)}" aria-label="اختيار ${esc(x.name)}" ${pick.has(x.name)?'checked':''}></td>`:''}${isC&&cdOn()?`<td>${cdTagCon(x.name)||'—'}</td>`:''}<td class="rn"><b>${esc(x.name)}</b>${col==='items'&&APP&&typeof accIsPriv==='function'&&accIsPriv(x.name)?'<span class="kind-tag priv-tag">خاص 🔒</span>':''}${x.reg?'':`<span class="pend">غير مسجّل</span>`}</td>${col==='contractors'?`<td>${conKind(x.name)==='supplier'?'<span class="kind-tag">مورد</span>':conKind(x.name)==='both'?'<span class="kind-tag">مقاول ومورد</span>':'مقاول باطن'}</td><td class="ri">${esc(r.item)||'—'}</td>`:`${APP?`<td>${itTag(itType(x.name))||'<span class="note">—</span>'}${itStype(x.name)?`<span class="note">${esc(itStype(x.name))}</span>`:''}</td>`:''}<td class="date">${cdOn()?(cdTagItem(x.name)||'—'):esc(r.code)||'—'}</td>`}
+      return `<tr>${isC&&canReg()?`<td class="pk"><input type="checkbox" data-regpick="${esc(x.name)}" aria-label="اختيار ${esc(x.name)}" ${pick.has(x.name)?'checked':''}></td>`:''}${isC&&cdOn()?`<td>${cdTagCon(x.name)||'—'}</td>`:''}<td class="rn"><b>${esc(x.name)}</b>${col==='items'&&APP&&typeof accIsPriv==='function'&&accIsPriv(x.name)?'<span class="kind-tag priv-tag">خاص 🔒</span>':''}${x.reg?'':`<span class="pend">غير مسجّل</span>`}</td>${col==='contractors'?`<td>${conKind(x.name)==='supplier'?'<span class="kind-tag">مورد</span>':conKind(x.name)==='both'?'<span class="kind-tag">مقاول ومورد</span>':'مقاول باطن'}</td><td class="ri">${esc(r.item)||'—'}</td>`:`${APP?`<td>${itTag(itType(x.name))||'<span class="note">—</span>'}${itStype(x.name)?`<span class="note">${esc(itStype(x.name))}</span>`:''}</td><td class="ri">${esc(igOf(x.name,igMyPf()))||'—'}</td>`:''}<td class="date">${cdOn()?(cdTagItem(x.name)||'—'):esc(r.code)||'—'}</td>`}
       ${col==='contractors'?(()=>{if(APP){const q=conDue(x.name);return q?`<td class="num plain">${fmt(q.after)}${q.s&&q.q?`<span class="note">مستخلصات ${fmt(q.q.after)} · فواتير ${fmt(q.s.due)}</span>`:q.s?'<span class="note">من فواتير المخزن</span>':''}</td><td class="num">${fmt(q.paid)}${q.looseAmt?`<span class="note neg">+ ${fmt(q.looseAmt)} غير مربوطة</span>`:''}</td><td class="num strong${q.left<0?' neg':''}">${fmt(q.left)}</td>`:`<td class="num plain">—</td><td class="num">${fmt(st.total)}</td><td class="num">—</td>`}const c=claimOf(x.name);return `<td class="num plain">${c==null?'—':fmt(c)}</td><td class="num">${fmt(st.total)}</td><td class="num strong${c!=null&&c-st.total<0?' neg':''}">${c==null?'—':fmt(c-st.total)}</td>`})():`<td class="num">${fmt(st.total)}</td>`}<td class="num plain">${st.n}</td><td class="num plain">${st.sites}</td><td class="date">${esc(st.last)||'—'}</td>${col==='contractors'?`<td>${esc(r.spec)||'—'}</td><td class="date rp" dir="ltr">${esc(r.phone)||'—'}</td>`:''}
       <td class="acts"><button class="ghost" data-stmt="${col}" data-name="${esc(x.name)}">كشف حساب</button>${col==='items'&&APP&&typeof canPriv==='function'&&canPriv()?`<button class="ghost" data-priv="${esc(x.name)}" data-on="${accIsPriv(x.name)?'':'1'}">${accIsPriv(x.name)?'إلغاء «خاص»':'اجعله خاص'}</button>`:''}${x.reg&&canEditRec(r)?`<button class="ghost" data-regedit="${col}" data-name="${esc(x.name)}">تعديل</button>`:''}${!x.reg&&canReg()?`<button class="ghost" data-regadd="${col}" data-name="${esc(x.name)}">تسجيل</button>`:''}${x.reg&&canEditRec(r)?(S.confirmReg===delKey?`<span class="confirm"><button class="danger" data-regdelyes="${col}" data-name="${esc(x.name)}">إزالة من القائمة</button><button data-regdelno="1">إلغاء</button></span>`:`<button class="ghost" data-regdel="${col}" data-name="${esc(x.name)}">حذف</button>`):''}</td></tr>`}).join('')}
     </tbody></table></div><p class="foot-note" style="margin:0">الحذف يزيل الاسم من قائمة الاختيار فقط، وتبقى الحركات المسجلة عليه كما هي. الأسماء التي عليها «غير مسجّل» موجودة في حركات قديمة، ويمكنك تسجيلها بضغطة واحدة.</p>`
@@ -7016,10 +7024,12 @@ function renderRegister(col){
       logChange('edit',col,upd,old);
       if(col==='items'&&name!==old.name.trim()&&APP&&typeof accIsPriv==='function'&&accIsPriv(old.name)&&!accIsPriv(name)){m.className='msg';m.textContent='لحظة…';accPrivSet(name,true).then(ok=>{if(ok){f.onsubmit(ev)}else{m.className='msg err';m.textContent='هذا البند «خاص»، ويجب أن يُعلَّم اسمه الجديد «خاص» أولًا، وهذا يتطلب اتصالًا بالإنترنت. حاول مرة أخرى.'}});return}
       if(name!==old.name.trim()){for(const e of S.exp.filter(e=>(e[R.field]||'').trim()===old.name.trim())){const ne={...clean(e),[R.field]:name,updated:Date.now()};delete ne.id;queue('expenses',e.id,ne)}if(col==='items')igRenameItem(old.name.trim(),name)}
+      if(col==='items'&&$('#r_grp')){const g=$('#r_grp').value;if(regNormK(igOf(name,igMyPf()))!==regNormK(g))igAssign(name,g)}
       S.regEdit=null;S.flash={text:'تم حفظ التعديل',until:Date.now()+6000};S.justSaved=true;render();return}
     if(!addReg(col,data)){m.className='msg err';m.textContent=regMine(col).some(x=>x.name===data.name.trim())?'هذا الاسم موجود بالفعل.':'هذا الاسم مسجّل بالفعل في القائمة العامة. اختره مباشرةً عند تسجيل المصروف، وسيظهر هنا بعد ذلك.';return}
+    if(col==='items'&&$('#r_grp')&&$('#r_grp').value)igAssign(name,$('#r_grp').value);
     S.flash={text:'أُضيف '+name,until:Date.now()+6000};S.justSaved=true;render();const n=$('#r_name');if(n)n.focus()};
-  if(S.regFill&&S.regEdit){S.regFill=false;const r=regRecsK(R).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_kind',r.kind||'');sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc);sv('#r_type',r.type||'');if(r.stype&&$('#r_stype')&&![...$('#r_stype').options].some(o=>o.value===r.stype)){const o=document.createElement('option');o.value=o.textContent=r.stype;$('#r_stype').appendChild(o)}sv('#r_stype',r.stype||'')}
+  if(S.regFill&&S.regEdit){S.regFill=false;const r=regRecsK(R).find(x=>x.id===S.regEdit.id)||{};const sv=(id,v)=>{const el=$(id);if(el)el.value=v??''};sv('#r_name',r.name);sv('#r_kind',r.kind||'');sv('#r_spec',r.spec);sv('#r_phone',r.phone);sv('#r_claim',r.claim||'');if(r.item)setRegFromRecord('r_item','items',r.item);sv('#r_code',r.code);sv('#r_desc',r.desc);sv('#r_type',r.type||'');if($('#r_grp'))sv('#r_grp',igOf(r.name,igMyPf())||'');if(r.stype&&$('#r_stype')&&![...$('#r_stype').options].some(o=>o.value===r.stype)){const o=document.createElement('option');o.value=o.textContent=r.stype;$('#r_stype').appendChild(o)}sv('#r_stype',r.stype||'')}
   {const t=$('#r_type'),w=$('#r_stype_w');if(t&&w){const f=()=>{w.hidden=t.value!=='srv'};t.onchange=f;f()}}
   {const d=document.querySelector('.qs-multi');if(d)d.ontoggle=()=>{S.qsOpen=d.open}}
   document.querySelectorAll('[data-qsm]').forEach(c=>c.onchange=()=>{S.qsSel=[...document.querySelectorAll('[data-qsm]:checked')].map(x=>x.value)});
@@ -7507,7 +7517,7 @@ async function printReport(kind){
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
-const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','r_type','r_stype','r_kind','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','r_type','r_stype','r_kind','r_grp','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
 /* ---------- post-dated cheques: what is coming due ---------- */
 function dueSoon(days){
   const t=today(),lim=addDays(t,days);
@@ -7555,6 +7565,39 @@ const UIC={
 };
 const uiIcon=k=>`<svg class="ui-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UIC[k]||''}</svg>`;
 /* put an icon in each menu item and turn its count into a small pill next to the name */
+/* ===== كروت بتتقفل وتتفتح بالسهم زي الإعدادات (قرار 31 أكتوبر): أي كارت عليه data-ck="مفتاح" والعنوان أول .sec-h جواه.
+   data-ckd="1" = مفتوح أول مرة، data-ckforce="1" = مفتوح غصب (وإنت بتعدّل)، data-cks = ملخص بيظهر جنب العنوان وهو مقفول. الحالة على الجهاز. ===== */
+const CK=(()=>{try{return JSON.parse(localStorage.getItem('adc_cards_v1')||'{}')||{}}catch(e){return {}}})();
+const ckOpen=el=>el.dataset.ckforce==='1'||(CK[el.dataset.ck]!=null?!!CK[el.dataset.ck]:el.dataset.ckd==='1');
+function ckApply(){
+  document.querySelectorAll('#pane [data-ck]').forEach(el=>{const h=el.querySelector(':scope > .sec-h');if(!h)return;
+    const o=ckOpen(el);el.classList.toggle('ck-closed',!o);h.classList.add('ck-h');
+    let a=h.querySelector(':scope > .ck-a');if(!a){a=document.createElement('span');a.className='ck-a';a.setAttribute('aria-hidden','true');h.prepend(a)}a.textContent=o?'▾ ':'◂ ';
+    let s=h.querySelector(':scope > .ck-s');if(el.dataset.cks&&!o){if(!s){s=document.createElement('span');s.className='ck-s';h.appendChild(s)}s.textContent=' — '+el.dataset.cks}else if(s)s.remove();
+    h.setAttribute('role','button');h.setAttribute('aria-expanded',String(o))});
+}
+document.addEventListener('click',ev=>{const h=ev.target.closest('.ck-h');if(!h||ev.target.closest('button:not(.ck-h),input,select,a,label')&&!ev.target.closest('.ck-a'))return;const el=h.parentElement;if(!el||!el.dataset.ck||el.dataset.ckforce==='1')return;
+  CK[el.dataset.ck]=!ckOpen(el);try{localStorage.setItem('adc_cards_v1',JSON.stringify(CK))}catch(e){}ckApply()});
+/* ===== «القوائم»: المقاولين + البنود + الأسماء والأكواد صفحة واحدة بتبويبات ===== */
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-stabgo]');if(!b)return;S.siteTab=b.dataset.stabgo;S.justSaved=true;render()});
+const LISTS_SEL=['__contractors','__items','__codes','__pendregs'];
+function listsBar(){
+  const cur=S.sel==='__contractors'?'con':S.sel==='__items'?'item':(S.sel==='__codes'&&CDP.tab==='list')?'tree':'dup',can=APP&&typeof cdCan==='function'&&cdCan();
+  const dupN=can&&typeof cdTabs==='function'?cdTabs().filter(t=>t[0]!=='list').reduce((a,t)=>a+(+t[2]||0),0):0;
+  const T=[['con','المقاولون والموردون','__contractors'],['item','البنود','__items'],...(can?[['tree','الشجرة والأكواد','__codes|list'],['dup','المتكرر وبانتظار التسجيل','__codes|con']]:[])];
+  return `<div class="pane-h"><h2>القوائم</h2></div><div class="seg lists-tabs" role="tablist">${T.map(([k,t,g])=>`<button role="tab" data-listgo="${g}" aria-selected="${k===cur}">${t}${k==='dup'&&dupN?` <b class="neg">${dupN}</b>`:''}</button>`).join('')}</div>`;
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-listgo]');if(!b)return;const [sel,tab]=b.dataset.listgo.split('|');if(tab){CDP.tab=tab;CDP.msg=null}S.sel=sel;S.stmt=null;S.regEdit=null;S.justSaved=true;render();window.scrollTo({top:0})});
+/* ===== القائمة الرئيسية مجموعات ===== */
+function uiGroupMenu(tm){
+  const get=id=>tm.querySelector(`.site-btn[data-site="${id}"]`);
+  for(const id of ['__contractors','__codes']){const b=get(id);if(b)b.remove()}
+  const it=get('__items');if(it){const n=it.querySelector('.n');if(n)n.textContent='القوائم';const t=it.querySelector('.cnt,.t');if(t)t.remove();it.setAttribute('aria-current',String(LISTS_SEL.includes(S.sel)))}
+  const G=[['',['__wait']],['الشغل اليومي',['__store','__custody','__certs']],['التقارير',['__stmts','__journal','__all']],['القوائم',['__items','__banks']],['أدوات',['__search','__review','__imports','__trash']]];
+  const used=new Set(),out=[];for(const [h,ids] of G){const bs=ids.map(get).filter(Boolean);if(!bs.length)continue;if(h)out.push(h);for(const b of bs){out.push(b);used.add(b)}}
+  const rest=[...tm.querySelectorAll('.site-btn')].filter(b=>!used.has(b));
+  tm.innerHTML='';for(const x of out){if(typeof x==='string')tm.insertAdjacentHTML('beforeend',`<div class="mh" role="presentation">${x}</div>`);else tm.appendChild(x)}for(const b of rest)tm.appendChild(b);
+}
 function uiDecorateMenu(){
   const tm=$('#toolMenu');if(!tm)return;
   tm.querySelectorAll('.site-btn').forEach(b=>{const id=b.dataset.site;if(!id||b.querySelector('.ui-ic'))return;
@@ -7566,6 +7609,7 @@ function uiDecorateMenu(){
   if(APP&&typeof implList==='function'&&implList().length&&!tm.querySelector('[data-site="__imports"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__imports" aria-current="${S.sel==='__imports'}">${uiIcon('__imports')}<span class="n">سجل الاستيراد</span></button>`);
   if(APP&&typeof cdCan==='function'&&cdCan()&&!tm.querySelector('[data-site="__codes"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__codes" aria-current="${S.sel==='__codes'}">${uiIcon('__codes')}<span class="n">الأسماء والأكواد</span></button>`);
   if(!tm.querySelector('[data-site="__search"]'))(tr?tr.insertAdjacentHTML.bind(tr,'beforebegin'):tm.insertAdjacentHTML.bind(tm,'beforeend'))(`<button class="site-btn jbtn" role="menuitem" data-site="__search" aria-current="${S.sel==='__search'}">${uiIcon('__search')}<span class="n">بحث</span></button>`);
+  if(APP&&!appIsEngineer())uiGroupMenu(tm);
 }
 const uiMobile=()=>window.matchMedia&&window.matchMedia('(max-width:820px)').matches;
 function uiBottom(){
@@ -7712,12 +7756,14 @@ function render(){
   S.sel==='__wait'&&APP?renderWaiting():S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?(typeof cdCan==='function'&&cdCan()?(CDP.tab='pend',S.sel='__codes',renderCodes()):prRenderPage()):S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
   if(APP&&!appIsEngineer()&&(S.conflicts||[]).length)$('#pane').insertAdjacentHTML('afterbegin',cfCard());
   if(APP&&typeof itsLoad==='function'){itsLoad().then(()=>itsSync()).catch(()=>{})}
+  if(APP&&!appIsEngineer()&&LISTS_SEL.includes(S.sel)&&!S.stmt){const ph=$('#pane > .pane-h');if(ph&&!ph.querySelector('.actions'))ph.remove();$('#pane').insertAdjacentHTML('afterbegin',listsBar())}
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   {const eng=APP&&appIsEngineer(),bar=eng?'':excelBar();if(bar&&bar.includes('xbar ok'))$('#pane').insertAdjacentHTML('afterbegin',bar);uiNoticeBtn(eng?[]:uiNotices());uiBottom();if(APP&&typeof backBar==='function'){const bb=backBar();if(bb)$('#pane').insertAdjacentHTML('afterbegin',bb);else if(S.back&&S.back.at!==navAt()){S.back=null;navClear()}}}
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
+  ckApply();
   navTrack();{const bb=$('#backBtn');if(bb)bb.hidden=!NAV.stack.length}if(NAV.stack.length&&document.body.classList.contains('eng-mode'))$('#pane').insertAdjacentHTML('afterbegin','<div class="nav-back"><button type="button" class="ghost" data-navback aria-label="رجوع للشاشة السابقة">→ رجوع</button></div>');
   for(const id in keep){const el=document.getElementById(id);if(el){el.value=keep[id];if(id==='r_type'&&el.onchange)el.onchange()}}
   dueToggle('e');dueToggle('j');
