@@ -4539,7 +4539,9 @@ function cdMatSuggest(main){if(typeof SO==='undefined'||!SO.d)return '';const id
   for(const m of SO.d.moves||[])if(!m.deleted&&m.kind==='in'&&ids.has((m.data||{}).item)&&(m.data||{}).sitem){const s=m.data.sitem.trim();c.set(s,(c.get(s)||0)+1)}
   return [...c.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||''}
 const cdSupplyItems=()=>regNames('items').filter(x=>x.reg&&x.name!==REV_ITEM&&x.name!==PAY_ITEM).map(x=>x.name);
-function cdTabs(){
+let CDTM={k:null,v:null,at:0};
+function cdTabs(){const k=[S.items,S.cons,S.exp,typeof SO!=='undefined'&&SO.d?SO.d.items:null,typeof SO!=='undefined'&&SO.d?SO.d.moves:null,CD.rows,CD.dupOk];if(CDTM.v&&Date.now()-CDTM.at<5000&&CDTM.k.every((x,i)=>x===k[i]))return CDTM.v;CDTM={k,v:cdTabs0(),at:Date.now()};return CDTM.v}
+function cdTabs0(){
   const nCon=cdGroupsOf('con').length,nItem=cdGroupsOf('item').length,nMat=APPU.owner?cdMatGroups().length+cdOrphans().length:0;
   const ungrouped=cdItemRegs().filter(x=>x.name!==REV_ITEM&&!cdGroupOf(x.name)).length,noAbbr=cdGroups().filter(g=>!cdG(g.name)).length;
   const mains=typeof SO!=='undefined'&&SO.d?(SO.d.items||[]).filter(i=>!i.deleted&&!i.parent):[],unl=mains.filter(m=>!m.sitem).length;
@@ -4763,14 +4765,22 @@ document.addEventListener('click',async ev=>{
    - المستحق للمقاول = «إجمالي الأعمال بعد الخصومات» في آخر مستخلص معتمد لكل (موقع + مقاول + بند)، والمدفوع = المصروفات باسمه على نفس البند في نفس الموقع. */
 const accN=v=>typeof spN==='function'?spN(v):soNorm(v);
 const accExps=()=>(typeof spExp==='function'?spExp():S.exp||[]).filter(e=>!e._priv&&!e.deleted);
+/* المصروفات متجمّعة بالاسم (بعد الدمج) — مرة لكل نسخة من المصروفات */
+let AEX={src:null};
+function accExpsOf(k){const src=typeof spTech==='function'&&spTech()?(CT.paid||[]):S.exp||[];if(AEX.src!==src||AEX.n!==src.length||AEX.al!==(typeof SP!=='undefined'?SP.alias:null)){const m=new Map();for(const e of accExps()){if(!e.contractor)continue;const kk=accN(e.contractor);if(!m.has(kk))m.set(kk,[]);m.get(kk).push(e)}AEX={src,n:src.length,al:typeof SP!=='undefined'?SP.alias:null,m}}return AEX.m.get(k)||[]}
 const accMoves=()=>(typeof SO!=='undefined'&&SO.d&&SO.d.moves)||[];
 const accIn=(o,id,date)=>(!o.ids||o.ids.has(id))&&(!o.to||(date||'')<=o.to);
 /* الفواتير (كل فاتورة: site, sk اسم المورد بعد الدمج، due/net، bad عدد الأصناف من غير سعر، pend) */
-function accInvs(o){o=o||{};
+const ACCM={};
+const accKey=(t,o)=>t+'|'+(o.ids?[...o.ids].sort().join(','):'*')+'|'+(o.to||'');
+function accMemo(t,o,fn){const mv=accMoves(),k=accKey(t,o);if(ACCM.mv!==mv||ACCM.al!==(typeof SP!=='undefined'?SP.alias:null)){ACCM.mv=mv;ACCM.al=typeof SP!=='undefined'?SP.alias:null;ACCM.c=new Map()}if(!ACCM.c.has(k))ACCM.c.set(k,fn());return ACCM.c.get(k)}
+function accInvs(o){o=o||{};return accMemo('i',o,()=>accInvs0(o))}
+function accCrs(o){o=o||{};return accMemo('c',o,()=>accCrs0(o))}
+function accInvs0(o){
   return soInvoices(accMoves().filter(m=>m.kind==='in'&&!m.deleted&&accIn(o,m.site_id,m.date))).map(x=>({...x,net:x.due,netPre:x.net,site:x.lines[0].site_id,sk:accN(x.sup),bad:x.lines.filter(m=>!(+(m.data||{}).price>0)).length,pend:x.lines.some(m=>(m.data||{}).supPend)}));
 }
 /* المرتجعات (مجمّعة بالمرتجع) وإشعارات الخصم */
-function accCrs(o){o=o||{};const mv=accMoves().filter(m=>!m.deleted&&accIn(o,m.site_id,m.date));
+function accCrs0(o){const mv=accMoves().filter(m=>!m.deleted&&accIn(o,m.site_id,m.date));
   const rets=soInvoices(mv,'ret').map(x=>({k:'ret',date:x.date,sup:x.sup,sk:accN(x.sup),sitem:x.sitem,inv:x.inv,ref:(x.lines[0].data||{}).ref||'',site:x.lines[0].site_id,val:r2(x.gross+x.tax),bad:x.lines.filter(m=>!(+(m.data||{}).price>0)).length,pend:x.lines.some(m=>(m.data||{}).supPend)}));
   const cns=mv.filter(m=>m.kind==='cn').map(m=>{const d=m.data||{};return {k:'cn',date:m.date,sup:d.supplier||'',sk:accN(d.supplier),sitem:d.sitem||'',inv:d.inv||'',notes:d.notes||'',site:m.site_id,val:soCrVal(m),bad:0,pend:!!d.supPend}});
   return [...rets,...cns];
@@ -4779,7 +4789,7 @@ function accCrs(o){o=o||{};const mv=accMoves().filter(m=>!m.deleted&&accIn(o,m.s
 function accSup(name,o){o=o||{};const k=accN(name);if(!k)return null;
   const invs=(o.invs||accInvs(o)).filter(x=>x.sk===k&&!x.pend),crs=(o.crs||accCrs(o)).filter(c=>c.sk===k&&!c.pend);
   const sitems=new Set(invs.map(x=>soNorm(x.sitem||'')).filter(Boolean));
-  const mine=(o.exps||accExps()).filter(e=>accIn(o,e.siteId,e.date)&&e.contractor&&accN(e.contractor)===k);
+  const mine=(o.exps?o.exps.filter(e=>e.contractor&&accN(e.contractor)===k):accExpsOf(k)).filter(e=>accIn(o,e.siteId,e.date));
   const pays=mine.filter(e=>supPaySide(e,name,sitems)==='sup'),loose=conKind(name)==='both'?mine.filter(e=>supPaySide(e,name,sitems)==='none'):[];
   const it=o.item?soNorm(o.item):'',okIt=v=>!it||soNorm(v)===it;
   const I=invs.filter(x=>okIt(x.sitem)),C=crs.filter(c=>okIt(c.sitem)),P=pays.filter(e=>okIt(e.item));
@@ -6762,7 +6772,11 @@ async function svcSave(next){
   try{const r=await SB.from('app_settings').upsert({key:'svc_types',value:JSON.stringify(next)},{onConflict:'key'});if(r.error)return 'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100)}catch(e){return 'تعذّر الحفظ. تأكد من الاتصال بالإنترنت.'}
   SVC=next;appLs('adc_svc_v1',SVC);return ''}
 /* سجل البند: تقسيم صاحب الموقع الأول ثم قائمة المدير */
-function itRec(name){const n=regNormK(name);if(!n)return null;const L=regRecs('items').filter(r=>r&&!r.hidden&&regNormK(r.name)===n);if(!L.length)return null;
+/* فهرس سجلات البنود بالاسم — بيتعمل مرة لكل نسخة من S.items (بدل ما ندوّر في القائمة كلها كل مرة) */
+let ITX={src:null,m:null};
+function itIdx(){const src=S.items||[];if(ITX.src!==src||ITX.n!==src.length){const m=new Map();for(const r of src)if(r&&r.kind!=='group'&&!r.hidden&&r.name){const k=regNormK(r.name);if(!m.has(k))m.set(k,[]);m.get(k).push(r)}ITX={src,n:src.length,m,c:new Map()}}return ITX}
+function itRec(name){const X=itIdx(),n=regNormK(name);if(!n)return null;if(X.c.has(n))return X.c.get(n);const L=X.m.get(n)||[];if(!L.length){X.c.set(n,null);return null}const r0=itRec0(L);X.c.set(n,r0);return r0}
+function itRec0(L){
   const mine=S.isManager?'':(S.pfx||'');return L.find(r=>(r._p||'')===mine&&r.type)||L.find(r=>!(r._p||'')&&r.type)||L.find(r=>r.type)||L.find(r=>(r._p||'')===mine)||L[0]}
 /* نوع البند على السيرفر (جدول item_types) — للمهندس وأمين المخزن والمكتب الفني والمحاسب، وبيتزامن من المدير وصاحب الموقع */
 const ITS={m:(()=>{try{const v=typeof appLs==='function'?appLs('adc_ittypes_v1'):null;return v&&typeof v==='object'?v:{}}catch(e){return {}}})(),at:0,missing:false,busy:false,synced:{}};
@@ -6934,9 +6948,12 @@ function bindConItem(conId,itemId){
 }
 /* the claim total covers all sites; a regular user only sees his own payments, so he sees a claim only on a contractor he registered himself */
 function claimOf(name){if(APP)return null;const r=(S.cons||[]).find(x=>x.name.trim()===name&&!x.hidden);if(!r||!(r.claim>0))return null;if(!S.isManager&&!OFF&&S.pfx&&(r._p??'')!==S.pfx)return null;return +r.claim}
+/* إحصائيات كل الأسماء مرة واحدة لكل نسخة من المصروفات (بدل ما نلف على المصروفات كلها لكل صف) */
+const RSX={};
 function regStats(col,name){
-  const f=REG[col].field,l=(col==='items'&&APP&&typeof payAlloc==='function'?payAlloc(S.exp):S.exp).filter(e=>(e[f]||'').trim()===name);
-  return {n:l.length,total:sum(l),sites:new Set(l.map(e=>e.siteId)).size,last:l.map(e=>e.date).sort().pop()||''};
+  const f=REG[col].field,src=col==='items'&&APP&&typeof payAlloc==='function'?payAlloc(S.exp):S.exp;
+  let X=RSX[col];if(!X||X.src!==src||X.n!==src.length){const m=new Map();for(const e of src){const k=(e[f]||'').trim();let y=m.get(k);if(!y)m.set(k,y={n:0,total:0,sites:new Set(),last:''});y.n++;y.total+=amt(e);y.sites.add(e.siteId);if((e.date||'')>y.last)y.last=e.date||''}X=RSX[col]={src,n:src.length,m}}
+  const y=X.m.get(name);return y?{n:y.n,total:r2(y.total),sites:y.sites.size,last:y.last}:{n:0,total:0,sites:0,last:''};
 }
 S.igOpen=S.igOpen||new Set();
 /* البنود متقسمة بالنوع جوه البند العام: [[نوع|null, [أسماء]]] — null لما مفيش أنواع خالص */
@@ -7583,7 +7600,9 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-stabgo]'
 const LISTS_SEL=['__contractors','__items','__codes','__pendregs'];
 function listsBar(){
   const cur=S.sel==='__contractors'?'con':S.sel==='__items'?'item':(S.sel==='__codes'&&CDP.tab==='list')?'tree':'dup',can=APP&&typeof cdCan==='function'&&cdCan();
-  const dupN=can&&typeof cdTabs==='function'?cdTabs().filter(t=>t[0]!=='list').reduce((a,t)=>a+(+t[2]||0),0):0;
+  /* عدد المتكرر بيتحسب بعد ما الصفحة تظهر (حسابه تقيل مع خامات كتير) */
+  const fresh=can&&CDTM.v&&Date.now()-CDTM.at<5000,dupN=fresh?CDTM.v.filter(t=>t[0]!=='list').reduce((a,t)=>a+(+t[2]||0),0):0;
+  if(can&&!fresh)setTimeout(()=>{try{const n=cdTabs().filter(t=>t[0]!=='list').reduce((a,t)=>a+(+t[2]||0),0);const b=document.querySelector('.lists-tabs [data-listgo="__codes|con"]');if(b&&n&&!b.querySelector('b'))b.insertAdjacentHTML('beforeend',' <b class="neg">'+n+'</b>')}catch(e){}},60);
   const T=[['con','المقاولون والموردون','__contractors'],['item','البنود','__items'],...(can?[['tree','الشجرة والأكواد','__codes|list'],['dup','المتكرر وبانتظار التسجيل','__codes|con']]:[])];
   return `<div class="pane-h"><h2>القوائم</h2></div><div class="seg lists-tabs" role="tablist">${T.map(([k,t,g])=>`<button role="tab" data-listgo="${g}" aria-selected="${k===cur}">${t}${k==='dup'&&dupN?` <b class="neg">${dupN}</b>`:''}</button>`).join('')}</div>`;
 }
@@ -7641,7 +7660,9 @@ function uiNotices(){
 }
 /* ===== «بانتظارك» في مكان واحد (المرة التالتة من تنظيم 30 أكتوبر): كل اللي محتاج قرار في كل المواقع + التنبيهات العامة.
    الجرس فوق = العدد بس، والضغط بيفتح الصفحة دي. كارت «بانتظارك في هذا الموقع» في صفحة الموقع زي ما هو. ===== */
-function waitAll(){
+let WAITM={at:0,v:null};
+function waitAll(){if(Date.now()-WAITM.at<400&&WAITM.v)return WAITM.v;WAITM={at:Date.now(),v:waitAll0()};return WAITM.v}
+function waitAll0(){
   if(!APP||appIsEngineer())return {groups:[],gen:[],n:0};
   const groups=S.sites.map(s=>({site:s,items:waitList(s.id)})).filter(g=>g.items.length),gen=[];{const bar=excelBar();if(bar&&!bar.includes('xbar ok'))gen.push(bar)}if(typeof quNotices==='function')gen.push(...quNotices());if(NT.repNew)gen.push(`<div class="xbar"><span>يوجد كشف أسبوعي جديد.</span><button class="primary" data-site="__settings">احفظه من الإعدادات</button></div>`);
   return {groups,gen,n:groups.reduce((a,g)=>a+g.items.length,0)+gen.length};
