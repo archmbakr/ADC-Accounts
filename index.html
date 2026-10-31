@@ -368,6 +368,7 @@ details.fold[open]>summary{margin-bottom:10px}
 .hf-row.low .nm,.hf-row.low b{color:var(--danger)}
 .sp-subj{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}.sp-s{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--fg);cursor:pointer;font:inherit}.sp-s b{font-size:15px}.sp-s small{color:var(--muted);font-size:11.5px}.sp-s[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.sp-s[aria-pressed=true] small{color:var(--on-accent);opacity:.85}.sp-s.go{border-style:dashed}.sp-shape button[aria-selected=true]{font-weight:700}
 .gi.gt{padding:8px 4px 2px;border:0;background:transparent}
+.cdt-n{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);margin:4px 0}.cdt-n[draggable=true]{cursor:grab}.cdt-n.l0{background:var(--accent-soft);font-weight:700}.cdt-n.l1{margin-inline-start:22px}.cdt-n.l2{margin-inline-start:48px;background:var(--sunk)}.cdt-n.l3{margin-inline-start:74px;background:var(--sunk);font-size:13px}.cdt-loose .cdt-n.l1{margin-inline-start:0}.cdt-t{border:0;background:transparent;color:var(--muted);width:18px;padding:0;cursor:pointer;font:inherit}.cdt-mv{padding:2px 10px;font-size:12px}.cdt-over{outline:2px dashed var(--ok);outline-offset:2px;background:color-mix(in srgb,var(--ok) 12%,var(--surface))}.cdt-drag{opacity:.5}.cdt-box{margin:4px 0 8px 22px;padding:10px;border:1px solid var(--hl-line);border-radius:8px;background:var(--hl-bg);color:var(--hl-fg);display:flex;flex-direction:column;gap:6px}.cdt-opts{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto}.cdt-o{text-align:start;border:0;background:var(--surface);color:var(--fg);padding:6px 8px;border-radius:6px;cursor:pointer;font:inherit}.cdt-o:hover{background:var(--accent-soft)}.cdt-sg{display:block;margin:-2px 30px 4px}.cdt-code{padding:0}
 .kind-tag{display:inline-block;margin-inline-start:6px;font-size:11px;padding:0 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600;vertical-align:middle}.kind-tag.it-sup{background:var(--accent-soft);color:var(--accent)}.kind-tag.it-lab{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}.kind-tag.it-srv{background:color-mix(in srgb,var(--money) 16%,transparent);color:var(--money)}.kind-tag[class*=it-]{margin-inline-start:0}
 .split-t{min-width:0}.split-t td{padding:7px 10px}.split-t tr.ct-sec td{background:var(--sunk)}.split-t tr.sub td{font-weight:600;color:var(--muted)}.split-t tr.grand td{font-weight:700;border-top:2px solid var(--line)}
 .reg-tools{align-items:center;gap:8px;flex-wrap:wrap}.reg-tools .grow{flex:1}.reg-tools .seg{margin:0}
@@ -4541,7 +4542,7 @@ function cdTabs(){
   const nCon=cdGroupsOf('con').length,nItem=cdGroupsOf('item').length,nMat=APPU.owner?cdMatGroups().length+cdOrphans().length:0;
   const ungrouped=cdItemRegs().filter(x=>x.name!==REV_ITEM&&!cdGroupOf(x.name)).length,noAbbr=cdGroups().filter(g=>!cdG(g.name)).length;
   const mains=typeof SO!=='undefined'&&SO.d?(SO.d.items||[]).filter(i=>!i.deleted&&!i.parent):[],unl=mains.filter(m=>!m.sitem).length;
-  return [['con','المقاولون والموردون',nCon],['item','البنود',nItem],...(APPU.owner?[['mat','خامات المخزن',nMat]]:[]),['grp','البنود العامة والاختصارات',ungrouped+noAbbr],['link','ربط الخامات ببنود التوريد',unl],...(typeof prGroups==='function'?[['pend','بانتظار التسجيل',prGroups().length]]:[]),['list','الأكواد',null]];
+  return [['con','المقاولون والموردون',nCon],['item','البنود',nItem],...(APPU.owner?[['mat','خامات المخزن',nMat]]:[]),['grp','البنود العامة والاختصارات',ungrouped+noAbbr],...(typeof prGroups==='function'?[['pend','بانتظار التسجيل',prGroups().length]]:[]),['list','الشجرة والأكواد',unl||null]];
 }
 function cdDupCard(kind,g,gi){
   const k=kind+':'+gi,sel=CDP.sel[k]||g[0].name,mineOk=g.every(cdMineOnly),hidden=CDP.open[k+':x']||{};
@@ -4583,8 +4584,89 @@ function cdLinkTab(){
    <td>${cdOn()?cdTag(cdM(m.id))||'—':'—'}</td><td>${m.sitem?'<span class="chip ok">مربوطة</span>':s?'<span class="chip wait">مقترحة — أكّد</span>':'<span class="chip no">غير مربوطة</span>'}</td></tr>`}).join('')}</tbody></table></div>
   ${nSg&&can?`<div class="row" style="margin-top:8px"><button class="primary" type="button" data-cd="linkall">أكّد كل المقترح (${nSg})</button></div>`:''}`:'<p class="note">لا توجد خامات في المخزن.</p>'}</div>`;
 }
+/* ================= «الشجرة والأكواد»: بند عام ← بند (بنوعه) ← خامة رئيسية ← فرعية، والنقل بزرار «نقل» أو بالسحب (قرار 31 أكتوبر) =================
+   نقل البند بين البنود العامة (igAssign)، الخامة الرئيسية تحت بند توريدات (store_items.sitem) أو تحت خامة تانية (parent)،
+   والفرعية بين الرئيسيات أو تبقى رئيسية. الحركات والفواتير والمصروفات ما بتتغيّرش. */
+CDP.topen=CDP.topen||new Set();CDP.tq=CDP.tq||'';CDP.mv=CDP.mv||null;
+const cdtCanMat=()=>APPU.owner||(typeof myRole==='function'&&myRole()==='user');
+function cdtData(){
+  const pf=igMyPf(),items=regNames('items').filter(x=>x.reg&&x.name!==REV_ITEM&&x.name!==PAY_ITEM).map(x=>x.name);
+  const G=igNames(pf),by=new Map(G.map(g=>[regNormK(g),{name:g,items:[]}])),free=[];
+  for(const n of items){const g=igOf(n,pf);if(g){const k=regNormK(g);if(!by.has(k))by.set(k,{name:g,items:[]});by.get(k).items.push(n)}else free.push(n)}
+  const its=typeof SO!=='undefined'&&SO.d?(SO.d.items||[]).filter(i=>!i.deleted):[],mains=its.filter(i=>!i.parent).sort(soByName);
+  const subsOf=id=>its.filter(i=>i.parent===id).sort(soByName),matsOf=n=>mains.filter(m=>m.sitem&&soNorm(m.sitem)===soNorm(n));
+  const linked=new Set(items.map(n=>soNorm(n))),loose=mains.filter(m=>!m.sitem||!linked.has(soNorm(m.sitem)));
+  return {pf,items,groups:[...by.values()].sort((a,b)=>(cdG(a.name)||a.name).localeCompare(cdG(b.name)||b.name,'ar')),free,mains,subsOf,matsOf,loose};
+}
+/* الأماكن اللي ينفع النقل ليها */
+function cdtTargets(D,mv){
+  if(mv.k==='item')return [...D.groups.map(g=>({v:'g:'+g.name,t:'بند عام: '+g.name})),{v:'g:',t:'— من غير بند عام —'}];
+  const it=soItem(mv.id);if(!it)return [];
+  const sup=D.items.filter(n=>itNeedSup(n)||!itType(n)&&/توريد/.test(n)).map(n=>{const g=igOf(n,D.pf);return {v:'s:'+n,t:(g?g+' ← ':'')+n}});
+  const mains=D.mains.filter(m=>m.id!==it.id&&m.id!==it.parent).map(m=>({v:'p:'+m.id,t:'تحت خامة: '+m.name}));
+  if(mv.k==='main')return [...sup,{v:'s:',t:'— خامة من غير بند توريد —'},...(D.subsOf(it.id).length?[]:mains)];
+  return [...mains,{v:'main',t:'— اجعلها خامة رئيسية —'}];
+}
+async function cdtMove(mv,v){
+  const name=mv.k==='item'?mv.id:soLabel(mv.id);let t='';
+  if(mv.k==='item'){const g=v.slice(2);igAssign(mv.id,g);t=g?'«'+name+'» أصبح تحت «'+g+'».':'«'+name+'» أصبح من غير بند عام.'}
+  else{const it=soItem(mv.id);if(!it)return;if(!cdtCanMat())return cdtMsg('ربط الخامات للمدير وصاحب الموقع.',false);
+    if(v.startsWith('s:')){const s=v.slice(2);soQueue('store_items','put',it.id,{...soClean(it),sitem:s||null,parent:null});t=s?'«'+it.name+'» أصبحت تحت بند «'+s+'». فواتير المخزن الجديدة لها تأخذ هذا البند تلقائيًا.':'«'+it.name+'» أصبحت من غير بند توريد.'}
+    else if(v.startsWith('p:')){const p=soItem(v.slice(2));if(!p)return;if(!it.parent&&soSubs(it.id).length)return cdtMsg('هذه الخامة تحتها خامات فرعية، ولا يمكن جعلها فرعية.',false);
+      if(!String(it.unit||'').trim())return cdtMsg('الخامة الفرعية تحتاج إلى وحدة. اكتب وحدة «'+it.name+'» من المخزن ← قائمة الخامات أولًا.',false);
+      if(soDup(it.name,p.id,it.id))return cdtMsg('يوجد تحت «'+p.name+'» خامة بنفس الاسم. ادمجهما من تبويب «خامات المخزن».',false);
+      soQueue('store_items','put',it.id,{...soClean(it),parent:p.id});CDP.topen.add('m:'+p.id);t='«'+it.name+'» أصبحت خامة فرعية تحت «'+p.name+'».'}
+    else if(v==='main'){soQueue('store_items','put',it.id,{...soClean(it),parent:null});t='«'+it.name+'» أصبحت خامة رئيسية. اربطها ببند توريد من «لسه مش متحطين في مكانهم».'}
+    try{await soFlush()}catch(e){}}
+  if(typeof cdAutoSoon==='function')cdAutoSoon();
+  const oc=cdOn()?(mv.k==='item'?cdI(mv.id):cdM(mv.id)):'';
+  CDP.mv=null;cdtMsg(t+(oc?' الكود '+oc+' يبقى كما هو'+(APPU.owner?' (يمكنك تعديله من زر الكود).':'.'):''),true);
+}
+function cdtMsg(t,ok){CDP.msg={ok:ok!==false,t,at:Date.now()};S.justSaved=true;render()}
+function cdTreeTab(){
+  if(typeof SO==='undefined'||!SO.d)return '<div class="card"><p class="note">جاري تحميل المخزن…</p></div>';
+  const D=cdtData(),q=arNorm(CDP.tq||''),hit=s=>!q||arNorm(s).includes(q)||(cdOn()&&String(s).toLowerCase().includes(q)),own=APPU.owner&&cdOn();
+  const code=(k,key,c)=>c?`${own?`<button type="button" class="linkish cdt-code" data-cd="setcode" data-kind="${k}" data-key="${esc(key)}" data-code="${esc(c)}" title="تعديل الكود">${cdTag(c)}</button>`:cdTag(c)}`:'';
+  const mvBtn=(k,id)=>`<button type="button" class="ghost cdt-mv" data-cdtmv="${k}" data-id="${esc(id)}">نقل</button>`;
+  const mvBox=(k,id)=>{if(!CDP.mv||CDP.mv.k!==k||CDP.mv.id!==id)return '';const T=cdtTargets(D,CDP.mv),fq=arNorm(CDP.mvq||''),L=T.filter(x=>!fq||arNorm(x.t).includes(fq)).slice(0,40);
+    return `<div class="cdt-box"><b>نقل «${esc(k==='item'?id:soLabel(id))}» إلى:</b><input id="cdtMvQ" placeholder="اكتب جزءًا من الاسم…" value="${esc(CDP.mvq||'')}" autocomplete="off"><div class="cdt-opts">${L.map(x=>`<button type="button" class="cdt-o" data-cdtto="${esc(x.v)}">${esc(x.t)}</button>`).join('')||'<span class="note">لا توجد نتائج.</span>'}</div><button type="button" class="ghost" data-cdtx>إلغاء</button></div>`};
+  const tog=k=>q||CDP.topen.has(k);
+  const matHit=m=>hit(m.name)||D.subsOf(m.id).some(s=>hit(s.name));
+  const sub=s=>!hit(s.name)&&!q?'':`<div class="cdt-n l3" draggable="true" data-dnd="sub|${esc(s.id)}">${code('M',s.id,cdM(s.id))}<span class="grow">${esc(s.name)}</span><small class="note">${esc(s.unit||'')}</small>${cdtCanMat()?mvBtn('sub',s.id):''}</div>${mvBox('sub',s.id)}`;
+  const mat=(m,lvl)=>{const S2=D.subsOf(m.id),o=tog('m:'+m.id);return `<div class="cdt-n ${lvl}" draggable="true" data-dnd="main|${esc(m.id)}" data-drop="m|${esc(m.id)}">${S2.length?`<button type="button" class="cdt-t" data-cdttog="m:${esc(m.id)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('M',m.id,cdM(m.id))}<span class="grow">${esc(m.name)} <small class="note">(خامة${S2.length?' · '+S2.length+' فرعية':m.unit?' · '+esc(m.unit):''})</small></span>${cdtCanMat()?mvBtn('main',m.id):''}</div>${mvBox('main',m.id)}${o?S2.map(s=>sub(s)).join(''):''}`};
+  const item=n=>{const t=itType(n),M=D.matsOf(n),o=tog('i:'+n),show=hit(n)||M.some(matHit);if(!show)return '';
+    return `<div class="cdt-n l1" draggable="true" data-dnd="item|${esc(n)}"${itNeedSup(n)||!t&&/توريد/.test(n)?` data-drop="s|${esc(n)}"`:''}>${M.length?`<button type="button" class="cdt-t" data-cdttog="i:${esc(n)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('I',arNorm(n),cdI(n))}<span class="grow"><b>${esc(n)}</b> ${itTag(t)||'<small class="note">من دون نوع</small>'}${M.length?` <small class="note">(${M.length} خامة)</small>`:''}</span>${mvBtn('item',n)}</div>${mvBox('item',n)}${o?M.map(m=>mat(m,'l2')).join(''):''}`};
+  const group=g=>{const body=g.items.map(item).join(''),o=tog('g:'+g.name);if(q&&!body&&!hit(g.name))return '';
+    return `<div class="cdt-n l0" data-drop="g|${esc(g.name)}"><button type="button" class="cdt-t" data-cdttog="g:${esc(g.name)}">${o?'▾':'◂'}</button>${code('G',arNorm(g.name),cdG(g.name))}<span class="grow">${esc(g.name)} <small>(بند عام · ${g.items.length})</small></span></div>${o?body||'<p class="note" style="margin:4px 30px">لا توجد بنود تحته.</p>':''}`};
+  const sug=D.loose.map(m=>({m,s:cdMatSuggest(m)})).filter(x=>x.s);
+  const freeB=D.free.map(item).join(''),looseB=D.loose.filter(m=>!q||matHit(m)).map(m=>mat(m,'l1')+(cdMatSuggest(m)?`<small class="note cdt-sg">الاقتراح: ← ${esc(cdMatSuggest(m))}</small>`:'')).join('');
+  return `<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><input id="cdtQ" placeholder="بحث بالاسم${cdOn()?' أو الكود':''}، مثال: طوب" value="${esc(CDP.tq||'')}" style="flex:1;min-width:200px" autocomplete="off"><span class="note">اضغط «نقل» أو اسحب ⋮ على الكمبيوتر وأفلت على المكان الجديد.</span></div></div>
+  ${D.free.length||D.loose.length?`<div class="card cdt-loose" data-drop="g|"><div class="sec-h">لسه مش متحطين في مكانهم</div>
+    ${D.free.length?`<div class="note">بنود من غير بند عام (${D.free.length})</div>${freeB||'<p class="note">—</p>'}`:''}
+    ${D.loose.length?`<div class="note" style="margin-top:8px" data-drop="s|">خامات من غير بند توريد (${D.loose.length})</div>${looseB||'<p class="note">—</p>'}${sug.length&&cdtCanMat()?`<div class="row" style="margin-top:6px"><button type="button" class="primary" data-cd="linkall">أكّد الاقتراحات (${sug.length})</button><span class="note">الاقتراح من «بند التوريد» المكتوب على فواتير الخامة.</span></div>`:''}`:''}</div>`:''}
+  <div class="card cdt"><div class="sec-h">الشجرة</div>${D.groups.map(group).join('')||'<p class="note">لا توجد بنود عامة. أنشئها من صفحة «البنود» أو من تبويب «البنود العامة والاختصارات».</p>'}
+  <p class="note" style="margin-top:8px">البند العام ← البند (بنوعه) ← خامات المخزن الرئيسية تحت بنود التوريدات ← الفرعية. النقل لا يغيّر أي فاتورة أو مصروف؛ يتغيّر المكان في الشجرة والتقارير، وفواتير المخزن الجديدة تأخذ بند التوريد المربوط بالخامة تلقائيًا.${cdOn()?' الأكواد ثابتة: النقل لا يغيّر الكود'+(APPU.owner?'، ويمكنك تعديله بالضغط عليه.':'.'):''}</p></div>`;
+}
+document.addEventListener('click',ev=>{
+  const tg=ev.target.closest('[data-cdttog]');if(tg){const k=tg.dataset.cdttog;if(CDP.topen.has(k))CDP.topen.delete(k);else CDP.topen.add(k);S.justSaved=true;render();return}
+  const mv=ev.target.closest('[data-cdtmv]');if(mv){CDP.mv=CDP.mv&&CDP.mv.id===mv.dataset.id?null:{k:mv.dataset.cdtmv,id:mv.dataset.id};CDP.mvq='';S.justSaved=true;render();const i=$('#cdtMvQ');if(i)i.focus();return}
+  if(ev.target.closest('[data-cdtx]')){CDP.mv=null;S.justSaved=true;render();return}
+  const to=ev.target.closest('[data-cdtto]');if(to&&CDP.mv){cdtMove(CDP.mv,to.dataset.cdtto);return}
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;if(t.id==='cdtMvQ'){CDP.mvq=t.value;const p=t.selectionStart;S.justSaved=true;render();const n=$('#cdtMvQ');if(n){n.focus();try{n.setSelectionRange(p,p)}catch(e){}}return}
+  if(t.id==='cdtQ'){clearTimeout(cdtQT);cdtQT=setTimeout(()=>{CDP.tq=t.value;const p=t.selectionStart;S.justSaved=true;render();const n=$('#cdtQ');if(n){n.focus();try{n.setSelectionRange(p,p)}catch(e){}}},250)}
+});
+let cdtQT=null,cdtDrag=null;
+/* السحب والإفلات (الكمبيوتر) */
+document.addEventListener('dragstart',ev=>{const n=ev.target.closest&&ev.target.closest('[data-dnd]');if(!n)return;const [k,id]=n.dataset.dnd.split('|');cdtDrag={k,id};try{ev.dataTransfer.setData('text/plain',id);ev.dataTransfer.effectAllowed='move'}catch(e){}n.classList.add('cdt-drag')});
+document.addEventListener('dragend',ev=>{cdtDrag=null;document.querySelectorAll('.cdt-drag,.cdt-over').forEach(e=>e.classList.remove('cdt-drag','cdt-over'))});
+const cdtDropVal=(d,el)=>{if(!d||!el)return '';const [k,v]=[el.dataset.drop.slice(0,1),el.dataset.drop.slice(2)];
+  if(d.k==='item'&&k==='g')return 'g:'+v;if(d.k==='main'&&k==='s')return 's:'+v;if((d.k==='sub'||d.k==='main')&&k==='m'&&v!==d.id)return 'p:'+v;if(d.k==='sub'&&k==='s'&&!v)return 'main';return ''};
+document.addEventListener('dragover',ev=>{if(!cdtDrag)return;const el=ev.target.closest&&ev.target.closest('[data-drop]');document.querySelectorAll('.cdt-over').forEach(e=>e!==el&&e.classList.remove('cdt-over'));if(el&&cdtDropVal(cdtDrag,el)){ev.preventDefault();el.classList.add('cdt-over')}});
+document.addEventListener('drop',ev=>{if(!cdtDrag)return;const el=ev.target.closest&&ev.target.closest('[data-drop]'),v=cdtDropVal(cdtDrag,el);if(!v)return;ev.preventDefault();const d=cdtDrag;cdtDrag=null;cdtMove(d,v)});
 function cdListTab(){
-  if(!cdOn())return `<div class="card"><p class="note">الأكواد لم تُعمل بعد.${APPU.owner?' راجع الأسماء المتكررة والبنود العامة والاختصارات وربط الخامات، ثم اضغط «عمل الأكواد».':' المدير يعملها من نفس الصفحة.'}</p></div>`;
+  if(!cdOn())return '';
   const G=cdGroups().map(g=>({g,c:cdG(g.name)})).filter(x=>x.c).sort((a,b)=>a.c.localeCompare(b.c)),its=CD.rows.filter(r=>r.kind==='I'),mats=CD.rows.filter(r=>r.kind==='M'),q=arNorm(CDP.q||''),hit=r=>!q||arNorm(r.name).includes(q)||String(r.code).toLowerCase().includes(q);
   const tree=[...G.map(x=>({code:x.c,name:x.g.name})),...(its.some(r=>r.parent==='GN')&&!G.some(x=>x.c==='GN')?[{code:'GN',name:'من غير بند عام'}]:[])].map(gr=>{const L=its.filter(r=>r.parent===gr.code).sort((a,b)=>a.code.localeCompare(b.code));
     const rows=L.map(r=>{const ms=mats.filter(m=>m.parent===r.code).sort((a,b)=>a.code.localeCompare(b.code));return [`<div class="r l1">${cdTag(r.code)}<span class="grow">${esc(r.name)}</span>${typeof itTag==='function'?itTag(itType(r.name)):''}</div>`,...ms.map(m=>[`<div class="r l2">${cdTag(m.code)}<span class="grow">${esc(m.name)}</span><span class="m">خامة</span></div>`,...mats.filter(s=>s.parent===m.code).sort((a,b)=>a.code.localeCompare(b.code)).map(s=>`<div class="r l3">${cdTag(s.code)}<span class="grow">${esc(s.name)}</span></div>`)].flat())].flat()}).flat();
@@ -4592,8 +4674,7 @@ function cdListTab(){
     return `<div class="r l0">${cdTag(gr.code)}<span class="grow">${esc(gr.name)}</span><span class="m">بند عام</span></div>${rows.join('')}`}).join('');
   const cons=CD.rows.filter(r=>r.kind==='C'||r.kind==='S').filter(hit).sort((a,b)=>a.code.localeCompare(b.code));
   return `<div class="card"><div class="row" style="gap:8px"><input id="cdQ" placeholder="بحث بالاسم أو الكود، مثال: PL-01" value="${esc(CDP.q||'')}" style="flex:1" autocomplete="off"><button class="ghost" type="button" data-cd="xlsx">Excel</button></div>
-   <div class="sec-h" style="margin-top:10px">البنود والخامات</div><div class="tree">${tree||'<p class="note">لا توجد نتائج.</p>'}</div>
-   <div class="sec-h" style="margin-top:12px">المقاولون والموردون</div><div class="tbl-wrap"><table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th>${APPU.owner?'<th></th>':''}</tr></thead><tbody>${cons.map(r=>`<tr><td>${cdTag(r.code)}</td><td class="tl">${esc(r.name)}</td><td>${r.kind==='C'?'مقاول':'مورد'}</td>${APPU.owner?`<td><button class="ghost" type="button" data-cd="setcode" data-kind="${r.kind}" data-key="${esc(r.key)}" data-code="${esc(r.code)}">تعديل الكود</button></td>`:''}</tr>`).join('')||'<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
+   <div class="sec-h" style="margin-top:12px">أكواد المقاولين والموردين</div><div class="tbl-wrap"><table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th>${APPU.owner?'<th></th>':''}</tr></thead><tbody>${cons.map(r=>`<tr><td>${cdTag(r.code)}</td><td class="tl">${esc(r.name)}</td><td>${r.kind==='C'?'مقاول':'مورد'}</td>${APPU.owner?`<td><button class="ghost" type="button" data-cd="setcode" data-kind="${r.kind}" data-key="${esc(r.key)}" data-code="${esc(r.code)}">تعديل الكود</button></td>`:''}</tr>`).join('')||'<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
    ${APPU.owner?'<p class="note">الأكواد ثابتة. تعديل الكود يدويًا للمدير فقط، ويجب ألا يتكرر.</p>':''}</div>`;
 }
 function renderCodes(){
@@ -4611,7 +4692,7 @@ function renderCodes(){
     <div class="card"><p class="note" style="margin-top:0">أسماء متشابهة (همزة، تاء مربوطة، مسافات، أو مكتوبة بشكلين). اختر الاسم الصحيح وادمج، أو علّمها «مختلفة». ينقل الدمج كل الحركات (مصروفات، فواتير مخزن، مستخلصات، عهد) إلى الاسم الصحيح، ولا يمكن التراجع عنه (توجد نسخة احتياطية على السيرفر). الأسماء التي تختلف أرقامها (مقاسات، أوزان) لا تظهر كمتشابهة.</p>
     ${G.length?G.map((g,i)=>cdDupCard(tab,g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد أسماء متكررة.</p>'}</div>`}
   else if(tab==='mat'){const G=cdMatGroups();body=cdOrphCard()+`<div class="card"><p class="note" style="margin-top:0">خامات مكتوبة بشكلين في كتالوج المخزن. ينقل الدمج كل التوريدات والمرتجعات والجرد إلى الخامة الصحيحة. الخامات التي تختلف أرقامها (مقاسات، أوزان) لا تظهر كمتشابهة.</p>${G.length?G.map((g,i)=>cdMatCard(g,i)).join(''):'<p class="pill-ok" style="display:inline-block">لا توجد خامات متكررة.</p>'}</div>`}
-  else if(tab==='grp')body=cdGrpTab();else if(tab==='link')body=cdLinkTab();else body=cdListTab();
+  else if(tab==='grp')body=cdGrpTab();else if(tab==='link')body=cdLinkTab();else body=cdTreeTab()+(cdOn()?cdListTab():'');
   const left=T.filter(t=>t[0]!=='list'&&t[2]).reduce((a,t)=>a+t[2],0);
   $('#pane').innerHTML=`<div class="pane-h"><h2>الأسماء والأكواد</h2></div>
   ${tabsBar}
