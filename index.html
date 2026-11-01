@@ -469,7 +469,7 @@ table.reg-t td.rp,table.reg-t th.rp{width:1%;white-space:nowrap;font-size:13px}
     <h1 class="sr-only">حسابات المواقع</h1>
     <div class="hdr-acts" id="hdrActs" hidden>
       <button type="button" id="homeBtn" data-home aria-label="الصفحة الرئيسية"><svg class="ui-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg><span class="home-l"> الرئيسية</span></button>
-      <button type="button" id="backBtn" data-navback hidden aria-label="رجوع للشاشة السابقة"><span aria-hidden="true">→</span> رجوع</button>
+      <button type="button" id="backBtn" data-navback hidden aria-label="رجوع للشاشة السابقة" title="رجوع"><span aria-hidden="true">→</span></button>
       <div class="pop-wrap"><button type="button" id="menuBtn" data-pop="toolMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">☰</span> القائمة</button><div class="pop pop-tools" id="toolMenu" role="menu" hidden></div></div>
       <div class="pop-wrap"><button type="button" class="primary" id="addBtn" data-pop="addMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">+</span> إضافة</button><div class="pop" id="addMenu" role="menu" hidden></div></div>
       <button type="button" id="setBtn" class="set-btn" data-site="__settings" title="الإعدادات" aria-label="الإعدادات"><span aria-hidden="true">⚙</span><span class="set-l"> الإعدادات</span></button>
@@ -4052,7 +4052,7 @@ function navGo(t){
     const h=document.querySelector('#pane .hl');if(h)h.scrollIntoView({block:'center'});else window.scrollTo({top:0});
   },60);
 }
-function backBar(){if(!S.back||S.back.at!==navAt())return '';return `<div class="backbar"><button type="button" class="ghost" data-backgo>→ رجوع</button><span>${esc(S.back.label)}</span></div>`}
+function backBar(){if(!S.back||S.back.at!==navAt())return '';return `<div class="backbar"><button type="button" class="ghost" data-backgo aria-label="رجوع" title="رجوع">→</button><span>${esc(S.back.label)}</span></div>`}
 document.addEventListener('click',ev=>{
   const n=ev.target.closest('[data-nav]');if(n){ev.preventDefault();let t=null;try{t=JSON.parse(n.dataset.nav)}catch(e){}navGo(t);return}
   if(ev.target.closest('[data-backgo]')){const b=S.back;S.back=null;navClear();if(b){S.sel=b.from.sel;if(b.from.tab!=null)CT.tab=b.from.tab}if(typeof SO!=='undefined'&&SO.form)SO.form=null;S.justSaved=true;render();window.scrollTo({top:0});return}
@@ -6503,7 +6503,7 @@ function setFold(){
 }
 function renderSettings(){
   const tools=`<div class="card set-tools"><div class="sec-h">أدوات</div><div class="row">${canBanks()||bankList().length?`<button type="button" class="ghost" data-site="__banks">الحسابات البنكية${bankList().length?' ('+bankList().length+')':''}</button>`:''}<button type="button" class="ghost" data-site="__trash">سلة المهملات${(S.trash||[]).length?' ('+S.trash.length+')':''}</button></div></div>`;
-  $('#pane').innerHTML=`<div class="pane-h"><h2>الإعدادات</h2></div>`+tools+(APP&&S.isManager&&typeof svcCard==='function'?svcCard(true):'')+backupHTML()+storageCard()+securityCard()+logCard();
+  $('#pane').innerHTML=`<div class="pane-h"><h2>الإعدادات</h2></div>`+tools+backupHTML()+storageCard()+securityCard()+logCard();
   bindOverview();setFold();
 }
 function bindOverview(){
@@ -7148,27 +7148,29 @@ function igCard(){
   for(const x of items){const g=igOf(x.name,pf);if(g){const k=regNormK(g);if(!by.has(k))by.set(k,{name:g,items:[]});by.get(k).items.push(x.name)}else free.push(x.name)}
   const mineK=new Set(igGroups(pf).map(g=>regNormK(g.name)));
   const sel=(it,cur)=>`<select data-igitem="${esc(it)}" aria-label="البند العام لـ${esc(it)}"><option value="">— غير تابع لبند عام —</option>${[...by.values()].map(g=>`<option value="${esc(g.name)}" ${g.name===cur?'selected':''}>تحت: ${esc(g.name)}</option>`).join('')}</select>`;
+  const tsel=it=>{const t=itType(it)||'';return `<select data-ittypeedit="${esc(it)}" aria-label="تصنيف ${esc(it)}"><option value="">— بلا تصنيف —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}" ${t===v?'selected':''}>${l}</option>`).join('')}</select>`};
   const m=S.igMsg;S.igMsg=null;
-  const grp=g=>{const open=S.igOpen.has(regNormK(g.name));return `<div class="g-card"><div class="gh" data-igtog="${esc(regNormK(g.name))}">${open?'▾':'◂'} ${esc(g.name)} <span class="cnt">(بند عام · ${g.items.length} ${g.items.length===1||g.items.length>10?'بند':'بنود'})${!mineK.has(regNormK(g.name))&&pf?' · من المدير':''}</span>${mineK.has(regNormK(g.name))?`<span class="acts"><button type="button" class="ghost" data-igren="${esc(g.name)}">تعديل الاسم</button>${g.items.length?'':`<button type="button" class="ghost" data-igdel="${esc(g.name)}">حذف</button>`}</span>`:''}</div>
-    ${open?igByType(g.items).map(([t,L])=>`${t!=null?`<div class="gi gt">${t?itTag(t):'<span class="note">من دون نوع</span>'}</div>`:''}${L.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,g.name)}</div>`).join('')}`).join('')||'<div class="gi"><span class="note">لا توجد بنود تابعة له حتى الآن. اختر البند العام أمام أي بند من «بنود غير تابعة لبند عام».</span></div>':''}</div>`};
+  const grp=g=>{const open=S.igOpen.has(regNormK(g.name));return `<div class="g-card"><div class="gh" data-igtog="${esc(regNormK(g.name))}">${open?'▾':'◂'} ${esc(g.name)} <span class="cnt">(بند عام · ${g.items.length} ${g.items.length===1||g.items.length>10?'بند':'بنود'})${!mineK.has(regNormK(g.name))&&pf?' · من المدير':''}</span>${mineK.has(regNormK(g.name))?`<span class="acts"><button type="button" class="ghost" data-igren="${esc(g.name)}">تعديل الاسم</button><button type="button" class="ghost" data-igdel="${esc(g.name)}">حذف</button></span>`:''}</div>
+    ${open?igByType(g.items).map(([t,L])=>`${t!=null?`<div class="gi gt">${t?itTag(t):'<span class="note">من دون نوع</span>'}</div>`:''}${L.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${tsel(it)}${sel(it,g.name)}</div>`).join('')}`).join('')||'<div class="gi"><span class="note">لا توجد بنود تابعة له حتى الآن. اختر البند العام أمام أي بند من «بنود غير تابعة لبند عام».</span></div>':''}</div>`};
   const fo=S.igOpen.has('__free');
   const sug=igSvcSuggest(pf);
-  return `<div class="card" id="igCard"><div class="sec-h">البنود العامة</div>
+  return `${APP&&S.isManager&&typeof svcCard==='function'?svcCard(false):''}<div class="card" id="igCard"><div class="sec-h">البنود العامة</div>
   ${sug.length?`<div class="warn-box" style="margin-bottom:8px"><b>${sug.length} ${sug.length===1?'بند خدمات ومصاريف':'بنود خدمات ومصاريف'} من دون بند عام.</b> اقتراح التطبيق: ${sug.map(x=>esc(x.name)+' ← '+esc(x.g)).join('، ')}. <button type="button" class="primary" data-igsvc>طبّق الاقتراح</button><br><small>المصاريف التي تخص شغلانة (مثل نقل مواسير السباكة) تحت بندها العام، والباقي تحت «${IG_GEN}» (إيجار مكتب الموقع، إكراميات، مياه وكهرباء، نقل عام، حراسة…).</small></div>`:''}
   <p class="note">البند العام يجمع عدة بنود (مثال: «أعمال السباكة» = مصنعيات + توريدات أعمال السباكة) ويظهر بإجماليه في الكشوف. البند الواحد يتبع بندًا عامًا واحدًا فقط.${pf?' في مواقعك يُطبَّق تقسيمك، وإذا لم يكن البند مقسّمًا عندك يُطبَّق تقسيم المدير.':''}</p>
   <div class="row" style="gap:8px;flex-wrap:wrap"><input id="ig_new" maxlength="80" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:220px"><button type="button" class="primary" data-igadd>إضافة بند عام</button></div>
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
   ${[...by.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(grp).join('')}
-  <div class="g-card g-free"><div class="gh" data-igtog="__free">${fo?'▾':'◂'} بنود غير تابعة لبند عام <span class="cnt">(${free.length})</span></div>${fo?igByType(free).map(([t,L])=>`${t!=null?`<div class="gi gt">${t?itTag(t):'<span class="note">من دون نوع</span>'}</div>`:''}${L.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${sel(it,'')}</div>`).join('')}`).join('')||'<div class="gi"><span class="note">كل البنود تابعة لبنود عامة.</span></div>':''}</div></div>`;
+  <div class="g-card g-free"><div class="gh" data-igtog="__free">${fo?'▾':'◂'} بنود غير تابعة لبند عام <span class="cnt">(${free.length})</span></div>${fo?igByType(free).map(([t,L])=>`${t!=null?`<div class="gi gt">${t?itTag(t):'<span class="note">من دون نوع</span>'}</div>`:''}${L.map(it=>`<div class="gi"><span class="nm">${esc(it)}</span>${tsel(it)}${sel(it,'')}</div>`).join('')}`).join('')||'<div class="gi"><span class="note">كل البنود تابعة لبنود عامة.</span></div>':''}</div></div>`;
 }
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-igtog]');if(t&&!ev.target.closest('button,select,input')){const k=t.dataset.igtog;if(S.igOpen.has(k))S.igOpen.delete(k);else S.igOpen.add(k);render();return}
   if(ev.target.closest('[data-igsvc]')){const L=igSvcSuggest(igMyPf());for(const x of L)igAssign(x.name,x.g);S.igMsg={ok:1,t:'وُضع '+L.length+' '+(L.length===1?'بند':'بنود')+' تحت بنودها العامة.'};if(typeof CDP!=='undefined')CDP.msg={ok:1,at:Date.now(),t:S.igMsg.t};for(const x of L)S.igOpen.add(regNormK(x.g));render();return}
   if(ev.target.closest('[data-igadd]')){const n=(($('#ig_new')||{}).value||'').trim(),e=igCreate(n);S.igMsg=e?{t:e}:{ok:1,t:'أُضيف البند العام «'+n+'». اختره أمام البنود التابعة له.'};if(!e){S.igOpen.add(regNormK(n));S.igOpen.add('__free')}render();return}
   const r=ev.target.closest('[data-igren]');if(r){const old=r.dataset.igren,g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(old));if(!g)return;const n=(prompt('الاسم الجديد للبند العام',old)||'').trim();if(!n||n===old)return;if(igGroups(igMyPf()).some(x=>x.id!==g.id&&regNormK(x.name)===regNormK(n))){S.igMsg={t:'هذا الاسم موجود.'};render();return}igSave(g,{name:n});S.igMsg={ok:1,t:'تغيّر الاسم.'};render();return}
-  const d=ev.target.closest('[data-igdel]');if(d){const g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(d.dataset.igdel));if(g){igSave(g,{hidden:true});S.igMsg={ok:1,t:'حُذف البند العام.'};render()}return}
+  const d=ev.target.closest('[data-igdel]');if(d){const g=igGroups(igMyPf()).find(x=>regNormK(x.name)===regNormK(d.dataset.igdel));if(g){if((g.items||[]).length&&!confirm('حذف «'+g.name+'» هيخلّي بنوده ('+g.items.length+') من غير بند عام. تكمل؟'))return;igSave(g,{hidden:true});S.igMsg={ok:1,t:'حُذف البند العام'+((g.items||[]).length?'، وبنوده بقت من غير بند عام.':'.')};render()}return}
 });
-document.addEventListener('change',ev=>{const s=ev.target.closest&&ev.target.closest('[data-igitem]');if(!s)return;const it=s.dataset.igitem,v=s.value;igAssign(it,v);S.igMsg={ok:1,t:v?'«'+it+'» أصبح تابعًا لـ«'+v+'».':'«'+it+'» أصبح غير تابع لبند عام.'};if(v)S.igOpen.add(regNormK(v));render()});
+document.addEventListener('change',ev=>{const te=ev.target.closest&&ev.target.closest('[data-ittypeedit]');if(te){const it=te.dataset.ittypeedit,t=te.value;if(!t){S.igMsg={t:'اختر تصنيفًا.'};render();return}const ok=itSetType(it,t);S.igMsg=ok?{ok:1,t:'«'+it+'» أصبح: '+itTypeLbl(t)+'.'}:{t:'لا يمكنك تعديل تصنيف «'+it+'».'};render();return}
+  const s=ev.target.closest&&ev.target.closest('[data-igitem]');if(!s)return;const it=s.dataset.igitem,v=s.value;igAssign(it,v);S.igMsg={ok:1,t:v?'«'+it+'» أصبح تابعًا لـ«'+v+'».':'«'+it+'» أصبح غير تابع لبند عام.'};if(v)S.igOpen.add(regNormK(v));render()});
 function renderRegister(col){
   if(APP&&col==='contractors'&&typeof SO!=='undefined'&&!SO.loaded&&!SO._ld&&typeof soLoad==='function')soLoad().then(()=>{if(S.sel==='__contractors')render()}).catch(()=>{});
   const R=REG[col];
@@ -7931,7 +7933,10 @@ async function ocPut(row){
   try{const {error}=await netTO(SB.from('owner_docs').upsert(r),12000);
     if(error){flash(/approved/.test(error.message||'')?'المستخلص معتمد، وفتح الاعتماد للمدير فقط.':/owner_docs|relation|does not exist|schema cache/i.test(error.message||'')?'يجب تشغيل ملف التحديث (SQL) الخاص بمستخلص المالك أولًا.':'تعذّر الحفظ: '+String(error.message||'').slice(0,140),1);return false}}
   catch(e){flash('تعذّر الحفظ. تأكد من الاتصال بالإنترنت.',1);return false}
-  const i=OC.rows.findIndex(x=>x.id===r.id);if(i>=0)OC.rows[i]={...OC.rows[i],...r};else OC.rows.push(r);appLs(LS_OC,{rows:OC.rows,at:Date.now()});return true}
+  const i=OC.rows.findIndex(x=>x.id===r.id);if(i>=0)OC.rows[i]={...OC.rows[i],...r};else OC.rows.push(r);appLs(LS_OC,{rows:OC.rows,at:Date.now()});
+  /* أي مستخلص (مسودة أو معتمد) بيقفل الفواتير والمصروفات اللي فيه فورًا */
+  if(r.kind==='cert'){const st=S.sites.find(x=>x.id===r.site_id);if(st&&typeof ocLockSync==='function')ocLockSync(st)}
+  return true}
 async function ocDel(id){
   if(!SB||!navigator.onLine){flash('الحذف يحتاج إلى اتصال بالإنترنت.',1);return false}
   try{const {error}=await netTO(SB.from('owner_docs').delete().eq('id',id),12000);if(error){flash('تعذّر الحذف: '+String(error.message||'').slice(0,140),1);return false}}catch(e){flash('تعذّر الحذف.',1);return false}
@@ -7945,6 +7950,8 @@ function ocDefTpl(){return {name:'نموذج نسبة إشراف',head:['الم�
 const ocSrc=(T,sec,part)=>{const v=(sec&&sec.parts&&sec.parts[part])||(T&&T.data.parts&&T.data.parts[part])||ocDefTpl().parts[part];return OC_SRCOK[part].includes(v)?v:'none'};
 /* ---------- الحركات (فواتير المخزن، المرتجعات، المصروفات) ---------- */
 function ocTypeOf(it){const t=(typeof itType==='function'&&itType(it))||(typeof itGuess==='function'&&itGuess(it))||'';return t==='sup'||t==='lab'||t==='srv'?t:(/توريد/.test(it||'')?'sup':'srv')}
+/* وصف السطر للطباعة والإكسل: اسم المورد اللي في آخر الوصف بيتشال من بند التوريدات */
+const ocPrDesc=l=>{const d=String(l.desc||'');if(l.part!=='sup')return d;const i=d.lastIndexOf(' — ');return i>0?d.slice(0,i):d};
 function ocInvDesc(it,no,date,inv,sup){return (it&&no?'فاتورة '+it+' رقم ('+no+')':'فاتورة'+(inv?' رقم '+inv:''))+' بتاريخ ('+ocDmy(date)+')'+(sup?' — '+sup:'')}
 function ocMoves(site,P,T){
   const sid=site.id,pf=site._p||'',co=ocCoSet(sid),out=[],secs=(P&&P.data.secs)||[];
@@ -8208,7 +8215,7 @@ function ocDocBody(c){
   for(const x of K.secs){if(!x.ls.length)continue;const codes=ocCodes(x);
     body+=`<h3>${x.i} — ${esc(x.s.title||x.s.g||'')}</h3><table><thead><tr>${C.filter(([k])=>!['prev','cur','tot'].includes(k)||k===['prev','cur','tot'].find(on)).map(([k,l])=>['prev','cur','tot'].includes(k)?`<th colspan="${qn}">الكميات</th>`:`<th rowspan="2">${l==='الإجمالي'?'الإجمالي':l}</th>`).join('')}</tr><tr>${['prev','cur','tot'].filter(on).map(k=>`<th>${{prev:'سابق',cur:'حالي',tot:'الإجمالي'}[k]}</th>`).join('')}</tr></thead><tbody>`;
     for(const [p,pl] of OC_PARTS){const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length)continue;body+=`<tr class="grp-h"><td colspan="${C.length}">${pl}</td></tr>`;
-      for(const l of ls){const v={no:codes[l.id],desc:esc(l.desc||''),unit:esc(l.unit||''),cq:l.cq===''||l.cq==null?'-':m(ocNum(l.cq)),rate:m(ocNum(l.rate)),prev:m(ocNum(l.prevQ)),cur:m(r2(ocNum(l.totQ)-ocNum(l.prevQ))),tot:m(ocNum(l.totQ)),pct:m(ocPct(l))+'%',val:m(ocV(l)),note:esc([l.note,l.numNote].filter(Boolean).join(' — '))};
+      for(const l of ls){const v={no:codes[l.id],desc:esc(ocPrDesc(l)),unit:esc(l.unit||''),cq:l.cq===''||l.cq==null?'-':m(ocNum(l.cq)),rate:m(ocNum(l.rate)),prev:m(ocNum(l.prevQ)),cur:m(r2(ocNum(l.totQ)-ocNum(l.prevQ))),tot:m(ocNum(l.totQ)),pct:m(ocPct(l))+'%',val:m(ocV(l)),note:esc([l.note,l.numNote].filter(Boolean).join(' — '))};
         body+=`<tr>${C.map(([k])=>`<td class="${k==='desc'||k==='note'||k==='unit'?'tl':'n'}${k==='val'?' b':''}">${v[k]}</td>`).join('')}</tr>`}}
     body+=`<tr class="sub-t"><td colspan="${Math.max(1,C.findIndex(([k])=>k==='val'))}">إجمالي البند العام — ${esc(x.s.title||x.s.g||'')}</td>${on('val')?`<td class="n b">${m(x.tot)}</td>`:''}${C.slice(C.findIndex(([k])=>k==='val')+1).map(()=>'<td></td>').join('')}</tr></tbody></table>`}
   return {hd:ocHeadHTML(c,P,T,'مستخلص رقم ('+c.data.no+')'),title:'مستخلص رقم ('+c.data.no+')'+(site.name?' — '+site.name:''),sub:'',body,signs:(T&&T.data.sigs&&T.data.sigs.length)?T.data.sigs:['المهندس','مدير المشروع','الاستشاري','المالك'],land:true};
@@ -8247,7 +8254,7 @@ async function ocExcel(c){
     put(0,x.i+' — '+(x.s.title||x.s.g||''),6);merges.push('A'+r+':'+L(N-1)+r);r++;hdr();const r0=r;
     for(const [p,pl] of OC_PARTS){const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length)continue;put(0,pl,6);merges.push('A'+r+':'+L(N-1)+r);r++;
       for(const l of ls){const R_=r,cl=k=>ci(k)>=0?L(ci(k))+R_:null;
-        const v={no:codes[l.id],desc:l.desc||'',unit:l.unit||'',cq:l.cq===''||l.cq==null?'-':ocNum(l.cq),rate:ocNum(l.rate),prev:ocNum(l.prevQ),tot:ocNum(l.totQ),pct:ocPct(l)/100,note:[l.note,l.numNote].filter(Boolean).join(' — ')};
+        const v={no:codes[l.id],desc:ocPrDesc(l),unit:l.unit||'',cq:l.cq===''||l.cq==null?'-':ocNum(l.cq),rate:ocNum(l.rate),prev:ocNum(l.prevQ),tot:ocNum(l.totQ),pct:ocPct(l)/100,note:[l.note,l.numNote].filter(Boolean).join(' — ')};
         for(const [k] of C){if(k==='cur'){put(ci(k),r2(v.tot-v.prev),3,cl('tot')&&cl('prev')?cl('tot')+'-'+cl('prev'):null);continue}
           if(k==='val'){const f=[cl('tot')||String(v.tot),cl('rate')||String(v.rate),cl('pct')||String(v.pct)].join('*');put(ci(k),ocV(l),3,f);continue}
           put(ci(k),v[k],k==='desc'||k==='note'||k==='unit'?7:k==='pct'?8:3)}
@@ -8702,7 +8709,7 @@ function render(){
   if(S.pflash&&S.pflash.until>Date.now())$('#pane').insertAdjacentHTML('afterbegin',`<div class="xbar ok"><span>${esc(S.pflash.text)}</span></div>`);
   if(S.viewer)$('#pane').insertAdjacentHTML('beforeend',viewerHTML());
   ckApply();
-  navTrack();{const bb=$('#backBtn');if(bb)bb.hidden=!NAV.stack.length}if(NAV.stack.length&&document.body.classList.contains('eng-mode'))$('#pane').insertAdjacentHTML('afterbegin','<div class="nav-back"><button type="button" class="ghost" data-navback aria-label="رجوع للشاشة السابقة">→ رجوع</button></div>');
+  navTrack();{const bb=$('#backBtn');if(bb)bb.hidden=!NAV.stack.length}if(NAV.stack.length&&document.body.classList.contains('eng-mode'))$('#pane').insertAdjacentHTML('afterbegin','<div class="nav-back"><button type="button" class="ghost" data-navback aria-label="رجوع للشاشة السابقة" title="رجوع">→</button></div>');
   for(const id in keep){const el=document.getElementById(id);if(el){el.value=keep[id];if(id==='r_type'&&el.onchange)el.onchange()}}
   dueToggle('e');dueToggle('j');
   for(const p of ['en','ca']){const c=document.getElementById(p+'_con'),w=document.getElementById(p+'_conw');if(c&&w)w.hidden=c.value!=='__oth'}
