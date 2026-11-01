@@ -4675,7 +4675,7 @@ async function cdtMove(mv,v){
   CDP.mv=null;cdtMsg(t+(oc?' الكود '+oc+' يبقى كما هو'+(APPU.owner?' (يمكنك تعديله من زر الكود).':'.'):''),true);
 }
 function cdtMsg(t,ok){CDP.msg={ok:ok!==false,t,at:Date.now()};S.justSaved=true;render()}
-function cdTreeTab(){
+function cdTreeTab(hub){
   if(typeof SO==='undefined'||!SO.d)return '<div class="card"><p class="note">جاري تحميل المخزن…</p></div>';
   const D=cdtData(),q=arNorm(CDP.tq||''),hit=s=>!q||arNorm(s).includes(q)||(cdOn()&&String(s).toLowerCase().includes(q)),own=APPU.owner&&cdOn();
   const code=(k,key,c)=>c?`${own?`<button type="button" class="linkish cdt-code" data-cd="setcode" data-kind="${k}" data-key="${esc(key)}" data-code="${esc(c)}" title="تعديل الكود">${cdTag(c)}</button>`:cdTag(c)}`:'';
@@ -4683,13 +4683,16 @@ function cdTreeTab(){
   const mvBox=(k,id)=>{if(!CDP.mv||CDP.mv.k!==k||CDP.mv.id!==id)return '';const T=cdtTargets(D,CDP.mv),fq=arNorm(CDP.mvq||''),L=T.filter(x=>!fq||arNorm(x.t).includes(fq)).slice(0,40);
     return `<div class="cdt-box"><b>نقل «${esc(k==='item'?id:soLabel(id))}» إلى:</b><input id="cdtMvQ" placeholder="اكتب جزءًا من الاسم…" value="${esc(CDP.mvq||'')}" autocomplete="off"><div class="cdt-opts">${L.map(x=>`<button type="button" class="cdt-o" data-cdtto="${esc(x.v)}">${esc(x.t)}</button>`).join('')||'<span class="note">لا توجد نتائج.</span>'}</div><button type="button" class="ghost" data-cdtx>إلغاء</button></div>`};
   const tog=k=>q||CDP.topen.has(k);
+  const hb=(k,id)=>hub?`<button type="button" class="ghost cdt-mv" data-ithub="${k}" data-id="${esc(id)}" title="تعديل / دمج / حذف" aria-label="تعديل أو دمج أو حذف">⋯</button>`:'';
+  const hx=(k,id)=>hub?itHubBox(D,k,id):'';
+  const gb=n=>hub&&igGroups(igMyPf()).some(x=>regNormK(x.name)===regNormK(n))?`<button type="button" class="ghost cdt-mv" data-igren="${esc(n)}">تعديل الاسم</button><button type="button" class="ghost cdt-mv" data-igdel="${esc(n)}">حذف</button>`:'';
   const matHit=m=>hit(m.name)||D.subsOf(m.id).some(s=>hit(s.name));
-  const sub=s=>!hit(s.name)&&!q?'':`<div class="cdt-n l3" draggable="true" data-dnd="sub|${esc(s.id)}">${code('M',s.id,cdM(s.id))}<span class="grow">${esc(s.name)}</span><small class="note">${esc(s.unit||'')}</small>${cdtCanMat()?mvBtn('sub',s.id):''}</div>${mvBox('sub',s.id)}`;
-  const mat=(m,lvl)=>{const S2=D.subsOf(m.id),o=tog('m:'+m.id);return `<div class="cdt-n ${lvl}" draggable="true" data-dnd="main|${esc(m.id)}" data-drop="m|${esc(m.id)}">${S2.length?`<button type="button" class="cdt-t" data-cdttog="m:${esc(m.id)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('M',m.id,cdM(m.id))}<span class="grow">${esc(m.name)} <small class="note">(خامة${S2.length?' · '+S2.length+' فرعية':m.unit?' · '+esc(m.unit):''})</small></span>${cdtCanMat()?mvBtn('main',m.id):''}</div>${mvBox('main',m.id)}${o?S2.map(s=>sub(s)).join(''):''}`};
+  const sub=s=>!hit(s.name)&&!q?'':`<div class="cdt-n l3" draggable="true" data-dnd="sub|${esc(s.id)}">${code('M',s.id,cdM(s.id))}<span class="grow">${esc(s.name)}</span><small class="note">${esc(s.unit||'')}</small>${cdtCanMat()?mvBtn('sub',s.id):''}${hb('sub',s.id)}</div>${mvBox('sub',s.id)}${hx('sub',s.id)}`;
+  const mat=(m,lvl)=>{const S2=D.subsOf(m.id),o=tog('m:'+m.id);return `<div class="cdt-n ${lvl}" draggable="true" data-dnd="main|${esc(m.id)}" data-drop="m|${esc(m.id)}">${S2.length?`<button type="button" class="cdt-t" data-cdttog="m:${esc(m.id)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('M',m.id,cdM(m.id))}<span class="grow">${esc(m.name)} <small class="note">(خامة${S2.length?' · '+S2.length+' فرعية':m.unit?' · '+esc(m.unit):''})</small></span>${cdtCanMat()?mvBtn('main',m.id):''}${hb('main',m.id)}</div>${mvBox('main',m.id)}${hx('main',m.id)}${o?S2.map(s=>sub(s)).join(''):''}`};
   const item=n=>{const t=itType(n),M=D.matsOf(n),o=tog('i:'+n),show=hit(n)||M.some(matHit);if(!show)return '';
-    return `<div class="cdt-n l1" draggable="true" data-dnd="item|${esc(n)}"${itNeedSup(n)||!t&&/توريد/.test(n)?` data-drop="s|${esc(n)}"`:''}>${M.length?`<button type="button" class="cdt-t" data-cdttog="i:${esc(n)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('I',arNorm(n),cdI(n))}<span class="grow"><b>${esc(n)}</b> ${itTag(t)||'<small class="note">من دون نوع</small>'}${M.length?` <small class="note">(${M.length} خامة)</small>`:''}</span>${mvBtn('item',n)}</div>${mvBox('item',n)}${o?M.map(m=>mat(m,'l2')).join(''):''}`};
+    return `<div class="cdt-n l1" draggable="true" data-dnd="item|${esc(n)}"${itNeedSup(n)||!t&&/توريد/.test(n)?` data-drop="s|${esc(n)}"`:''}>${M.length?`<button type="button" class="cdt-t" data-cdttog="i:${esc(n)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('I',arNorm(n),cdI(n))}<span class="grow"><b>${esc(n)}</b> ${itTag(t)||'<small class="note">من دون نوع</small>'}${M.length?` <small class="note">(${M.length} خامة)</small>`:''}</span>${mvBtn('item',n)}${hb('item',n)}</div>${mvBox('item',n)}${hx('item',n)}${o?M.map(m=>mat(m,'l2')).join(''):''}`};
   const group=g=>{const body=g.items.map(item).join(''),o=tog('g:'+g.name);if(q&&!body&&!hit(g.name))return '';
-    return `<div class="cdt-n l0" data-drop="g|${esc(g.name)}"><button type="button" class="cdt-t" data-cdttog="g:${esc(g.name)}">${o?'▾':'◂'}</button>${code('G',arNorm(g.name),cdG(g.name))}<span class="grow">${esc(g.name)} <small>(بند عام · ${g.items.length})</small></span></div>${o?body||'<p class="note" style="margin:4px 30px">لا توجد بنود تحته.</p>':''}`};
+    return `<div class="cdt-n l0" data-drop="g|${esc(g.name)}"><button type="button" class="cdt-t" data-cdttog="g:${esc(g.name)}">${o?'▾':'◂'}</button>${code('G',arNorm(g.name),cdG(g.name))}<span class="grow">${esc(g.name)} <small>(بند عام · ${g.items.length})</small></span>${gb(g.name)}</div>${o?body||'<p class="note" style="margin:4px 30px">لا توجد بنود تحته.</p>':''}`};
   const sug=D.loose.map(m=>({m,s:cdMatSuggest(m)})).filter(x=>x.s);
   const freeB=D.free.map(item).join(''),looseB=D.loose.filter(m=>!q||matHit(m)).map(m=>mat(m,'l1')+(cdMatSuggest(m)?`<small class="note cdt-sg">الاقتراح: ← ${esc(cdMatSuggest(m))}</small>`:'')).join('');
   return `<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px"><input id="cdNewG" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:200px"><button class="primary" type="button" data-cd="newg">+ بند عام</button></div><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><input id="cdtQ" placeholder="بحث بالاسم${cdOn()?' أو الكود':''}، مثال: طوب" value="${esc(CDP.tq||'')}" style="flex:1;min-width:200px" autocomplete="off"><span class="note">اضغط «نقل» أو اسحب ⋮ على الكمبيوتر وأفلت على المكان الجديد.</span></div></div>
@@ -4700,6 +4703,48 @@ function cdTreeTab(){
   <div class="card cdt"><div class="sec-h">الشجرة</div>${D.groups.map(group).join('')||'<p class="note">لا توجد بنود عامة. أنشئها من صفحة «البنود» أو من تبويب «البنود العامة والاختصارات».</p>'}
   <p class="note" style="margin-top:8px">البند العام ← البند (بنوعه) ← خامات المخزن الرئيسية تحت بنود التوريدات ← الفرعية. النقل لا يغيّر أي فاتورة أو مصروف؛ يتغيّر المكان في الشجرة والتقارير، وفواتير المخزن الجديدة تأخذ بند التوريد المربوط بالخامة تلقائيًا.${cdOn()?' الأكواد ثابتة: النقل لا يغيّر الكود'+(APPU.owner?'، ويمكنك تعديله بالضغط عليه.':'.'):''}</p></div>`;
 }
+/* ===== صفحة البنود = كل ما يخص البنود (قرار 1 نوفمبر): الشجرة + ⋯ لكل سطر (تعديل، كشف حساب، دمج، حذف) ===== */
+function itUsed(n){const k=regNormK(n);if(!k)return false;
+  if((S.exp||[]).some(e=>!e.deleted&&regNormK(e.item)===k))return true;
+  if(typeof CT!=='undefined'&&(CT.rows||[]).some(c=>regNormK(ctItem(c))===k))return true;
+  if(typeof SO!=='undefined'&&SO.d&&((SO.d.moves||[]).some(m=>!m.deleted&&regNormK((m.data||{}).sitem)===k)||(SO.d.items||[]).some(i=>!i.deleted&&i.sitem&&regNormK(i.sitem)===k)))return true;
+  return false}
+function itHubBox(D,k,id){if(!CDP.act||CDP.act.k!==k||CDP.act.id!==id)return '';
+  if(k==='item'){const L=D.items.filter(n=>n!==id).sort((a,b)=>a.localeCompare(b,'ar'));
+    return `<div class="cdt-box"><b>«${esc(id)}»</b><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button type="button" class="primary" data-regedit="items" data-name="${esc(id)}">تعديل (الاسم، النوع، البند العام)</button><button type="button" class="ghost" data-stmt="items" data-name="${esc(id)}">كشف حساب</button><button type="button" class="danger" data-ithdel>حذف</button></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><select id="ithMg" aria-label="دمج في"><option value="">دمج في بند تاني…</option>${L.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select><button type="button" class="ghost" data-ithmerge>دمج</button><button type="button" class="ghost" data-ithx>إغلاق</button></div>
+      <p class="note">الدمج بينقل كل المصروفات والمستخلصات والفواتير للبند التاني، والبند ده بيختفي. البند اللي عليه حركات ما ينفعش يتحذف، ادمجه.</p></div>`}
+  const it=soItem(id);if(!it)return '';const C=typeof soMergeCands==='function'?soMergeCands(it):[];
+  return `<div class="cdt-box"><b>«${esc(soLabel(id))}»</b><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button type="button" class="primary" data-ithren>تعديل الاسم</button>${APPU.owner?'<button type="button" class="danger" data-ithdel>حذف</button>':''}</div>
+    ${APPU.owner?`<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><select id="ithMg" aria-label="دمج في"><option value="">دمج في خامة تانية…</option>${C.map(x=>`<option value="${esc(x.id)}">${esc(soLabel(x.id))}</option>`).join('')}</select><button type="button" class="ghost" data-ithmerge>دمج</button><button type="button" class="ghost" data-ithx>إغلاق</button></div><p class="note">الدمج بينقل كل حركات المخزن للخامة التانية. الخامة اللي عليها حركات ما ينفعش تتحذف، ادمجها.</p>`:'<button type="button" class="ghost" data-ithx>إغلاق</button>'}</div>`}
+function itHubCard(){
+  if(typeof SO!=='undefined'&&!SO.loaded&&!SO._ld&&typeof soLoad==='function')soLoad().then(()=>{if(S.sel==='__items')render()}).catch(()=>{});
+  const m=CDP.msg&&Date.now()-(CDP.msg.at||0)<20000?CDP.msg:null,g=S.igMsg;S.igMsg=null;
+  return `${APP&&S.isManager&&typeof svcCard==='function'?svcCard(false):''}<div class="sec-h" style="margin-top:6px">كل البنود: البند العام ← البند ← الخامات</div>
+  <p class="note">⋯ جنب أي بند أو خامة: تعديل، كشف حساب، دمج، حذف. البند العام: «تعديل الاسم» و«حذف» جنبه. «نقل» أو السحب لتغيير المكان. الخامات بتظهر لما تفتح بند التوريدات.</p>
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}${g?`<p class="msg ${g.ok?'ok':'err'}">${esc(g.t)}</p>`:''}${cdTreeTab(true)}`}
+document.addEventListener('click',async ev=>{
+  const a=ev.target.closest('[data-ithub]');if(a){const k=a.dataset.ithub,id=a.dataset.id;CDP.act=CDP.act&&CDP.act.k===k&&CDP.act.id===id?null:{k,id};S.justSaved=true;render();return}
+  if(ev.target.closest('[data-ithx]')){CDP.act=null;S.justSaved=true;render();return}
+  if(!CDP.act)return;const {k,id}=CDP.act;
+  if(ev.target.closest('[data-ithmerge]')){const sel=$('#ithMg'),to=sel&&sel.value;if(!to){cdtMsg('اختر اللي هيتدمج فيه.',false);return}
+    if(!navigator.onLine||!SB){cdtMsg('الدمج محتاج اتصال بالإنترنت.',false);return}
+    if(k==='item'){if(!confirm('دمج «'+id+'» في «'+to+'»؟\nكل المصروفات والمستخلصات والفواتير اللي على «'+id+'» هتتنقل لـ«'+to+'»، و«'+id+'» هيختفي. الخطوة دي مش بترجع.'))return;
+      const e=await cdMerge('item',id,to);if(e){cdtMsg(e,false);return}CDP.act=null;try{await cdReloadAll()}catch(x){}cdtMsg('اتدمج «'+id+'» في «'+to+'».',true);return}
+    const src=soItem(id),dst=soItem(to);if(!src||!dst)return;const er=typeof soMergeErr==='function'?soMergeErr(src,dst):'';if(er){cdtMsg(er,false);return}
+    CDP.act=null;await soMerge(id,to);S.justSaved=true;render();return}
+  if(ev.target.closest('[data-ithren]')){const it=soItem(id);if(!it)return;const n=(prompt('الاسم الجديد للخامة',it.name)||'').trim();if(!n||n===it.name)return;
+    if(soDup(n,it.parent||null,it.id)){cdtMsg('فيه خامة بنفس الاسم في نفس المكان. استخدم «دمج».',false);return}
+    soQueue('store_items','put',it.id,{...soClean(it),name:n});try{await soFlush()}catch(x){}CDP.act=null;cdtMsg('اتغيّر الاسم لـ«'+n+'».',true);return}
+  if(ev.target.closest('[data-ithdel]')){
+    if(k==='item'){if(itUsed(id)){cdtMsg('«'+id+'» عليه حركات (مصروفات أو مستخلصات أو فواتير أو خامات مربوطة)، فما ينفعش يتحذف. ادمجه في بند تاني بدل الحذف.',false);return}
+      const r=regRecsK(REG.items).find(x=>x.name.trim()===id&&!x.hidden);if(!r||!canEditRec(r)){cdtMsg('ما تقدرش تحذف «'+id+'».',false);return}
+      if(!confirm('حذف البند «'+id+'»؟'))return;igAssign(id,'');queue('items',r.id,{...clean(r),hidden:true,updated:Date.now()});logChange('delete','items',{name:r.name});CDP.act=null;cdtMsg('اتحذف «'+id+'».',true);return}
+    const it=soItem(id);if(!it||!APPU.owner)return;const subs=soItems().filter(x=>x.parent===it.id);
+    if(soUsed(it.id)||subs.some(x=>soUsed(x.id))){cdtMsg('«'+it.name+'» عليها حركات في المخزن. ادمجها في خامة تانية بدل الحذف.',false);return}
+    if(subs.length){cdtMsg('«'+it.name+'» تحتها خامات فرعية. انقلها أو احذفها الأول.',false);return}
+    if(!confirm('حذف الخامة «'+it.name+'»؟'))return;const ok=await soPut('store_items',{...soClean(it),deleted:true});CDP.act=null;cdtMsg(ok?'اتحذفت «'+it.name+'».':'تعذّر الحذف.',!!ok);return}
+});
 document.addEventListener('click',ev=>{
   const tg=ev.target.closest('[data-cdttog]');if(tg){const k=tg.dataset.cdttog;if(CDP.topen.has(k))CDP.topen.delete(k);else CDP.topen.add(k);S.justSaved=true;render();return}
   const mv=ev.target.closest('[data-cdtmv]');if(mv){CDP.mv=CDP.mv&&CDP.mv.id===mv.dataset.id?null:{k:mv.dataset.cdtmv,id:mv.dataset.id};CDP.mvq='';S.justSaved=true;render();const i=$('#cdtMvQ');if(i)i.focus();return}
@@ -7199,7 +7244,7 @@ function renderRegister(col){
     <div class="f c2"><label for="r_item">البند الأساسي (اختياري)</label><select id="r_item"><option value="">— بدون —</option>${regNames('items').map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`
     :`${APP?`<div class="f c2"><label for="r_type">نوع البند</label><select id="r_type"><option value="">— لم يُحدَّد —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div><div class="f c2"><label for="r_grp">البند العام</label><select id="r_grp"><option value="">— غير تابع لبند عام —</option>${igNames(igMyPf()).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}<option value="__newg">+ بند عام جديد…</option></select></div><div class="f c2" id="r_stype_w" hidden><label for="r_stype">نوع الخدمة</label><select id="r_stype"><option value="">— اختر —</option>${svcList().map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</select></div>`:''}${APP&&typeof cdOn==='function'&&cdOn()?'':`<div class="f c2"><label for="r_code">كود البند (اختياري)</label><input id="r_code" maxlength="30" dir="ltr"></div>`}<div class="f c2"><label for="r_desc">وصف (اختياري)</label><input id="r_desc" maxlength="120"></div>`}
     <div class="form-foot"><button class="primary" type="submit">${S.regEdit?'حفظ التعديل':'إضافة '+R.one}</button>${S.regEdit?'<button type="button" id="regCancel">إلغاء</button>':''}<span class="msg" id="regMsg"></span></div></form></div>`:''}
-  ${col==='items'?itTypeCard():''}${col==='items'&&APP&&typeof cdCan==='function'&&cdCan()?`<div class="row" style="gap:8px;margin:-4px 0 4px"><button type="button" class="ghost" data-ignew="1">+ بند عام</button><button type="button" class="ghost" data-listgo="__codes|list">رتّب البنود في الشجرة (البنود العامة والخامات) ↗</button></div>`:''}${col==='items'&&canReg()?igCard():''}
+  ${col==='items'?itTypeCard():''}${col==='items'&&APP&&typeof cdCan==='function'&&cdCan()?itHubCard():col==='items'&&canReg()?igCard():''}
   <div class="card" style="display:flex;flex-direction:column;gap:10px">
     ${isC?`<div class="row reg-tools"><div class="seg" role="tablist" aria-label="النوع">${[['','الكل'],['contractor','مقاولين باطن'],['supplier','موردين']].map(([v,t])=>`<button role="tab" data-regkind="${v}" aria-selected="${rk===v}">${t}</button>`).join('')}</div><span class="grow"></span>${list.length?'<button class="ghost" data-regx="xlsx">Excel</button><button class="ghost" data-regx="print">طباعة / PDF</button>':''}</div>`:''}
     ${col==='items'&&APP?`<div class="row reg-tools"><div class="seg" role="tablist" aria-label="نوع البند">${[['','الكل'],...IT_TYPES,['none','بدون نوع']].map(([v,t])=>`<button role="tab" data-itkind="${v}" aria-selected="${ik===v}">${t}</button>`).join('')}</div></div>`:''}
