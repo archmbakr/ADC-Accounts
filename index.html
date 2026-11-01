@@ -1730,7 +1730,7 @@ function ctCalc(c,all){
   const net=prevPaid==null?null:r2(after-prevPaid);
   const ovRows=rows.filter(r=>r.over),needRows=ovRows.filter(r=>r.need),overVal=r2(ovRows.reduce((a,r)=>a+r.over.val,0)),needVal=r2(needRows.reduce((a,r)=>a+r.over.val,0));
   const ok=d.overOk&&d.overOk.tots||{},overBlocked=needRows.some(r=>!(ok[r.l.id]!=null&&r.tot<=+ok[r.l.id]+1e-9));
-  return {rows,lines,works,pct,fin,ret,deds,dedNow,dedCum,after,prevPaid,net,prev,byId,frozen:d.prev_paid!=null,overVal,needVal,needRows,overBlocked};
+  return {rows,lines,works,pct,fin,ret,deds,dedNow,dedCum,after,prevPaid,net,prev,byId,frozen:d.prev_paid!=null,overVal,needVal,needRows,overBlocked,open:prev?null:(d.open||null)};
 }
 function ctCanApprove(c){return APPU.owner||((myRole()==='user'||myRole()==='acct')&&c.site_owner&&c.site_owner===(APPU.me&&APPU.me.id))}
 function ctMySites(){return S.sites.filter(s=>APPU.owner||(s._p||'')===S.pfx)}
@@ -1754,8 +1754,10 @@ function ctFormCert(f){
   const site=ctSitesForForm().find(x=>x.id===f.site)||null;
   const old=f.id?CT.rows.find(x=>x.id===f.id):null;
   return {id:f.id||'_new',site_id:f.site,site_owner:site?site.owner:null,contractor:f.con,no:f.no||ctNextNo(f.site,f.con,f.item),status:old?old.status:'draft',
-    data:{...(old?old.data:{}),item:f.item||'',date:f.date||today(),lines:f.lines||{},deds:f.deds||[],final:!!f.final,ret_pct:old&&old.data&&old.data.ret_pct!=null?old.data.ret_pct:ctRetPct(site&&site.owner,f.con)}};
+    data:{...(old?old.data:{}),item:f.item||'',date:f.date||today(),lines:f.lines||{},deds:f.deds||[],final:!!f.final,ret_pct:old&&old.data&&old.data.ret_pct!=null?old.data.ret_pct:ctRetPct(site&&site.owner,f.con),open:f.open||null}};
 }
+/* مستخلص جاري: أول مستخلص للمقاول على البند ده في الموقع بيتسجّل بعد مستخلص سابق اتعمل برا التطبيق */
+function ctHasPrevForm(f){return CT.rows.some(x=>x.id!==f.id&&x.site_id===f.site&&x.contractor===f.con&&ctItem(x)===f.item)}
 function ctFormHTML(){
   const f=CT.form;if(!f)return '';
   const sites=ctSitesForForm(),cons=f.site&&typeof regsFor==='function'?regsFor(f.site).map(x=>({name:x.name})):regNames('contractors'),its=f.site&&typeof siteItems==='function'?siteItems(f.site).map(name=>({name})):regNames('items');
@@ -1781,6 +1783,10 @@ function ctFormHTML(){
     ${ctSel('ct_con','المقاول',cons.map(x=>({v:x.name,t:x.name})),f.con,'اختر المقاول')}
     ${ctSel('ct_item','البند',(typeof itType==='function'?[...its].sort((a,b)=>(itType(b.name)==='lab')-(itType(a.name)==='lab')):its).map(x=>({v:x.name,t:x.name+(typeof itType==='function'&&itType(x.name)==='lab'?' · مصنعيات':'')})),f.item,'اختر البند')}
     <div class="f c1 half"><label for="ct_no">رقم المستخلص</label><input id="ct_no" type="number" min="1" step="1" value="${esc(String(c?c.no:(f.no||1)))}"></div>
+    ${f.site&&f.con&&f.item&&!ctHasPrevForm(f)?`<div class="f fw"><span class="note">هذا أول مستخلص لهذا المقاول على البند ده في الموقع:</span>
+      <div class="row" style="gap:14px;align-items:center;margin-top:4px"><label class="chk"><input type="radio" name="ct_start" value="first" ${f.open?'':'checked'}> أول مستخلص</label><label class="chk"><input type="radio" name="ct_start" value="ongoing" ${f.open?'checked':''}> مستخلص جاري</label></div>
+      ${f.open?`<div class="row" style="gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><label for="ct_onno">رقم آخر مستخلص سابق</label><input id="ct_onno" type="number" min="1" step="1" value="${esc(String(f.open.no||''))}" style="width:auto"><label for="ct_ontot">قيمته الإجمالية حتى تاريخه</label><input id="ct_ontot" type="number" inputmode="decimal" min="0" step="any" value="${esc(String(f.open.total??''))}" style="width:auto"></div><p class="note">رقم المستخلص الجديد يتحسب تلقائيًا = رقم السابق + 1.</p>`:''}
+    </div>`:''}
     <div class="f c1 half"><label for="ct_date">التاريخ</label><input id="ct_date" type="date" value="${esc(f.date||today())}" ${lockMin()}></div>${lockNote()}
     ${linesHTML}
     ${k&&k.lines.length?`<label class="chk fw"><input type="checkbox" id="ct_final" ${f.final?'checked':''}> مستخلص ختامي (يُرد معه تأمين الأعمال المحجوز)</label>
@@ -1794,6 +1800,7 @@ function ctSumHTML(k){
   const row=(l,v,cls)=>`<tr class="${cls||''}"><td>${l}</td><td class="num">${v}</td></tr>`;
   return `<div class="ct-calc"><table><tbody>
     ${row('إجمالي الأعمال حتى تاريخه',fmt(k.works),'strong')}
+    ${k.open?row('مستخلص سابق مُدخل (رقم '+k.open.no+') — إجماليه حتى تاريخه',fmt(k.open.total)):''}
     ${k.overVal?row('منها أعمال زائدة عن التعاقد'+(k.needVal?' <small class="neg">(منها '+fmt(k.needVal)+' تحتاج إلى موافقة)</small>':''),fmt(k.overVal)):''}
     ${row(k.fin?'تأمين الأعمال (يُرد مع الختامي)':'يُخصم: تأمين أعمال '+k.pct+'%',k.fin?'0':'('+fmt(k.ret)+')')}
     ${row('يُخصم: خصومات أخرى حتى تاريخه','('+fmt(k.dedCum)+')')}
@@ -1806,19 +1813,23 @@ function ctReadForm(){const f=CT.form;if(!f)return;const v=id=>{const e=$(id);re
   const ns=v('#ct_site'),nc=v('#ct_con'),ni=v('#ct_item');
   if(ns!=null)f.site=ns;const pc=f.con;if(nc!=null)f.con=nc;if(ni!=null)f.item=ni;
   if(f.con!==pc&&f.con&&!f.item&&typeof defItemOf==='function')f.item=defItemOf(f.con);
-  const no=v('#ct_no');if(no!=null)f.no=parseInt(no)||0;const dt=v('#ct_date');if(dt!=null)f.date=dt;const nt=v('#ct_notes');if(nt!=null)f.notes=nt;
+  const st=document.querySelector('#ctForm input[name=ct_start]:checked');
+  if(st){if(st.value==='first')f.open=null;else{f.open=f.open||{no:0,total:0};const on=$('#ct_onno'),ot=$('#ct_ontot');if(on)f.open.no=parseInt(on.value)||0;if(ot)f.open.total=+ot.value||0}}
+  const no=v('#ct_no');if(no!=null)f.no=parseInt(no)||0;if(f.open&&f.open.no)f.no=f.open.no+1;const dt=v('#ct_date');if(dt!=null)f.date=dt;const nt=v('#ct_notes');if(nt!=null)f.notes=nt;
   const fi=$('#ct_final');if(fi)f.final=fi.checked;
   f.lines=f.lines||{};document.querySelectorAll('#ctForm [data-lid]').forEach(e=>{const o=f.lines[e.dataset.lid]=f.lines[e.dataset.lid]||{};const k=e.dataset.k;o[k]=k==='note'?e.value:(e.value===''?'':+e.value)});
   f.deds=f.deds||[];document.querySelectorAll('#ctForm [data-ded]').forEach(e=>{const o=f.deds[+e.dataset.ded];if(o)o[e.dataset.k]=e.dataset.k==='amount'?(e.value===''?'':+e.value):e.value});
 }
 function ctBindForm(){
   const fm=$('#ctForm');if(!fm)return;
-  for(const id of ['#ct_site','#ct_con','#ct_item']){const e=$(id);if(e)e.onchange=()=>{ctReadForm();if(!CT.form.id){CT.form.no=0;CT.form.lines={}}render()}}
+  for(const id of ['#ct_site','#ct_con','#ct_item']){const e=$(id);if(e)e.onchange=()=>{ctReadForm();if(!CT.form.id){CT.form.no=0;CT.form.lines={};CT.form.open=null}render()}}
   const upd=()=>{ctReadForm();const f=CT.form;if(!(f.site&&f.con&&f.item))return;const k=ctCalc(ctFormCert(f));
     for(const r of k.rows)if(r.l.kind!=='sec'){const cell=document.getElementById('ct_r_'+r.l.id);if(cell){cell.textContent=fmt(r.res);const tr=cell.closest('tr');if(tr){tr.classList.toggle('row-neg',!!r.need);tr.classList.toggle('row-over',!!r.over&&!r.need)}}const op=document.getElementById('ct_op_'+r.l.id);if(op)op.innerHTML=ctOverPill(r)}
     const box=$('#ctCalc');if(box)box.innerHTML=ctSumHTML(k)};
-  fm.querySelectorAll('input').forEach(e=>{if(e.id!=='ct_final'&&e.type!=='checkbox')e.oninput=upd});
+  fm.querySelectorAll('input').forEach(e=>{if(e.id!=='ct_final'&&e.type!=='checkbox'&&e.type!=='radio')e.oninput=upd});
   {const e=$('#ct_final');if(e)e.onchange=upd}
+  fm.querySelectorAll('input[name=ct_start]').forEach(r=>r.onchange=()=>{ctReadForm();render()});
+  {const e=$('#ct_onno');if(e)e.oninput=()=>{ctReadForm();const n=$('#ct_no');if(n)n.value=CT.form.no;upd()}}
   let st='submitted';fm.querySelectorAll('button[type=submit]').forEach(b=>b.onclick=()=>{st=b.dataset.v});
   fm.onsubmit=async ev=>{ev.preventDefault();ctReadForm();const f=CT.form;
     if(isLocked(f.date)){CT.msg={t:lockMsg()};return render()}
@@ -1826,6 +1837,7 @@ function ctBindForm(){
     const c=ctFormCert(f),k=ctCalc(c);
     if(!(k.works>0))miss.push('كمية واحدة على الأقل في «الإجمالي حتى تاريخه»');
     if((f.deds||[]).some(x=>+x.amount>0&&!(x.desc||'').trim()))miss.push('سبب كل خصم');
+    if(f.open&&!(f.open.no>0))miss.push('رقم آخر مستخلص سابق');
     if(miss.length){CT.msg={t:'يجب أن تكتب: '+miss.join('، ')+'.'};return render()}
     if(CT.rows.some(x=>x.id!==f.id&&x.site_id===f.site&&x.contractor===f.con&&ctItem(x)===f.item&&x.no===f.no)){CT.msg={t:'يوجد مستخلص بنفس الرقم لهذا المقاول على نفس البند في هذا الموقع.'};return render()}
     const site=ctSitesForForm().find(x=>x.id===f.site);
@@ -2074,7 +2086,7 @@ document.addEventListener('click',async ev=>{
   if(a==='bqdel'){ctBoqRead();CT.boqEdit.lines.splice(+b.dataset.i,1);render();return}
   if(a==='bqsave'){ctBoqSave();return}
   if(a==='bqtpl'){try{const raw=atob(CT_BOQ_TPL),u=Uint8Array.from(raw,ch=>ch.charCodeAt(0));const s=CT.boqSel,nm=['نموذج بنود التعاقد',s.con,s.item].filter(Boolean).join(' - ');await saveFile(safeName(nm)+'.xlsx',new Blob([u],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))}catch(e){if(!(e&&e.name==='AbortError'))flash('تعذّر تنزيل النموذج: '+((e&&e.message)||e),1)}return}
-  if(a==='edit'&&c){const d=c.data||{};CT.form={id:c.id,site:c.site_id,con:c.contractor,item:d.item||'',no:c.no,date:d.date,lines:JSON.parse(JSON.stringify(d.lines||{})),deds:JSON.parse(JSON.stringify(d.deds||[])),notes:d.notes||'',final:!!d.final};CT.msg=null;render();const x=$('#ctFormCard');if(x)x.scrollIntoView({block:'start'});return}
+  if(a==='edit'&&c){const d=c.data||{};CT.form={id:c.id,site:c.site_id,con:c.contractor,item:d.item||'',no:c.no,date:d.date,lines:JSON.parse(JSON.stringify(d.lines||{})),deds:JSON.parse(JSON.stringify(d.deds||[])),notes:d.notes||'',final:!!d.final,open:d.open?JSON.parse(JSON.stringify(d.open)):null};CT.msg=null;render();const x=$('#ctFormCard');if(x)x.scrollIntoView({block:'start'});return}
   if(a==='delreq'&&c){if(!confirm('حذف المستخلص رقم '+c.no+' يحتاج إلى موافقة المدير. هل ترسل طلب حذف؟'))return;if(await ctSave({...c,data:{...c.data,delReq:{by:myBy(),byId:APPU.me&&APPU.me.id,at:Date.now()}}})){CT.msg={ok:1,t:'أُرسل طلب الحذف إلى المدير.'};render()}return}
   if(a==='delno'&&c){const d={...c.data};delete d.delReq;if(await ctSave({...c,data:d})){CT.msg={ok:1,t:APPU.owner?'رُفض طلب الحذف.':'أُلغي طلب الحذف.'};render()}return}
   if(a==='delok'&&c&&APPU.owner){if(!confirm('حذف المستخلص رقم '+c.no+' ('+c.contractor+')؟'))return;ctQueue({op:'del',id:c.id});await ctFlush();CT.msg={ok:1,t:'حُذف المستخلص.'};render();return}
@@ -7900,7 +7912,9 @@ const ocCerts=siteId=>OC.rows.filter(r=>r.kind==='cert'&&r.site_id===siteId).sor
 const ocTplOf=P=>(P&&OC.rows.find(r=>r.kind==='tpl'&&r.id===P.data.tpl))||null;
 const ocTplCanEdit=t=>S.isManager||(t.site_owner&&t.site_owner===S.uid);
 /* ---------- البنود اللي على حساب الشركة في الموقع (على سجل الموقع نفسه: coItems) ---------- */
-function ocCoList(siteId){const s=S.sites.find(x=>x.id===siteId);return s&&Array.isArray(s.coItems)?s.coItems:[]}
+/* بنود ثابتة على حساب الشركة في كل المواقع (زي المرتبات وما في حكمها) — مش بتتشال من القائمة */
+const OC_FIXED_CO=['مرتبات وما في حكمها'];
+function ocCoList(siteId){const s=S.sites.find(x=>x.id===siteId);const L=s&&Array.isArray(s.coItems)?s.coItems:[];return [...OC_FIXED_CO,...L.filter(x=>!OC_FIXED_CO.some(f=>regNormK(f)===regNormK(x)))]}
 function ocIsCo(siteId,item){if(!siteId||!item)return false;const k=regNormK(item);return ocCoList(siteId).some(x=>regNormK(x)===k)&&!(typeof itNeedSup==='function'&&itNeedSup(item))}
 const ocCoSet=siteId=>new Set(ocCoList(siteId).map(regNormK));
 function ocSetCo(siteId,list){const s=S.sites.find(x=>x.id===siteId);if(!s)return;const L=[...new Map(list.filter(Boolean).map(x=>[regNormK(x),String(x).trim()])).values()];queue('sites',s.id,{...clean(s),coItems:L,updated:Date.now(),editedById:S.uid||''})}
