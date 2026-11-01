@@ -7968,7 +7968,10 @@ function ocChanged(site,M){
 function ocReview(site){const P=ocProj(site.id);if(!P)return null;const T=ocTplOf(P),M=ocMoves(site,P,T),inK=ocInKeys(site.id),certs=ocCerts(site.id),appr=certs.filter(c=>c.data.status==='approved'),last=appr[appr.length-1];
   for(const m of M){m.st=ocStatus(m,P,inK);m.late=m.st==='new'&&!!last&&(m.date||'')<=(last.data.date||'')}
   const needStart=!P.data.oldTo&&!certs.length;
-  const open=M.filter(m=>m.st==='new'||m.st==='bad'||m.st==='nosec'),nt=M.filter(m=>m.st==='notype'),chg=ocChanged(site,M);
+  /* كل حركة تتحسب مرة واحدة بس: لو اتعدّلت بعد مستخلص معتمد تتحسب في «المعدّلة» وبس، ولو مكرر في القائمة يتحسب مرة */
+  const chg=ocChanged(site,M),chgK=new Set(chg.map(x=>x.key)),uq=new Map();for(const m of M)if(!uq.has(m.key))uq.set(m.key,m);
+  const U=[...uq.values()];
+  const open=U.filter(m=>(m.st==='new'||m.st==='bad'||m.st==='nosec')&&!chgK.has(m.key)),nt=U.filter(m=>m.st==='notype');
   const src={};for(const m of open){const k=m.kind;const x=src[k]||(src[k]={n:0,v:0});x.n++;x.v=r2(x.v+m.val)}
   return {M,open,nt,chg,src,needStart,n:open.length+chg.length,v:r2(open.reduce((a,m)=>a+m.val,0)),ntV:r2(nt.reduce((a,m)=>a+m.val,0))}}
 function ocWaitItem(siteId){if(!OC||!ocCan()||!OC.loaded)return null;const site=S.sites.find(s=>s.id===siteId);if(!site||!revCan(siteId)||!ocProj(siteId))return null;const R=ocReview(site);if(!R||R.needStart||!R.n)return null;
@@ -8667,6 +8670,8 @@ function render(){
   if(!S.loaded){$('#pane').innerHTML='<div class="blank"><h3>جاري تحميل الحسابات…</h3></div>';return}
   if(!S.dueAlerted&&(OFF||S.mode==='live'||S.mode==='off'))setTimeout(dueAlert,300);
   const keep={};const focusId=document.activeElement&&document.activeElement.id;
+  /* الحقل اللي المستخدم بيكتب فيه دلوقتي: نحفظ نصه ومكان المؤشر عشان الكتابة متتمسحش لو الشاشة اتحدّثت وهو بيكتب */
+  const FT=document.activeElement;const ftKeep=FT&&FT.id&&((FT.tagName==='INPUT'&&/^(text|search|tel|email|url|number)?$/.test(FT.type||''))||FT.tagName==='TEXTAREA')?{id:FT.id,v:FT.value,s:FT.selectionStart,e:FT.selectionEnd}:null;
   if(!S.justSaved)for(const id of KEEP){const el=document.getElementById(id);if(el)keep[id]=el.value}
   S.justSaved=false;
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal'||(S.sel==='__ocert'&&!!OC&&!!OC.cur))}
@@ -8690,6 +8695,7 @@ function render(){
   {const c=document.getElementById('so_sup'),w=document.getElementById('so_supnw');if(c&&w)w.hidden=!(c.value==='__new'||c.value==='__pend')}
   document.querySelectorAll('[data-words]').forEach(wordsRefresh);
   if(focusId){const el=document.getElementById(focusId);if(el&&(el.tagName==='INPUT'||el.tagName==='SELECT')&&el.type!=='file')el.focus()}
+  if(ftKeep){const el=document.getElementById(ftKeep.id);if(el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA')){if(el.value!==ftKeep.v)el.value=ftKeep.v;el.focus();try{el.setSelectionRange(ftKeep.s,ftKeep.e)}catch(x){}}}
 }
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.viewer){S.viewer=null;render()}});
 document.addEventListener('click',ev=>{
