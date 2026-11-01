@@ -12,8 +12,10 @@ export const fmt = v => (v == null || v === '') ? '' : num(v).toLocaleString('en
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sum = l => l.reduce((a, x) => a + num(x.amount), 0);
 const meth = x => METHOD[x.method] && x.method !== 'cash' ? x.method : 'cash';
-const notDue = (x, d) => x.method === 'deferred' && (x.due || '') > d;
-const mlabel = (x, today) => METHOD[meth(x)] + (['bank', 'transfer', 'deferred'].includes(x.method) && x.bank ? ' · ' + x.bank : '') + (x.method === 'deferred' && x.due ? ' · ' + (notDue(x, today) ? 'يستحق ' : 'استُحق ') + x.due + (x.chq ? ' · شيك ' + x.chq : '') : '');
+/* الشيك لا يدخل الرصيد إلا بعد تأكيد تحصيله (coll = تاريخ التحصيل) — نفس التطبيق */
+const notDue = (x, d) => x.method === 'deferred' && !(x.coll && x.coll <= d);
+const jv = (x, d) => notDue(x, d) ? 0 : num(x.amount);
+const mlabel = (x, today) => METHOD[meth(x)] + (['bank', 'transfer', 'deferred'].includes(x.method) && x.bank ? ' · ' + x.bank : '') + (x.method === 'deferred' ? (x.coll ? ' · حُصِّل ' + x.coll : x.due ? ' · ' + (x.due > today ? 'يستحق ' : 'استحق ولم يُحصَّل ') + x.due : '') + (x.chq ? ' · شيك ' + x.chq : '') : '');
 const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.created || 0) - (b.created || 0);
 
 /* data = { sites, expenses, deposits, counts, log } كل موقع فيه owner (اسم المستخدم) اختياري */
@@ -22,7 +24,7 @@ export function computeSites(data, today) {
     const e = data.expenses.filter(x => x.siteId === s.id), d = data.deposits.filter(x => x.siteId === s.id);
     const isCu = x => x.method === 'custody' || !!x.custodyId, en = e.filter(x => !isCu(x));
     const ec = sum(en.filter(x => meth(x) === 'cash')), ed = sum(en.filter(x => notDue(x, today))), eu = sum(e.filter(isCu)), eb = sum(en) - ec - ed;
-    const byMeth = {}; for (const x of e) { const k = meth(x); byMeth[k] = (byMeth[k] || 0) + num(x.amount); }
+    const byMeth = {}; for (const x of e) { if (notDue(x, today)) continue; const k = isCu(x) ? 'custody' : meth(x); byMeth[k] = (byMeth[k] || 0) + num(x.amount); }
     const cu = (data.custody || []).filter(r => r.site_id === s.id && r.kind !== 'claim');
     const iC = cu.filter(r => r.kind === 'issue' && (r.data || {}).source !== 'bank').reduce((a, r) => a + num(r.data.amount), 0), iB = cu.filter(r => r.kind === 'issue' && (r.data || {}).source === 'bank').reduce((a, r) => a + num(r.data.amount), 0), rt = cu.filter(r => r.kind === 'return').reduce((a, r) => a + num(r.data.amount), 0);
     const dc = sum(d.filter(x => meth(x) === 'cash')), dd = sum(d.filter(x => notDue(x, today))), db = sum(d) - dc - dd;
@@ -38,14 +40,16 @@ export function computeSites(data, today) {
       const diff = (num(c.cash) + num(c.bank)) - (bookCash + bookBank);
       rc = { st: Math.abs(diff) < 0.005 ? 'ok' : diff < 0 ? 'short' : 'over', date: dt, actual: num(c.cash) + num(c.bank), diff };
     }
-    return { id: s.id, name: s.name || '', owner: s.owner || '', dep: dc + db + dd, exp: ec + eb + ed + eu, cash: dc - ec - iC + rt, bank: db - eb - iB, defer: dd - ed, cust: iC + iB - rt - eu, total: dc + db + dd - ec - eb - ed - eu, rc, byMeth, fromCust: sum(e.filter(x => x.custodyId)) };
+    /* العهدة اللي لسه مع المهندسين بتتحسب مصروف لحد ما تتصفّى، فالرصيد = الفلوس الموجودة فعلًا (نقدي + بنك) — نفس التطبيق */
+    const cuOut = Math.round((iC + iB - rt - eu) * 100) / 100;
+    return { id: s.id, name: s.name || '', owner: s.owner || '', dep: dc + db, exp: ec + eb + eu + cuOut, cash: dc - ec - iC + rt, bank: db - eb - iB, defer: dd - ed, cust: cuOut, total: dc + db - ec - eb - eu - cuOut, rc, byMeth, fromCust: eu };
   }).sort((a, b) => (a.owner || '').localeCompare(b.owner || '', 'ar') || a.name.localeCompare(b.name, 'ar'));
 }
 const siteLabel = s => s.name + (s.owner ? ' (' + s.owner + ')' : '');
 const MO = [['cash', 'نقدي'], ['transfer', 'تحويلات'], ['bank', 'بنك'], ['deferred', 'شيكات'], ['custody', 'من العهدة']];
 const bm = (s, k) => (s.byMeth || {})[k] || 0;
-const methText = s => MO.filter(([k]) => Math.abs(bm(s, k)) > 0.004).map(([k, l]) => l + ' ' + fmt(bm(s, k))).join(' · ') + (s.fromCust > 0.004 ? ' · منها من العهد ' + fmt(s.fromCust) : '');
-const addMeth = l => { const o = { byMeth: {}, fromCust: 0 }; for (const s of l) { for (const [k] of MO) o.byMeth[k] = bm(o, k) + bm(s, k); o.fromCust += s.fromCust || 0; } return o; };
+const methText = s => MO.filter(([k]) => Math.abs(bm(s, k)) > 0.004).map(([k, l]) => l + ' ' + fmt(bm(s, k))).join(' · ') + (Math.abs(s.cust || 0) > 0.004 ? ' · عهد لدى المهندسين ' + fmt(s.cust) : '');
+const addMeth = l => { const o = { byMeth: {}, fromCust: 0, cust: 0 }; for (const s of l) { for (const [k] of MO) o.byMeth[k] = bm(o, k) + bm(s, k); o.fromCust += s.fromCust || 0; o.cust += s.cust || 0; } return o; };
 
 /* مقاول باطن أو مورد (من قائمة المقاولين) */
 const KINDL = { contractor: 'مقاول باطن', supplier: 'مورد', '': 'بدون مقاول' };
@@ -67,17 +71,18 @@ export function buildXlsx({ title, data, week, today, stampNow, lastMod }) {
   const dt = t => t ? new Date(t).toLocaleString('sv-SE', { timeZone: 'Africa/Cairo' }).slice(0, 16) : '';
   const s1 = { name: 'الملخص', rows: [], styles: {}, widths: [30, 14, 14, 14, 13, 13, 14, 13, 14, 14], freeze: 0 };
   s1.rows.push([title]); s1.styles[0] = 3; s1.rows.push(['آخر تعديل: ' + lastMod + ' · تاريخ الكشف: ' + stampNow]); s1.rows.push([]);
-  H(s1, ['الموقع', 'الإيداعات', 'المصروفات', 'الرصيد الدفتري', 'المنصرف نقدي', 'المنصرف تحويلات', 'المنصرف بنك', 'المنصرف شيكات', 'منها من العهد', 'آخر جرد', 'الموجود فعلًا', 'الحالة']);
-  const mv = s => [bm(s, 'cash'), bm(s, 'transfer'), bm(s, 'bank'), bm(s, 'deferred') + bm(s, 'custody'), s.fromCust || 0];
+  H(s1, ['الموقع', 'الإيداعات', 'المصروفات', 'الرصيد الدفتري', 'المنصرف نقدي', 'المنصرف تحويلات', 'المنصرف بنك', 'المنصرف شيكات', 'العُهد (المصفّى + الباقي مع المهندسين)', 'آخر جرد', 'الموجود فعلًا', 'الحالة']);
+  const mv = s => [bm(s, 'cash'), bm(s, 'transfer'), bm(s, 'bank'), bm(s, 'deferred'), Math.round((bm(s, 'custody') + (s.cust || 0)) * 100) / 100];
   for (const s of sites) s1.rows.push([siteLabel(s), s.dep, s.exp, s.total, ...mv(s), s.rc.date || '', s.rc.st === 'none' ? '' : s.rc.actual, ST[s.rc.st] + (s.rc.st === 'short' || s.rc.st === 'over' ? ' ' + fmt(Math.abs(s.rc.diff)) : '')]);
   if (sites.length > 1) T(s1, ['الإجمالي', ...['dep', 'exp', 'total'].map(k => sites.reduce((a, s) => a + s[k], 0)), ...mv(addMeth(sites))]);
   const wk = sh('تعديلات الأسبوع', [17, 9, 9, 26, 13, 12, 50, 14]);
   H(wk, ['التاريخ والوقت', 'العملية', 'النوع', 'الموقع', 'المبلغ', 'تاريخ الحركة', 'التفاصيل', 'بواسطة']);
   for (const l of week) wk.rows.push([dt(l.at), ACT[l.action] || l.action || '', KIND[l.kind] || l.kind || '', l.siteName || '', l.amount == null ? '' : num(l.amount), l.date || '', l.details || '', l.by || '']);
-  const rows = [...data.deposits.map(x => ({ ...x, k: 'dep' })), ...data.expenses.map(x => ({ ...x, k: 'exp' }))].sort(byDate);
+  const cuRow = s => Math.abs(s.cust) > 0.004 ? [{ k: 'exp', siteId: s.id, date: today, amount: s.cust, notes: 'عهد لدى المهندسين (الباقي حتى اليوم)', method: 'custody', cuv: 1 }] : [];
+  const rows = [...data.deposits.map(x => ({ ...x, k: 'dep' })), ...data.expenses.map(x => ({ ...x, k: 'exp' })), ...sites.flatMap(cuRow)].sort(byDate);
   const jr = sh('دفتر اليومية', [12, 26, 10, 13, 13, 28, 18, 22, 22, 20, 14, 14]);
   H(jr, ['التاريخ', 'الموقع', 'النوع', 'وارد', 'منصرف', 'البيان', 'البند', 'المقاول', 'ملاحظات', 'طريقة الدفع', 'الرصيد', 'المسجل']);
-  { let run = 0, ti = 0, to = 0; for (const r of rows) { const v = num(r.amount); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; } jr.rows.push([r.date || '', nm(r.siteId), r.k === 'dep' ? 'إيداع' : 'مصروف', r.k === 'dep' ? v : '', r.k === 'exp' ? v : '', r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''), r.item || '', r.contractor || '', r.remarks || '', mlabel(r, today), run, r.by || '']); } T(jr, ['', '', 'الإجمالي', ti, to, '', '', '', '', '', run]); }
+  { let run = 0, ti = 0, to = 0; for (const r of rows) { const v = r.cuv ? num(r.amount) : jv(r, today); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; } jr.rows.push([r.date || '', nm(r.siteId), r.k === 'dep' ? 'إيداع' : 'مصروف', r.k === 'dep' ? v : '', r.k === 'exp' ? v : '', r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''), r.item || '', r.contractor || '', r.remarks || '', r.cuv ? 'عهدة' : mlabel(r, today), run, r.by || '']); } T(jr, ['', '', 'الإجمالي', ti, to, '', '', '', '', '', run]); }
   const ex = sh('المصروفات', [13, 26, 12, 18, 22, 22, 22, 26, 14, 17]);
   H(ex, ['المبلغ', 'البيان', 'التاريخ', 'البند', 'المقاول', 'ملاحظات', 'طريقة الدفع', 'الموقع', 'المسجل', 'وقت التسجيل', 'مقاول / مورد']); ex.widths.push(13);
   const el = data.expenses.slice().sort(byDate); for (const r of el) ex.rows.push([num(r.amount), r.notes || '', r.date || '', r.item || '', r.contractor || '', r.remarks || '', mlabel(r, today), nm(r.siteId), r.by || '', dt(r.created), r.contractor ? KINDL[kindOf(data, r.contractor)] : '']); T(ex, [sum(el), 'الإجمالي']);
@@ -103,9 +108,9 @@ export function buildHtml({ title, sub, data, week, today, logo }) {
   const wkT = week.length ? `<h2 class="pb">تعديلات الأسبوع (${week.length})</h2><table><thead><tr><th>الوقت</th><th>العملية</th><th>النوع</th><th>الموقع</th><th>المبلغ</th><th>تاريخ الحركة</th><th>التفاصيل</th><th>بواسطة</th></tr></thead><tbody>
   ${week.map(l => `<tr><td class="n">${esc(dt(l.at))}</td><td><span class="a a-${esc(l.action)}">${esc(ACT[l.action] || l.action || '')}</span></td><td>${esc(KIND[l.kind] || l.kind || '')}</td><td class="tl">${esc(l.siteName || '')}</td><td class="n">${l.amount == null ? '' : fmt(l.amount)}</td><td class="n">${esc(l.date || '')}</td><td class="tl d">${esc(l.details || '')}</td><td>${esc(l.by || '')}</td></tr>`).join('')}</tbody></table>` : '<h2>تعديلات الأسبوع</h2><p>لا توجد تعديلات هذا الأسبوع.</p>';
   const stmt = s => {
-    const rows = [...data.deposits.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'dep' })), ...data.expenses.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'exp' }))].sort(byDate);
+    const rows = [...data.deposits.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'dep' })), ...data.expenses.filter(x => x.siteId === s.id).map(x => ({ ...x, k: 'exp' })), ...(Math.abs(s.cust) > 0.004 ? [{ k: 'exp', siteId: s.id, date: today, amount: s.cust, notes: 'عهد لدى المهندسين (الباقي حتى اليوم)', method: 'custody', cuv: 1 }] : [])].sort(byDate);
     let run = 0, ti = 0, to = 0;
-    const tr = rows.map(r => { const v = num(r.amount); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; }
+    const tr = rows.map(r => { const v = r.cuv ? num(r.amount) : jv(r, today); if (r.k === 'dep') { run += v; ti += v; } else { run -= v; to += v; }
       return `<tr><td class="n">${esc(r.date || '')}</td><td class="n in">${r.k === 'dep' ? fmt(v) : ''}</td><td class="n">${r.k === 'exp' ? fmt(v) : ''}</td><td class="tl">${esc(r.notes || (r.k === 'dep' ? 'إيداع من المالك' : ''))}</td><td>${esc(r.item || '')}</td><td class="tl">${esc(r.contractor || '')}</td><td>${esc(METHOD[meth(r)])}</td><td class="n b bal${neg(run)}">${fmt(run)}</td></tr>`; }).join('');
     return `<section class="site"><h2>كشف حساب: ${esc(siteLabel(s))}</h2><table><thead><tr><th>التاريخ</th><th>وارد</th><th>منصرف</th><th>البيان</th><th>البند</th><th>المقاول</th><th>طريقة الدفع</th><th class="bal">الرصيد</th></tr></thead><tbody>${tr || '<tr><td colspan="8">لا توجد حركات</td></tr>'}</tbody><tfoot><tr><td>الإجمالي</td><td class="n">${fmt(ti)}</td><td class="n">${fmt(to)}</td><td colspan="4"></td><td class="n">${fmt(run)}</td></tr></tfoot></table>${splitT(data, rows.filter(r => r.k === 'exp'))}</section>`;
   };
