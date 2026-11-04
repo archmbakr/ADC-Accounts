@@ -742,7 +742,7 @@ const REG_ROLES=['engineer','tech','eng_tech','store'];
 function appRegSites(){return S.sites.map(s=>{const o=ctOwnerOf(s),m=o&&(APPU.members||[]).find(x=>x.id===o);return {id:s.id,name:s.name+(m?' ('+(m.name||m.email)+')':''),owner:o,plain:s.name}}).sort((a,b)=>a.name.localeCompare(b.name,'ar'))}
 function appRegRow(m){
   const mine=(CT.access||[]).filter(a=>a.engineer===m.id),open=APPU.regOpen===m.id;
-  return `<tr class="reg-row"><td colspan="6"><div class="row" style="align-items:center;gap:8px"><span class="note" style="margin:0">المواقع: ${mine.length?mine.map(a=>esc(a.site_name||siteNameOf(a.site_id))).join('، '):'<b class="neg">لم يُسجَّل على أي موقع</b>'}</span><button type="button" class="ghost" data-app="reg" data-id="${esc(m.id)}">${open?'إغلاق':'تحديد المواقع'}</button></div>
+  return `<tr class="reg-row"><td colspan="6"><div class="row" style="align-items:center;gap:8px"><span class="note" style="margin:0">المواقع: ${mine.length?mine.map(a=>esc(a.site_name||siteNameOf(a.site_id))).join('، '):'<b class="neg">لم يُسجَّل على أي موقع</b>'}</span><button type="button" class="ghost" data-app="reg" data-id="${esc(m.id)}">${open?'إغلاق':'تحديد المواقع'}</button>${['tech','eng_tech'].includes(m.role)?`<label class="chk" style="margin-inline-start:8px"><input type="checkbox" data-boqgrant="${esc(m.id)}" ${(SO.boqUsers||[]).includes(m.id)?'checked':''}> يضيف ويعدّل بنود التعاقد في مواقعه</label>`:''}</div>
   ${open?`<div class="qs-checks">${appRegSites().map(s=>`<label class="chk"><input type="checkbox" data-reg="${esc(s.id)}" data-person="${esc(m.id)}" ${mine.some(a=>a.site_id===s.id)?'checked':''}> ${esc(s.name)}</label>`).join('')||'<p class="note">لا توجد مواقع.</p>'}</div>`:''}</td></tr>`;
 }
 /* who is registered on my sites (read-only: the owner decides from Settings ← Users) */
@@ -1657,7 +1657,8 @@ async function ctLoad0(){
       if(a.error&&/certs|relation|does not exist|schema cache/i.test(a.error.message||'')){CT.missing=true;ok=true}
       else if(!a.error){CT.missing=false;CT.srv=a.data||[];CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[];ok=true;
         if(appIsEngineer()&&isTechR(myRole())){try{const p=await netTO(SB.rpc('cert_paid_rows'));CT.paid=p.error?null:(p.data||[])}catch(e){CT.paid=CT.paid||null}}
-        appLs(LS_CT,{rows:CT.srv,access:CT.access,ret:CT.ret,boq:CT.boq,paid:CT.paid||null,at:Date.now()})}
+        appLs(LS_CT,{rows:CT.srv,access:CT.access,ret:CT.ret,boq:CT.boq,paid:CT.paid||null,at:Date.now()});
+        if(appIsEngineer()){try{const st=await netTO(SB.from('app_settings').select('key,value').in('key',['inv_del_roles','boq_users']),5000);if(!st.error)soPermFrom(st.data||[])}catch(e){}}}
     }catch(e){}
   }
   if(!ok&&!CT.srv)ctFromCache();
@@ -1765,7 +1766,7 @@ function ctFormHTML(){
   const codes=k?ctCodes(k.lines):{};
   const site=sites.find(x=>x.id===f.site)||null;
   const linesHTML=!ready?'<p class="note fw">اختر الموقع والمقاول والبند لتظهر بنود التعاقد.</p>'
-   :!k.lines.length?`<div class="fw"><p class="msg err">لم تُسجَّل بنود التعاقد لهذا المقاول على هذا البند في هذا الموقع بعد.</p>${ctCanApprove({site_owner:site&&site.owner})?'<button type="button" data-ct="boqgo">تسجيل بنود التعاقد</button>':'<p class="note">اطلب من صاحب الموقع تسجيلها من صفحة المستخلصات.</p>'}</div>`
+   :!k.lines.length?`<div class="fw"><p class="msg err">لم تُسجَّل بنود التعاقد لهذا المقاول على هذا البند في هذا الموقع بعد.</p>${ctCanApprove({site_owner:site&&site.owner})||ctBoqMe(f.site)?'<button type="button" data-ct="boqgo">تسجيل بنود التعاقد</button>':'<p class="note">اطلب من صاحب الموقع تسجيلها من صفحة المستخلصات.</p>'}</div>`
    :`<div class="fw tbl-wrap"><table class="ct-lines"><thead><tr><th>م</th><th>البند</th><th>الوحدة</th><th class="num">كمية التعاقد</th><th class="num">الفئة</th><th class="num">السابق</th><th class="num">الإجمالي حتى تاريخه</th><th class="num">نسبة الإنجاز %</th><th class="num">الناتج</th><th>ملاحظات</th></tr></thead><tbody>
      ${k.rows.map(r=>r.l.kind==='sec'?`<tr class="ct-sec"><td>${codes[r.l.id]}</td><td colspan="9"><b>${esc(r.l.desc||'')}</b></td></tr>`
       :`<tr class="${r.need?'row-neg':r.over?'row-over':''}"><td>${codes[r.l.id]}</td><td>${esc(r.l.desc||'')} <span id="ct_op_${r.l.id}">${ctOverPill(r)}</span></td><td>${esc(r.l.unit||'')}</td><td class="num plain">${ctRateOnly(r.l)?'<span class="note">فئة فقط</span>':fmt(r.l.qty)}</td><td class="num plain">${fmt(r.l.rate)}</td><td class="num plain">${fmt(r.ptot)}</td>
@@ -1862,7 +1863,7 @@ function ctBoqLoad(){
 }
 function ctBoqUsed(lid){const s=CT.boqSel;return CT.rows.some(c=>c.site_id===s.site&&c.contractor===s.con&&ctItem(c)===s.item&&((c.data||{}).lines||{})[lid]&&+c.data.lines[lid].tot)}
 function ctBoqHTML(mySites){
-  const s=CT.boqSel,cons=regNames('contractors'),its=regNames('items');ctBoqLoad();const E=CT.boqEdit,auto=E?ctAutoCodes(E.lines):{};
+  const s=CT.boqSel,eg=appIsEngineer()&&s&&s.site,cons=eg&&typeof regsFor==='function'?regsFor(s.site).map(x=>({name:x.name})):regNames('contractors'),its=eg&&typeof siteItems==='function'?siteItems(s.site).map(name=>({name})):regNames('items');ctBoqLoad();const E=CT.boqEdit,auto=E?ctAutoCodes(E.lines):{};
   const total=E?E.lines.filter(l=>l.kind!=='sec').reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0):0;
   const m=CT.boqMsg;CT.boqMsg=null;
   return `<details class="card"${CT.openBoq?' open':''} id="ctBoqBox"><summary class="sec-h" style="cursor:pointer">بنود التعاقد (الكميات والفئات)</summary>
@@ -1932,8 +1933,9 @@ async function ctBoqSave(){
   const bad=lines.filter(l=>l.kind!=='sec'&&(!l.desc||!(l.rate>0)));
   if(bad.length){CT.boqMsg={t:'كل بند يحتاج وصفًا وفئة أكبر من صفر.'};return render()}
   if(!lines.some(l=>l.kind!=='sec')){CT.boqMsg={t:'أضف بندًا واحدًا على الأقل.'};return render()}
-  const site=ctMySites().find(x=>x.id===s.site);
-  const row={id:E.id||'q'+newId(),site_id:s.site,site_owner:ctOwnerOf(site),contractor:s.con,item:s.item,data:{lines,siteName:site?site.name:'',by:myBy(),at:Date.now()}};
+  const eg=appIsEngineer(),site=(eg?ctSitesForForm():ctMySites()).find(x=>x.id===s.site);
+  if(eg&&!ctBoqMe(s.site)){CT.boqMsg={t:'ليس لديك صلاحية على بنود التعاقد في هذا الموقع.'};return render()}
+  const row={id:E.id||'q'+newId(),site_id:s.site,site_owner:eg?(site&&site.owner)||null:ctOwnerOf(site),contractor:s.con,item:s.item,data:{lines,siteName:site?site.name:'',by:myBy(),at:Date.now()}};
   const {error}=await SB.from('cert_boq').upsert(row,{onConflict:'id'});
   if(error){CT.boqMsg={t:'تعذّر الحفظ: '+String(error.message||'').slice(0,120)};return render()}
   await ctLoad();CT.boqEdit=null;CT.boqMsg={ok:1,t:'تم حفظ بنود التعاقد.'};render();
@@ -1969,9 +1971,10 @@ function ctRenderEngineer(){
   ${!CT.form&&CT.msg?`<p class="msg ${CT.msg.ok?'ok':'err'}">${esc(CT.msg.t)}</p>`:''}
   ${sites.length?'':`<div class="card blank"><h3>لا توجد مواقع متاحة لك بعد</h3><p>اطلب من المدير أو صاحب الموقع أن يعطيك صلاحية المستخلصات على الموقع.</p></div>`}
   ${ctFormHTML()}
+  ${ctBoqMe()&&sites.length?ctBoqHTML(sites):''}
   <div class="card"><div class="sec-h">مستخلصات مواقعي</div>${ctListHTML(rows)}</div>`;
   if(!CT.form)CT.msg=null;
-  ctBindForm();
+  ctBindForm();if(ctBoqMe())ctBindBoq(sites);
 }
 /* صفحة المستخلصات للمدير وصاحب الموقع */
 function ctRenderPage(){
@@ -2150,7 +2153,18 @@ function lastMonthEnd(){const d=new Date();d.setDate(0);return d.getFullYear()+'
 /* قفل الفواتير والحد اليومي — بيتظبطوا من الإعدادات (المدير) */
 const SO_LIM_DEF={store_lock_h:72,edit_limit:10,px_pct:10};
 const soIntSet=(rows,k)=>{const x=(rows||[]).find(z=>z.key===k);const v=x&&/^\d+$/.test(String(x.value||''))?+x.value:SO_LIM_DEF[k];return v};
-function soLimFrom(rows){SO.editH=soIntSet(rows,'store_lock_h');SO.editLim=soIntSet(rows,'edit_limit');SO.pxPct=soIntSet(rows,'px_pct');const x=(rows||[]).find(z=>z.key==='store_edit_any');SO.editAny=!!(x&&x.value==='1');appLs('adc_lims_v1',{h:SO.editH,l:SO.editLim,a:SO.editAny,px:SO.pxPct})}
+function soPermFrom(rows){const g=k=>{const x=(rows||[]).find(z=>z.key===k);try{return x&&x.value?JSON.parse(x.value):null}catch(e){return null}};
+  const d=g('inv_del_roles'),b=g('boq_users');SO.delRoles=d&&typeof d==='object'&&!Array.isArray(d)?d:{};SO.boqUsers=Array.isArray(b)?b:[];appLs('adc_perm_v1',{d:SO.delRoles,b:SO.boqUsers})}
+{const c=appLs('adc_perm_v1');SO.delRoles=(c&&c.d)||{};SO.boqUsers=(c&&c.b)||[]}
+/* حذف الفواتير من غير طلب: مفتاح لكل نوع مستخدم من الإعدادات (قرار 3 نوفمبر) */
+const soDelRole=()=>!!(APP&&!APPU.owner&&(SO.delRoles||{})[myRole()]);
+/* الفاتورة داخلة في مستخلص مالك معتمد؟ (المسودة ما بتمنعش الحذف للأدوار المسموح لها) */
+function soLockAppr(L){if(typeof ocLockOf!=='function')return null;for(const o of L){const k=ocLockOf('mv:'+o.id);if(!k)continue;if(k.appr===false)continue;
+  if(k.appr==null&&typeof ocCan==='function'&&ocCan()&&OC.loaded){const c=ocCerts(k.site_id).find(x=>+x.data.no===+k.cert_no);if(c&&c.data.status!=='approved')continue}
+  return k.cert_no||'?'}return null}
+/* بنود التعاقد لمستخدم بعينه (قرار 4 نوفمبر): في المواقع المسجّل عليها */
+const ctBoqMe=siteId=>!!(APP&&APPU.me&&(SO.boqUsers||[]).includes(APPU.me.id)&&appIsEngineer()&&(!siteId||ctSitesForForm().some(x=>x.id===siteId)));
+function soLimFrom(rows){soPermFrom(rows);SO.editH=soIntSet(rows,'store_lock_h');SO.editLim=soIntSet(rows,'edit_limit');SO.pxPct=soIntSet(rows,'px_pct');const x=(rows||[]).find(z=>z.key==='store_edit_any');SO.editAny=!!(x&&x.value==='1');appLs('adc_lims_v1',{h:SO.editH,l:SO.editLim,a:SO.editAny,px:SO.pxPct})}
 {const c=appLs('adc_lims_v1');if(c){SO.editH=c.h;SO.editLim=c.l;SO.editAny=!!c.a;if(c.px!=null)SO.pxPct=c.px}}
 function limCard(){
   const m=SO.limMsg,h=soEditH(),l=quMax();SO.limMsg=null;
@@ -2166,9 +2180,18 @@ function limCard(){
   </div>
   <div class="f" style="margin-top:8px"><label for="lim_px">تنبيه فرق السعر في فواتير المخزن لو السعر اختلف عن آخر سعر للخامة في نفس الموقع بأكتر من</label><select id="lim_px" style="width:auto">${[5,10,15,20,25,30,50].concat([soPxThr()]).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b).map(v=>o(v,v+'%'+(v===10?' (الأساسي)':''),soPxThr())).join('')}</select></div>
   <label class="chk" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="lim_any" ${SO.editAny?'checked':''}> فتح تعديل الفواتير لغير مسجّلها (أي شخص لديه صلاحية على مخزن الموقع يعدّل الفواتير التي سجّلها غيره) — أغلقه عند الانتهاء من التعديلات</label>
+  <div class="sec-h" style="margin-top:12px;font-size:.95em">حذف فواتير المخزن من غير طلب</div>
+  <p class="note">النوع المختار يحذف الفاتورة كلها على طول بدل «طلب حذف». الفاتورة الداخلة في مستخلص مالك <b>معتمد</b> ما تتحذفش؛ لو المستخلص مسودة تتحذف وسطرها في المسودة يتعلّم «اتحذفت».</p>
+  <div class="row" style="gap:14px;flex-wrap:wrap">${['engineer','tech','eng_tech','store','acct'].map(r=>`<label class="chk"><input type="checkbox" data-delrole="${r}" ${(SO.delRoles||{})[r]?'checked':''}> ${esc(ROLE_L[r]||r)}</label>`).join('')}</div>
   <p class="note">الآن: ${h>0?'تُقفل الفاتورة بعد <b>'+h+' ساعة</b>':'<b>الفواتير لا تُقفل بمرور الوقت</b>'} · ${l>0?'<b>'+l+'</b> تعديل وحذف في اليوم':'<b>التعديل والحذف بلا حد يومي</b>'}. ${SO.editAny?' · <b class="neg">تعديل الفواتير مفتوح لغير مسجّلها</b>':''} (قفل الفترات والجرد يعملان كما هما.)</p>
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}`;
 }
+async function permSet(key,val,msg){if(!SB||!APPU.owner)return false;const r=await SB.from('app_settings').upsert({key,value:JSON.stringify(val)},{onConflict:'key'});
+  if(r.error){SO.limMsg={t:ctNetErr(r.error)?'هذا الإعداد يتطلب اتصالًا بالإنترنت.':'تعذّر الحفظ: '+String(r.error.message||'').slice(0,100)};render();return false}
+  if(key==='inv_del_roles')SO.delRoles=val;else SO.boqUsers=val;appLs('adc_perm_v1',{d:SO.delRoles,b:SO.boqUsers});SO.limMsg={ok:1,t:msg};logChange('edit','files',{details:msg});render();return true}
+document.addEventListener('change',ev=>{const t=ev.target;if(!t||!t.dataset)return;
+  if(t.dataset.delrole){const v={...(SO.delRoles||{})},r=t.dataset.delrole;if(t.checked)v[r]=1;else delete v[r];permSet('inv_del_roles',v,(t.checked?'أصبح ':'لم يعد ')+'«'+(ROLE_L[r]||r)+'» '+(t.checked?'يحذف فواتير المخزن على طول':'يحذف فواتير المخزن إلا بطلب'));return}
+  if(t.dataset.boqgrant){const id=t.dataset.boqgrant,L=(SO.boqUsers||[]).filter(x=>x!==id);if(t.checked)L.push(id);const m=(APPU.members||[]).find(x=>x.id===id);permSet('boq_users',L,(t.checked?'أصبح ':'لم يعد ')+'«'+((m&&(m.name||m.email))||'المستخدم')+'» '+(t.checked?'يضيف ويعدّل بنود التعاقد في مواقعه':'يضيف بنود التعاقد'));return}});
 async function limSet(k,v){
   if(!SB||!APPU.owner)return;
   const r=await SB.from('app_settings').upsert({key:k,value:String(v)},{onConflict:'key'});
@@ -2215,6 +2238,7 @@ async function soFlush(){
       try{const r=op.op==='del'?await SB.from(op.t).delete().eq('id',op.id):await SB.from(op.t).upsert(soClean(op.row),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
       if(err&&ctNetErr(err))break;
       appLs(LS_SOQ,soQ().filter(x=>x.qid!==op.qid));done++;
+      if(err){SO.err=SO.err||{};SO.err[op.id]=String(err.message||err).slice(0,160)}
       if(err){const m=String(err.message||'');if(/72h|edit window|quota/.test(m)){const rj=appLs(LS_SOREJ)||[];rj.push({...op,at:Date.now()});appLs(LS_SOREJ,rj.slice(-50))}showBanner('المخزن: لم يُحفظ — '+(/quota/.test(m)?quHit():/72h|edit window/.test(m)?'عدّى '+soEditH()+' ساعة على تسجيل التوريد، فأصبح التعديل للمدير أو صاحب الموقع. التعديل محفوظ على جهازك في صفحة الحركات.':/locked period/.test(m)?lockMsg():/later stock count|locked/.test(m)?'الحركة مقفولة لأن بعدها جرد. اطلب من صاحب الموقع تعديلها.':/no access/.test(m)?'ليس لديك صلاحية على مخزن هذا الموقع.':/only the owner/.test(m)?'حذف الخامات من القائمة للمدير فقط.':m.slice(0,120)))}
     }
   }finally{soBusy=false}
@@ -2317,6 +2341,19 @@ function soItemOpts(sel,onlyPick){
     return `<optgroup label="${esc(m.name)}">${subs.filter(s=>!onlyPick||soPickable(s)).map(s=>`<option value="${esc(s.id)}" ${sel===s.id?'selected':''}>${esc(s.name)}${s.unit?' ('+esc(s.unit)+')':''}</option>`).join('')}</optgroup>`}).join('');
 }
 
+/* ---------- خامة جديدة من سطر الفاتورة (قرار 4 نوفمبر): لو المكتوب مش خامة مسجّلة ---------- */
+const soNewMatBtn=i=>`<button type="button" class="ghost" data-so="newmat" data-i="${i}" title="الخامة دي مش مسجّلة">+ خامة جديدة</button>`;
+function soNewMatRow(f,i,cols){const N=SO.newMat;if(!N||N.i!==i||N.f!==f)return '';const r=(f.rows||[])[i]||{};
+  return `<tr class="so-nm"><td colspan="${cols}"><div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><b>خامة جديدة:</b><input id="so_nmn" value="${esc(N.name??r.txt??'')}" aria-label="اسم الخامة" style="min-width:160px"><input id="so_nmu" value="${esc(N.unit||'')}" placeholder="الوحدة (شيكارة، طن، م3…)" aria-label="الوحدة" style="width:150px"><select id="so_nmp" aria-label="تحت خامة رئيسية"><option value="">— خامة رئيسية —</option>${soMains().map(m=>`<option value="${esc(m.id)}" ${N.parent===m.id?'selected':''}>تحت: ${esc(m.name)}</option>`).join('')}</select><button type="button" class="primary" data-so="nmsave">حفظ الخامة</button><button type="button" class="ghost" data-so="nmcancel">إلغاء</button></div>${N.msg?`<p class="msg err">${esc(N.msg)}</p>`:''}<p class="note">الخامة بتتسجل في قائمة الخامات وتتحط في السطر ده على طول.</p></td></tr>`}
+async function soNewMatSave(){const N=SO.newMat,f=SO.form;if(!N||!f)return;const nm=$('#so_nmn'),un=$('#so_nmu'),pa=$('#so_nmp');
+  N.name=(nm?nm.value:N.name||'').trim();N.unit=(un?un.value:N.unit||'').trim();N.parent=pa?pa.value:(N.parent||'');
+  if(!N.name){N.msg='اكتب اسم الخامة.';return render()}if(!N.unit){N.msg='اكتب وحدة الخامة.';return render()}
+  if(soDup(N.name,N.parent||null)){N.msg='«'+N.name+'» موجودة بالفعل'+(N.parent?' تحت الخامة دي':'')+'. اختارها من القائمة.';return render()}
+  const row={id:'si'+newId(),parent:N.parent||null,name:N.name,unit:N.unit,photo:'',deleted:false,created_by:soMe()};if(!N.parent&&f.sitem)row.sitem=f.sitem;
+  if(SO.err)delete SO.err[row.id];const ok=await soPut('store_items',row),rej=SO.err&&SO.err[row.id];
+  if(rej){N.msg='لم تُحفظ الخامة: رفض الخادم الإضافة ('+rej+'). اطلب من المدير أو صاحب الموقع إضافتها.';return render()}
+  const rr=(f.rows||[])[N.i];if(rr)rr.txt=soPickText(row.id);SO.newMat=null;if(!ok)showBanner('اتسجّلت «'+row.name+'» على الجهاز، وهتترفع لما الإنترنت يرجع.');render();
+  const q=document.getElementById('so_lq_'+N.i);if(q)q.focus()}
 /* ---------- picking a material by typing: «أسمنت (شيكارة)» or «حديد تسليح — حديد 12 مم (طن)» ---------- */
 const soPickText=id=>soLabel(id)+(soUnit(id)?' ('+soUnit(id)+')':'');
 function soPickList(siteId){
@@ -2538,6 +2575,7 @@ function soDelBtns(m,all,canAll){
   if(rq&&APPU.owner)return `<span class="del-req">🗑️ طلب حذف من ${esc(rq.by||'')}</span><button type="button" class="danger inv-ed" data-so="invdelok" data-id="${id}">موافق على الحذف</button><button type="button" class="ghost inv-ed" data-so="invdelno" data-id="${id}">رفض</button>`;
   if(rq)return `<span class="del-req">🗑️ بانتظار موافقة المدير على الحذف</span>${rq.byId===soMe()?`<button type="button" class="ghost inv-ed" data-so="invdelno" data-id="${id}">إلغاء الطلب</button>`:''}`;
   if(appr)return `<button type="button" class="ghost inv-ed" data-so="invdel" data-id="${id}">حذف الفاتورة</button>`;
+  if(soDelRole()&&!all.some(o=>isLocked(o.date))){const no=soLockAppr(all);return no?`<span class="note">🔒 في مستخلص المالك رقم ${esc(String(no))} المعتمد</span>`:`<button type="button" class="ghost inv-ed" data-so="invdel" data-id="${id}">حذف الفاتورة</button>`}
   return canAll?`<button type="button" class="ghost inv-ed" data-so="invreq" data-id="${id}">طلب حذف الفاتورة</button>`:'';
 }
 function soFormGross(f){
@@ -2599,12 +2637,12 @@ function soFormHTML(site){
       <div class="form-foot"><button class="primary" type="submit">حفظ الإشعار</button><button type="button" data-so="cancel">إلغاء</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
     </form></div>`;
   if(soIsInv(f.kind)){const isR=f.kind==='ret',rows=f.rows&&f.rows.length?f.rows:[{txt:'',qty:''}];
-    const line=(r,i)=>{const id=soPickId(r.txt),u=id?soUnit(id):'';return `<tr${f.hlNoPrice&&String(r.txt||'').trim()&&!(+r.price>0)?' class="hl"':''}><td><input id="so_li_${i}" data-sol="${i}" list="so_items" value="${esc(r.txt||'')}" placeholder="اكتب أول حرفين من الخامة" autocomplete="off" aria-label="الخامة ${i+1}"></td><td><input id="so_lq_${i}" class="ct-in" data-solq="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.qty??''}" aria-label="الكمية ${i+1}"></td><td id="so_lu_${i}">${esc(u)}</td><td><input id="so_lp_${i}" class="ct-in" data-solp="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.price??''}" aria-label="سعر الوحدة ${i+1}"></td>${f.id?'':`<td class="acts">${rows.length>1?`<button type="button" class="ghost" data-so="rmline" data-i="${i}" aria-label="حذف السطر">×</button>`:''}</td>`}</tr>`};
+    const line=(r,i)=>{const id=soPickId(r.txt),u=id?soUnit(id):'';return `<tr${f.hlNoPrice&&String(r.txt||'').trim()&&!(+r.price>0)?' class="hl"':''}><td><input id="so_li_${i}" data-sol="${i}" list="so_items" value="${esc(r.txt||'')}" placeholder="اكتب أول حرفين من الخامة" autocomplete="off" aria-label="الخامة ${i+1}"></td><td><input id="so_lq_${i}" class="ct-in" data-solq="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.qty??''}" aria-label="الكمية ${i+1}"></td><td id="so_lu_${i}">${id?esc(u):String(r.txt||'').trim()?soNewMatBtn(i):''}</td><td><input id="so_lp_${i}" class="ct-in" data-solp="${i}" type="number" inputmode="decimal" min="0" step="any" value="${r.price??''}" aria-label="سعر الوحدة ${i+1}"></td>${f.id?'':`<td class="acts">${rows.length>1?`<button type="button" class="ghost" data-so="rmline" data-i="${i}" aria-label="حذف السطر">×</button>`:''}</td>`}</tr>`};
     return `<div class="card entry-card" id="soFormCard"><div class="sec-h">${isR?(f.id||f.inv0?'تعديل مرتجع':'مرتجع للمورد'):f.inv0?'تعديل فاتورة':f.id?'تعديل توريد':'بون توريد'} — ${esc(site.name)}</div>${isR?'<div class="ret-h">المرتجع يُخصم من رصيد الخامات في المخزن ومن حساب المورد.</div>':''}
     <form id="soForm" class="entry" novalidate>
       <div class="f c1 half"><label for="so_date">التاريخ</label><input id="so_date" type="date" value="${esc(f.date)}" ${lockMin()}></div>${lockNote()}
       ${soSupField(site,f)}
-      <div class="fw tbl-wrap"><table class="ct-lines so-bon"><thead><tr><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th><th class="num">سعر الوحدة</th>${f.id?'':'<th></th>'}</tr></thead><tbody>${rows.map(line).join('')}</tbody></table>
+      <div class="fw tbl-wrap"><table class="ct-lines so-bon"><thead><tr><th>الخامة</th><th class="num">الكمية</th><th>الوحدة</th><th class="num">سعر الوحدة</th>${f.id?'':'<th></th>'}</tr></thead><tbody>${rows.map((r,i)=>line(r,i)+soNewMatRow(f,i,f.id?4:5)).join('')}</tbody></table>
       <datalist id="so_items">${soPickList(site.id).map(x=>`<option value="${esc(x.t)}">`).join('')}</datalist></div>
       ${f.id?'':'<div class="fw"><button type="button" class="ghost" data-so="addline">+ خامة</button></div>'}
       ${isR?soRetFields(site,f):f.id?`<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="f c1"><label for="so_inv">رقم الفاتورة (اختياري)</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}"></div>`:`<div class="f c2"><label for="so_sitem">بند التوريد <b class="neg">*</b></label><select id="so_sitem"><option value="">اختر البند</option>${soSitemList(site.id).map(n=>`<option ${soNorm(n)===soNorm(f.sitem)?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="f c1"><label for="so_inv">رقم فاتورة المورد</label><input id="so_inv" maxlength="40" value="${esc(f.inv||'')}" placeholder="مكتوب على الفاتورة"></div>${soNoPreview(site,f)}`}
@@ -2734,7 +2772,7 @@ function soBindForm(site){
   const fm=$('#soForm');if(!fm)return;
   fm.onsubmit=ev=>{ev.preventDefault();soSaveForm(site)};
   fm.addEventListener('input',ev=>{const w=document.getElementById('so_pxw');if(!w||!ev.target||!ev.target.closest('[data-sol],[id^="so_lp_"],#so_date'))return;soReadForm();w.innerHTML=soPxWarnHTML(site,SO.form)});
-  fm.querySelectorAll('[data-sol]').forEach(e=>e.addEventListener('input',()=>{soReadForm();const u=$('#so_lu_'+e.dataset.sol),id=soPickId(e.value);if(u)u.textContent=id?soUnit(id):'';
+  fm.querySelectorAll('[data-sol]').forEach(e=>e.addEventListener('input',()=>{soReadForm();const u=$('#so_lu_'+e.dataset.sol),id=soPickId(e.value);if(u){if(id)u.textContent=soUnit(id);else u.innerHTML=String(e.value||'').trim()?soNewMatBtn(e.dataset.sol):''}
     /* بند التوريد الأساسي للخامة بيتحط لوحده لو لسه ما اتختارش (ويتغيّر يدويًا) */
     const si=$('#so_sitem');if(id&&si&&!si.value){const it=soItem(id),m=it&&it.parent?soItem(it.parent):it,v=m&&m.sitem;if(v){const o=[...si.options].find(x=>soNorm(x.value||x.textContent)===soNorm(v));if(o){si.value=o.value||o.textContent;soReadForm();const p=document.getElementById('so_nop');if(p)p.closest('.f').outerHTML=soNoPreview(site,SO.form)}}}}));
   const ph=$('#so_photo');if(ph)ph.onchange=()=>{SO.pick=ph.files&&ph.files[0]||null;soReadForm();render()};
@@ -2860,7 +2898,9 @@ async function soAddItem(name,unit,parent){
   if(parent&&!unit){SO.catMsg={t:'البند الفرعي يحتاج إلى وحدة (شيكارة، طن، م3، عدد…).'};return false}
   if(soDup(name,parent)){SO.catMsg={t:'«'+name+'» موجود بالفعل'+(parent?' تحت البند نفسه.':' في القائمة.')};return false}
   const row={id:'si'+newId(),parent:parent||null,name,unit,photo:'',deleted:false,created_by:soMe()};
-  const ok=await soPut('store_items',row);SO.catMsg={ok:1,t:'تمت إضافة «'+name+'»'+(ok?'.':' على هذا الجهاز، وسيُرفع عند عودة الاتصال.')};return true;
+  if(SO.err)delete SO.err[row.id];const ok=await soPut('store_items',row);const rej=SO.err&&SO.err[row.id];
+  if(rej){SO.catMsg={t:'لم تُحفظ «'+name+'»: رفض الخادم الإضافة ('+rej+'). اطلب من المدير أو صاحب الموقع إضافتها.'};return false}
+  SO.catMsg={ok:1,t:'تمت إضافة «'+name+'»'+(ok?'.':' على هذا الجهاز، وسيُرفع عند عودة الاتصال.')};return true;
 }
 document.addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-so]');if(!b)return;const a=b.dataset.so,id=b.dataset.id;
@@ -2878,6 +2918,9 @@ document.addEventListener('click',async ev=>{
   if(a==='mvtog'){SO.mvOpen=!SO.mvOpen;render();return}
   if(a==='balg'){const G=SO.balG||(SO.balG=new Set());if(G.has(id))G.delete(id);else G.add(id);render();return}
   if(a==='retry'){SO.loaded=false;render();return}
+  if(a==='newmat'){soReadForm();const i=+b.dataset.i,r=(SO.form.rows||[])[i]||{};SO.newMat={i,f:SO.form,name:String(r.txt||'').trim(),unit:'',parent:''};render();const u=$('#so_nmu');if(u)u.focus();return}
+  if(a==='nmcancel'){SO.newMat=null;render();return}
+  if(a==='nmsave'){soReadForm();await soNewMatSave();return}
   if(a==='addline'){soReadForm();SO.form.rows=[...(SO.form.rows||[]),{txt:'',qty:''}];render();const n=document.getElementById('so_li_'+(SO.form.rows.length-1));if(n)n.focus();return}
   if(a==='addsup'){soReadForm();const n=b.dataset.n;if(n&&typeof addReg==='function'){addReg('contractors',{name:n,kind:'supplier'});SO.msg={ok:1,t:'أُضيف «'+n+'» إلى قائمة الموردين. اضغط حفظ مرة أخرى.'}}render();return}
   if(a==='dupmerge'){soReadForm();soDupMerge(SO.form);SO.msg={ok:1,t:'دُمجت السطور المكررة ذات السعر نفسه. راجع الكميات واضغط حفظ.'};render();return}
@@ -2894,7 +2937,11 @@ document.addEventListener('click',async ev=>{
     SO.msg=null;render();const x=$('#soFormCard');if(x)x.scrollIntoView({block:'start'});return}
   if(a==='invdel'||a==='invdelok'||a==='invreq'||a==='invdelno'){const m=(SO.d.moves||[]).find(x=>x.id===id);if(!m)return;const L=soInvLines(m),tot=r2(L.reduce((t,o)=>t+(+(o.data||{}).price||0)*(+(o.data||{}).qty||0),0));
     const what=L.length+(L.length===1?' صنف':' أصناف')+(tot?' بقيمة '+fmt(tot)+' '+CUR:'');
-    if(a==='invdel'||a==='invdelok'){if(!(soCanAppr(m.site_id)||APPU.owner))return;if(!confirm('حذف الفاتورة كلها ('+what+')؟ ستنتقل إلى المحذوفات ويمكنك استرجاعها.'))return;await soInvDelAll(L);SO.msg={ok:1,t:'حُذفت الفاتورة ('+what+') ونُقلت إلى المحذوفات.'}}
+    if(a==='invdel'||a==='invdelok'){const own=soCanAppr(m.site_id)||APPU.owner;if(!own&&!(a==='invdel'&&soDelRole()))return;
+      if(!own){const no=soLockAppr(L);if(no){SO.msg={t:'الفاتورة داخلة في مستخلص المالك رقم '+no+' المعتمد، فما ينفعش تتحذف. اطلب من صاحب الموقع.'};render();return}}
+      if(!confirm('حذف الفاتورة كلها ('+what+')؟ ستنتقل إلى المحذوفات ويمكنك استرجاعها.'))return;
+      if(SO.err)for(const o of L)delete SO.err[o.id];await soInvDelAll(L);const rj=L.map(o=>SO.err&&SO.err[o.id]).find(Boolean);
+      SO.msg=rj?{t:'السيرفر رفض حذف جزء من الفاتورة ('+rj+'). لو الصلاحية متفعّلة من الإعدادات، لازم ملف التحديث (SQL) يتشغّل على Supabase.'}:{ok:1,t:'حُذفت الفاتورة ('+what+') ونُقلت إلى المحذوفات.'}}
     else if(a==='invreq'){if(!L.every(soCanEdit))return;if(!confirm('حذف الفاتورة كاملة يحتاج إلى موافقة المدير. هل ترسل طلب حذف ('+what+')؟'))return;await soInvReq(L,true);SO.msg={ok:1,t:'أُرسل طلب الحذف إلى المدير.'}}
     else{await soInvReq(L,false);SO.msg={ok:1,t:APPU.owner?'رُفض طلب الحذف.':'أُلغي طلب الحذف.'}}
     render();return}
@@ -4648,7 +4695,7 @@ function cdtData(){
   const its=typeof SO!=='undefined'&&SO.d?(SO.d.items||[]).filter(i=>!i.deleted):[],mains=its.filter(i=>!i.parent).sort(soByName);
   const subsOf=id=>its.filter(i=>i.parent===id).sort(soByName),matsOf=n=>mains.filter(m=>m.sitem&&soNorm(m.sitem)===soNorm(n));
   const linked=new Set(items.map(n=>soNorm(n))),loose=mains.filter(m=>!m.sitem||!linked.has(soNorm(m.sitem)));
-  return {pf,items,groups:[...by.values()].sort((a,b)=>(cdG(a.name)||a.name).localeCompare(cdG(b.name)||b.name,'ar')),free,mains,subsOf,matsOf,loose};
+  return {pf,items,groups:[...by.values()].sort((a,b)=>igOrd(a.name)-igOrd(b.name)||(cdG(a.name)||a.name).localeCompare(cdG(b.name)||b.name,'ar')),free,mains,subsOf,matsOf,loose};
 }
 /* الأماكن اللي ينفع النقل ليها */
 function cdtTargets(D,mv){
@@ -4685,12 +4732,12 @@ function cdTreeTab(hub){
   const tog=k=>q||CDP.topen.has(k);
   const hb=(k,id)=>hub?`<button type="button" class="ghost cdt-mv" data-ithub="${k}" data-id="${esc(id)}" title="تعديل / دمج / حذف" aria-label="تعديل أو دمج أو حذف">⋯</button>`:'';
   const hx=(k,id)=>hub?itHubBox(D,k,id):'';
-  const gb=n=>hub&&igGroups(igMyPf()).some(x=>regNormK(x.name)===regNormK(n))?`<button type="button" class="ghost cdt-mv" data-igren="${esc(n)}">تعديل الاسم</button><button type="button" class="ghost cdt-mv" data-igdel="${esc(n)}">حذف</button>`:'';
+  const gb=n=>hub&&igGroups(igMyPf()).some(x=>regNormK(x.name)===regNormK(n))?`<button type="button" class="ghost cdt-mv" data-igmv="up" data-name="${esc(n)}" title="لأعلى" aria-label="تحريك ${esc(n)} لأعلى">↑</button><button type="button" class="ghost cdt-mv" data-igmv="down" data-name="${esc(n)}" title="لأسفل" aria-label="تحريك ${esc(n)} لأسفل">↓</button><button type="button" class="ghost cdt-mv" data-igren="${esc(n)}">تعديل الاسم</button><button type="button" class="ghost cdt-mv" data-igdel="${esc(n)}">حذف</button>`:'';
   const matHit=m=>hit(m.name)||D.subsOf(m.id).some(s=>hit(s.name));
   const sub=s=>!hit(s.name)&&!q?'':`<div class="cdt-n l3" draggable="true" data-dnd="sub|${esc(s.id)}">${code('M',s.id,cdM(s.id))}<span class="grow">${esc(s.name)}</span><small class="note">${esc(s.unit||'')}</small>${cdtCanMat()?mvBtn('sub',s.id):''}${hb('sub',s.id)}</div>${mvBox('sub',s.id)}${hx('sub',s.id)}`;
   const mat=(m,lvl)=>{const S2=D.subsOf(m.id),o=tog('m:'+m.id);return `<div class="cdt-n ${lvl}" draggable="true" data-dnd="main|${esc(m.id)}" data-drop="m|${esc(m.id)}">${S2.length?`<button type="button" class="cdt-t" data-cdttog="m:${esc(m.id)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('M',m.id,cdM(m.id))}<span class="grow">${esc(m.name)} <small class="note">(خامة${S2.length?' · '+S2.length+' فرعية':m.unit?' · '+esc(m.unit):''})</small></span>${cdtCanMat()?mvBtn('main',m.id):''}${hb('main',m.id)}</div>${mvBox('main',m.id)}${hx('main',m.id)}${o?S2.map(s=>sub(s)).join(''):''}`};
   const item=n=>{const t=itType(n),M=D.matsOf(n),o=tog('i:'+n),show=hit(n)||M.some(matHit);if(!show)return '';
-    return `<div class="cdt-n l1" draggable="true" data-dnd="item|${esc(n)}"${itNeedSup(n)||!t&&/توريد/.test(n)?` data-drop="s|${esc(n)}"`:''}>${M.length?`<button type="button" class="cdt-t" data-cdttog="i:${esc(n)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('I',arNorm(n),cdI(n))}<span class="grow"><b>${esc(n)}</b> ${itTag(t)||'<small class="note">من دون نوع</small>'}${M.length?` <small class="note">(${M.length} خامة)</small>`:''}</span>${mvBtn('item',n)}${hb('item',n)}</div>${mvBox('item',n)}${hx('item',n)}${o?M.map(m=>mat(m,'l2')).join(''):''}`};
+    return `<div class="cdt-n l1" draggable="true" data-dnd="item|${esc(n)}"${itNeedSup(n)||!t&&/توريد/.test(n)?` data-drop="s|${esc(n)}"`:''}>${M.length?`<button type="button" class="cdt-t" data-cdttog="i:${esc(n)}">${o?'▾':'◂'}</button>`:'<span class="cdt-t">•</span>'}${code('I',arNorm(n),cdI(n))}<span class="grow"><b>${esc(n)}</b> ${itTag(t)||'<small class="note">من دون نوع</small>'}${t==='srv'?(()=>{const r=itRec(n),st=r&&r.stype;return st?` <small class="note">· ${esc(st)}</small>`:' <small class="neg">· من غير تصنيف</small>'})():''}${M.length?` <small class="note">(${M.length} خامة)</small>`:''}</span>${mvBtn('item',n)}${hb('item',n)}</div>${mvBox('item',n)}${hx('item',n)}${o?M.map(m=>mat(m,'l2')).join(''):''}`};
   const group=g=>{const body=g.items.map(item).join(''),o=tog('g:'+g.name);if(q&&!body&&!hit(g.name))return '';
     return `<div class="cdt-n l0" data-drop="g|${esc(g.name)}"><button type="button" class="cdt-t" data-cdttog="g:${esc(g.name)}">${o?'▾':'◂'}</button>${code('G',arNorm(g.name),cdG(g.name))}<span class="grow">${esc(g.name)} <small>(بند عام · ${g.items.length})</small></span>${gb(g.name)}</div>${o?body||'<p class="note" style="margin:4px 30px">لا توجد بنود تحته.</p>':''}`};
   const sug=D.loose.map(m=>({m,s:cdMatSuggest(m)})).filter(x=>x.s);
@@ -4712,21 +4759,31 @@ function itUsed(n){const k=regNormK(n);if(!k)return false;
 function itHubBox(D,k,id){if(!CDP.act||CDP.act.k!==k||CDP.act.id!==id)return '';
   if(k==='item'){const L=D.items.filter(n=>n!==id).sort((a,b)=>a.localeCompare(b,'ar'));
     return `<div class="cdt-box"><b>«${esc(id)}»</b><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button type="button" class="primary" data-regedit="items" data-name="${esc(id)}">تعديل (الاسم، النوع، البند العام)</button><button type="button" class="ghost" data-stmt="items" data-name="${esc(id)}">كشف حساب</button><button type="button" class="danger" data-ithdel>حذف</button></div>
+      ${(()=>{const r=itRec(id),t=itType(id)||'',st=(r&&r.stype)||'',SV=svcList();return `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><label for="ithType">التصنيف</label><select id="ithType"><option value="">— اختر —</option>${IT_TYPES.map(([v,l])=>`<option value="${v}" ${t===v?'selected':''}>${l}</option>`).join('')}</select><select id="ithStype" aria-label="نوع الخدمة" ${t==='srv'?'':'hidden'}><option value="">— نوع الخدمة —</option>${SV.map(x=>`<option value="${esc(x.name)}" ${x.name===st?'selected':''}>${esc(x.name)}</option>`).join('')}${st&&!SV.some(x=>x.name===st)?`<option selected>${esc(st)}</option>`:''}</select><button type="button" class="ghost" data-ithtype>حفظ التصنيف</button></div>`})()}
       <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><select id="ithMg" aria-label="دمج في"><option value="">دمج في بند تاني…</option>${L.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select><button type="button" class="ghost" data-ithmerge>دمج</button><button type="button" class="ghost" data-ithx>إغلاق</button></div>
       <p class="note">الدمج بينقل كل المصروفات والمستخلصات والفواتير للبند التاني، والبند ده بيختفي. البند اللي عليه حركات ما ينفعش يتحذف، ادمجه.</p></div>`}
   const it=soItem(id);if(!it)return '';const C=typeof soMergeCands==='function'?soMergeCands(it):[];
   return `<div class="cdt-box"><b>«${esc(soLabel(id))}»</b><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button type="button" class="primary" data-ithren>تعديل الاسم</button>${APPU.owner?'<button type="button" class="danger" data-ithdel>حذف</button>':''}</div>
     ${APPU.owner?`<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><select id="ithMg" aria-label="دمج في"><option value="">دمج في خامة تانية…</option>${C.map(x=>`<option value="${esc(x.id)}">${esc(soLabel(x.id))}</option>`).join('')}</select><button type="button" class="ghost" data-ithmerge>دمج</button><button type="button" class="ghost" data-ithx>إغلاق</button></div><p class="note">الدمج بينقل كل حركات المخزن للخامة التانية. الخامة اللي عليها حركات ما ينفعش تتحذف، ادمجها.</p>`:'<button type="button" class="ghost" data-ithx>إغلاق</button>'}</div>`}
+document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='ithType'){const w=$('#ithStype');if(w)w.hidden=ev.target.value!=='srv'}});
+/* بنود خدمات ومصاريف (نثريات، انتقالات…) من غير نوع خدمة */
+function itSvcMissCard(){const L=regNames('items').filter(x=>x.reg&&itType(x.name)==='srv'&&!((itRec(x.name)||{}).stype));if(!L.length)return '';const SV=svcList();
+  return `<div class="card hl-soft"><div class="sec-h">بنود خدمات ومصاريف من غير تصنيف (${L.length})</div><p class="note">البنود اللي مالهاش مقاول (نثريات، انتقالات، مرتبات…) اختارلها نوع الخدمة عشان تتجمع صح في التقارير.</p>
+  <div class="tbl-wrap"><table class="reg-t"><tbody>${L.map(x=>`<tr><td class="rn"><b>${esc(x.name)}</b></td><td><select data-svcpick="${esc(x.name)}" aria-label="نوع الخدمة لـ${esc(x.name)}"><option value="">— نوع الخدمة —</option>${SV.map(v=>`<option value="${esc(v.name)}">${esc(v.name)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div>`}
+document.addEventListener('change',ev=>{const s=ev.target.closest&&ev.target.closest('[data-svcpick]');if(!s||!s.value)return;const n=s.dataset.svcpick,ok=itSetType(n,'srv',s.value);cdtMsg(ok?'«'+n+'»: '+s.value+'.':'ما تقدرش تعدّل تصنيف «'+n+'».',ok)});
 function itHubCard(){
   if(typeof SO!=='undefined'&&!SO.loaded&&!SO._ld&&typeof soLoad==='function')soLoad().then(()=>{if(S.sel==='__items')render()}).catch(()=>{});
   const m=CDP.msg&&Date.now()-(CDP.msg.at||0)<20000?CDP.msg:null,g=S.igMsg;S.igMsg=null;
   return `${APP&&S.isManager&&typeof svcCard==='function'?svcCard(false):''}<div class="sec-h" style="margin-top:6px">كل البنود: البند العام ← البند ← الخامات</div>
   <p class="note">⋯ جنب أي بند أو خامة: تعديل، كشف حساب، دمج، حذف. البند العام: «تعديل الاسم» و«حذف» جنبه. «نقل» أو السحب لتغيير المكان. الخامات بتظهر لما تفتح بند التوريدات.</p>
-  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}${g?`<p class="msg ${g.ok?'ok':'err'}">${esc(g.t)}</p>`:''}${cdTreeTab(true)}`}
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}${g?`<p class="msg ${g.ok?'ok':'err'}">${esc(g.t)}</p>`:''}${itSvcMissCard()}${cdTreeTab(true)}`}
 document.addEventListener('click',async ev=>{
   const a=ev.target.closest('[data-ithub]');if(a){const k=a.dataset.ithub,id=a.dataset.id;CDP.act=CDP.act&&CDP.act.k===k&&CDP.act.id===id?null:{k,id};S.justSaved=true;render();return}
   if(ev.target.closest('[data-ithx]')){CDP.act=null;S.justSaved=true;render();return}
+  const gm=ev.target.closest('[data-igmv]');if(gm){igMove(gm.dataset.name,gm.dataset.igmv);S.justSaved=true;render();return}
   if(!CDP.act)return;const {k,id}=CDP.act;
+  if(ev.target.closest('[data-ithtype]')&&k==='item'){const t=($('#ithType')||{}).value||'',st=($('#ithStype')||{}).value||'';if(!t){cdtMsg('اختر التصنيف.',false);return}if(t==='srv'&&!st){cdtMsg('اختر نوع الخدمة (مثال: انتقالات، نثريات، مرتبات).',false);return}
+    const ok=itSetType(id,t,st);cdtMsg(ok?'«'+id+'»: '+itTypeLbl(t)+(t==='srv'?' — '+st:'')+'.':'ما تقدرش تعدّل تصنيف «'+id+'».',ok);return}
   if(ev.target.closest('[data-ithmerge]')){const sel=$('#ithMg'),to=sel&&sel.value;if(!to){cdtMsg('اختر اللي هيتدمج فيه.',false);return}
     if(!navigator.onLine||!SB){cdtMsg('الدمج محتاج اتصال بالإنترنت.',false);return}
     if(k==='item'){if(!confirm('دمج «'+id+'» في «'+to+'»؟\nكل المصروفات والمستخلصات والفواتير اللي على «'+id+'» هتتنقل لـ«'+to+'»، و«'+id+'» هيختفي. الخطوة دي مش بترجع.'))return;
@@ -7097,6 +7154,11 @@ function igRollup(exps,pfOf){
 const igAnyGroups=()=>(S.items||[]).some(r=>r&&r.kind==='group'&&!r.hidden);
 /* تغيير اسم البند العام (أو حذفه بـ newN='') بيتطبّق على أقسام مستخلصات المالك اللي مرتبطة بيه */
 function ocGroupRefs(oldN,newN){const k=regNormK(oldN);let n=0;if(!k||typeof OC==='undefined')return 0;for(const P of OC.rows.filter(r=>r.kind==='proj')){const secs=(P.data&&P.data.secs)||[];if(!secs.some(x=>regNormK(x.g)===k))continue;const d=ocClone(P.data);for(const x of d.secs)if(regNormK(x.g)===k){x.g=newN||'';if(newN)x.title=newN}ocPut({...P,data:d});n++}return n}
+/* ترتيب البنود العامة (قرار 4 نوفمبر): ord على سجل البند العام؛ اللي مالوش ترتيب في الآخر بالكود/الاسم */
+function igRec(name){const k=regNormK(name);return igGroups(igMyPf()).find(x=>regNormK(x.name)===k)||igGroups('').find(x=>regNormK(x.name)===k)||null}
+function igOrd(name){const g=igRec(name);return g&&g.ord!=null&&g.ord!==''?+g.ord:1e9}
+function igMove(name,dir){const L=cdtData().groups.map(g=>g.name),i=L.findIndex(n=>regNormK(n)===regNormK(name)),j=i+(dir==='up'?-1:1);if(i<0||j<0||j>=L.length)return;
+  [L[i],L[j]]=[L[j],L[i]];const mine=igGroups(igMyPf());L.forEach((n,k)=>{const g=mine.find(x=>regNormK(x.name)===regNormK(n));if(g&&+g.ord!==k)igSave(g,{ord:k})})}
 function igSave(g,patch){const d={...clean(g),...patch,updated:Date.now()};queue('items',g.id,d)}
 function igCreate(name){name=String(name||'').trim();if(!name)return 'اكتب اسم البند العام.';const pf=igMyPf();
   if(igGroups(pf).some(g=>regNormK(g.name)===regNormK(name)))return 'هذا البند العام موجود.';
@@ -8082,7 +8144,7 @@ function ocConLines(site,P,T,lines){
 /* المسودة: البيان والقيمة ورقم الفاتورة بيتحدّثوا من الحركة نفسها */
 function ocRefresh(c,site,P,T){if(c.data.status==='approved')return;const M=new Map(ocMoves(site,P,T).map(m=>[m.key,m]));
   for(const l of c.data.lines||[]){if(!l.src||/^k:/.test(l.src))continue;const m=M.get(l.src);
-    if(!m){const any=/^e:/.test(l.src)?S.exp.some(e=>'e:'+e.id===l.src&&!e.deleted):true;l.gone=!any;continue}l.gone=false;l.rate=m.val;
+    if(!m){const any=/^e:/.test(l.src)?S.exp.some(e=>'e:'+e.id===l.src&&!e.deleted):/^i:/.test(l.src)&&typeof SO!=='undefined'&&SO.d?accInvs({ids:new Set([site.id])}).some(x=>'i:'+x.k===l.src):true;l.gone=!any;continue}l.gone=false;l.rate=m.val;
     if(m.kind==='inv'){l.curNo=m.no;if(!l.descSet)l.desc=m.desc;l.numNote=l.srcNo&&m.no&&l.srcNo!==m.no&&l.srcCert?'كانت رقم ('+l.srcNo+') في المستخلص رقم '+l.srcCert:''}
     else if(!l.descSet)l.desc=m.desc}}
 function ocLineFromMove(m){return {id:'l'+newId(),s:m.s,part:m.part,src:m.key,desc:m.desc,unit:m.kind==='exp'?'':'فاتورة',cq:1,rate:m.val,prevQ:0,totQ:1,pct:100,srcNo:m.no||null}}
@@ -8478,7 +8540,7 @@ var OCL={m:new Map(),at:0,missing:false,_ld:null};
 {const c=appLs('adc_ocl_v1');if(c&&Array.isArray(c.rows))OCL.m=new Map(c.rows.map(r=>[r.id,r]))}
 function ocLockOf(id){return OCL.m.get(id)||null}
 function ocLocksLoad(force){if(!APP||!SB||OCL._ld||OCL.missing||!navigator.onLine)return;if(!force&&Date.now()-OCL.at<120e3)return;OCL.at=Date.now();
-  OCL._ld=(async()=>{try{const r=await netTO(SB.from('owner_locks').select('id,site_id,cert_no'),8000);
+  OCL._ld=(async()=>{try{const r=await netTO(SB.from('owner_locks').select('*'),8000);
     if(r.error){if(/owner_locks|relation|does not exist|schema cache/i.test(r.error.message||''))OCL.missing=true;return}
     const before=OCL.m.size;OCL.m=new Map((r.data||[]).map(x=>[x.id,x]));appLs('adc_ocl_v1',{rows:r.data||[],at:Date.now()});if(before!==OCL.m.size)try{render()}catch(e){}}catch(e){}})().finally(()=>{OCL._ld=null})}
 function ocLockIdsOf(site,src){
@@ -8487,9 +8549,11 @@ function ocLockIdsOf(site,src){
   return []}
 async function ocLockSync(site){
   if(!SB||!navigator.onLine||OCL.missing)return;
-  const want=new Map();for(const c of ocCerts(site.id))for(const l of c.data.lines||[])if(l.src)for(const id of ocLockIdsOf(site,l.src))if(!want.has(id))want.set(id,c.data.no);
-  const have=[...OCL.m.values()].filter(x=>x.site_id===site.id),add=[...want].filter(([id])=>!OCL.m.has(id)).map(([id,no])=>({id,site_id:site.id,site_owner:ocOwnerOf(site),cert_no:+no||null,by_id:S.uid||null})),del=have.filter(x=>!want.has(x.id)).map(x=>x.id);
-  try{if(add.length){const {error}=await netTO(SB.from('owner_locks').upsert(add),12000);if(error){if(/owner_locks|relation|does not exist|schema cache/i.test(error.message||''))OCL.missing=true;return}for(const r of add)OCL.m.set(r.id,r)}
+  const want=new Map();for(const c of ocCerts(site.id))for(const l of c.data.lines||[])if(l.src)for(const id of ocLockIdsOf(site,l.src)){const ap=c.data.status==='approved',w=want.get(id);if(!w||(ap&&!w.ap))want.set(id,{no:c.data.no,ap})}
+  const have=[...OCL.m.values()].filter(x=>x.site_id===site.id),del=have.filter(x=>!want.has(x.id)).map(x=>x.id);
+  const add=[...want].filter(([id,w])=>{const h=OCL.m.get(id);return !h||(!OCL.noAppr&&h.appr!==w.ap)}).map(([id,w])=>{const r={id,site_id:site.id,site_owner:ocOwnerOf(site),cert_no:+w.no||null,by_id:S.uid||null};if(!OCL.noAppr)r.appr=w.ap;return r});
+  try{if(add.length&&!OCL.noAppr){const {error}=await netTO(SB.from('owner_locks').upsert(add),12000);if(error&&/appr/.test(error.message||'')){OCL.noAppr=true;for(const r of add)delete r.appr}else if(!error){for(const r of add)OCL.m.set(r.id,r);add.length=0}}
+    if(add.length){const {error}=await netTO(SB.from('owner_locks').upsert(add),12000);if(error){if(/owner_locks|relation|does not exist|schema cache/i.test(error.message||''))OCL.missing=true;return}for(const r of add)OCL.m.set(r.id,r)}
     if(del.length){const {error}=await netTO(SB.from('owner_locks').delete().in('id',del),12000);if(!error)for(const id of del)OCL.m.delete(id)}
     appLs('adc_ocl_v1',{rows:[...OCL.m.values()],at:Date.now()})}catch(e){}}
 /* ---------- اللوجوهات: الشركة من «شكل التقارير»، المالك والاستشاري من ملف المشروع ---------- */
