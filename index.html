@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#7a1416"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ADC حسابات"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>.ent-bar{border:1px solid #c27a1a;background:rgba(217,130,43,.14)}.ni-li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ni-li>.linkish{flex:1;text-align:start}.ni-x{font-size:12px;padding:2px 10px;min-height:0}.ni-gx{display:flex;justify-content:flex-end;margin:-4px 0 8px}input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}.oc-band{background:var(--accent);color:var(--on-accent);font-weight:700;padding:6px 10px;border-radius:6px;margin:10px 0 4px}
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#7a1416"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ADC حسابات"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>.sp-prev tr.ok-row td{color:var(--muted)}.chk-ed select{min-width:160px}@media print{.no-print{display:none!important}}.ent-bar{border:1px solid #c27a1a;background:rgba(217,130,43,.14)}.ni-li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ni-li>.linkish{flex:1;text-align:start}.ni-x{font-size:12px;padding:2px 10px;min-height:0}.ni-gx{display:flex;justify-content:flex-end;margin:-4px 0 8px}input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}.oc-band{background:var(--accent);color:var(--on-accent);font-weight:700;padding:6px 10px;border-radius:6px;margin:10px 0 4px}
 .oc-sec{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}.oc-sh{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.oc-src{font-size:.92em;margin-bottom:6px}
 table.oc-t input{padding:3px 5px;font-size:.92em}table.oc-t input{width:auto;min-width:0}table.oc-t .w-n{width:78px}table.oc-t .w-p{width:54px}table.oc-t .w-s{width:56px}table.oc-t .w-d{width:min(300px,48vw)}table.oc-t .w-m{width:120px}
 #pane .oc-pg select[data-octype],#pane .oc-pg .row select,#pane .oc-pg .row input:not([type=checkbox]),#pane .oc-pg .oc-sh select,#pane .oc-pg .oc-src select,#pane .oc-inl input,#pane .oc-inl select,#ocSum input{width:auto;display:inline-block;min-width:0}#ocSum input{width:90px}table.oc-t td{padding:4px 5px}
@@ -1316,6 +1316,20 @@ async function custFlush(){
 function custPut(row){if(row&&row.data&&isFut(row.data.date)){const o=custMerged().find(x=>x.id===row.id);if(!o||(o.data||{}).date!==row.data.date){showBanner(FUT_MSG);return false}}const q=custQ().filter(x=>!(x.id===row.id&&x.op==='put'));q.push({qid:newId(),op:'put',id:row.id,row});appLs(LS_CUSTQ,q);custFlush();try{render()}catch(e){}}
 function custDel(id){const q=custQ().filter(x=>x.id!==id);q.push({qid:newId(),op:'del',id});appLs(LS_CUSTQ,q);custFlush();try{render()}catch(e){}}
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-reglim]');if(!b)return;S.regLim=b.dataset.reglim==='all'?1e9:(S.regLim||60)+100;S.justSaved=true;render()});
+/* ===== الحركات اللي السيرفر رفضها (مصروفات/إيداعات/جرد) ما بتتمسحش — 11 نوفمبر ===== */
+const LS_REJX='adc_rej_docs_v1';
+const rejList=()=>lsGet(LS_REJX)||[];
+function rejKeep(p,why){const L=rejList().filter(x=>!(x.col===p.col&&x.id===p.id));L.push({rid:newId(),col:p.col,id:p.id,data:p.data,pfx:p.pfx,why,at:Date.now()});lsSet(LS_REJX,L.slice(-200))}
+function rejCard(siteId){const L=rejList().filter(x=>!siteId||(x.data||{}).siteId===siteId||(x.col==='sites'&&x.id===siteId));if(!L.length)return '';
+  const K={expenses:'مصروف',deposits:'إيداع',counts:'جرد',sites:'موقع',contractors:'مقاول/مورد',items:'بند'};
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h">⚠ حركات لم تُحفظ على الخادم (${L.length})</div><p class="note">رفض الخادم هذه الحركات، وهي محفوظة على هذا الجهاز فقط. صحّح السبب ثم اضغط «إعادة المحاولة»، أو احذفها.</p>
+  ${L.map(x=>{const d=x.data||{};return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:8px 0"><div style="flex:1;min-width:200px"><b>${d.deleted?'حذف ':''}${esc(K[x.col]||x.col)}</b>${d.date?' · '+esc(d.date):''}${d.amount!=null?' · <b>'+fmt(amt(d))+'</b>':''}${d.contractor?' · '+esc(d.contractor):''}${d.item?' · '+esc(d.item):''}${!siteId&&d.siteId?' · '+esc(siteNameOf(d.siteId)):''}<br><span class="neg">السبب: ${esc(x.why)}</span></div>
+    <button type="button" class="primary" data-rejx="retry" data-r="${esc(x.rid)}">إعادة المحاولة</button><button type="button" class="ghost danger" data-rejx="del" data-r="${esc(x.rid)}">حذف</button></div>`}).join('')}</div>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-rejx]');if(!b)return;const r=rejList().find(x=>x.rid===b.dataset.r);if(!r)return;
+  if(b.dataset.rejx==='del'&&!confirm('حذف هذه الحركة من الجهاز؟ لن تُحفظ على الخادم.'))return;
+  lsSet(LS_REJX,rejList().filter(x=>x.rid!==r.rid));
+  if(b.dataset.rejx==='retry'){S.pending=S.pending.filter(p=>!(p.col===r.col&&p.id===r.id));S.pending.push({col:r.col,id:r.id,data:{...r.data,updated:Date.now()},pfx:r.pfx});savePending();merge();flush()}
+  S.justSaved=true;render()});
 /* حركات العهدة اللي السيرفر رفضها: ما بتتمسحش، بتفضل على الجهاز بالسبب (8 نوفمبر) */
 function custErrText(m){m=String(m||'');
   if(/invoice required/i.test(m))return custInvMsg;
@@ -2283,7 +2297,7 @@ async function soFlush(){
       if(err&&ctNetErr(err))break;
       appLs(LS_SOQ,soQ().filter(x=>x.qid!==op.qid));done++;
       if(err){SO.err=SO.err||{};SO.err[op.id]=String(err.message||err).slice(0,160)}
-      if(err){const m=String(err.message||'');if(/72h|edit window|quota/.test(m)){const rj=appLs(LS_SOREJ)||[];rj.push({...op,at:Date.now()});appLs(LS_SOREJ,rj.slice(-50))}showBanner('المخزن: لم يُحفظ — '+(/quota/.test(m)?quHit():/72h|edit window/.test(m)?'عدّى '+soEditH()+' ساعة على تسجيل التوريد، فأصبح التعديل للمدير أو صاحب الموقع. التعديل محفوظ على جهازك في صفحة الحركات.':/locked period/.test(m)?lockMsg():/later stock count|locked/.test(m)?'الحركة مقفولة لأن بعدها جرد. اطلب من صاحب الموقع تعديلها.':/no access/.test(m)?'ليس لديك صلاحية على مخزن هذا الموقع.':/only the owner/.test(m)?'حذف الخامات من القائمة للمدير فقط.':m.slice(0,120)))}
+      if(err){const m=String(err.message||'');{const why=/quota/.test(m)?'نفدت تعديلات اليوم.':/72h|edit window/.test(m)?'انتهت مدة التعديل ('+soEditH()+' ساعة) — التعديل للمدير أو صاحب الموقع.':/locked period/.test(m)?'الفترة مقفولة.':/later stock count/.test(m)?'بعدها جرد.':/no access/.test(m)?'لا توجد صلاحية على مخزن هذا الموقع.':/supplier|supply item/.test(m)?'المورد أو بند التوريد غير صحيح.':/whole invoice/.test(m)?'حذف الفاتورة كلها لصاحب الموقع.':/owner cert|locked/.test(m)?'الفاتورة مقفولة (مستخلص مالك أو قفل).':'رفض الخادم: '+m.slice(0,80);const rj=(appLs(LS_SOREJ)||[]).filter(o=>o.id!==op.id);rj.push({...op,why,at:Date.now()});appLs(LS_SOREJ,rj.slice(-100))}showBanner('المخزن: لم يُحفظ — '+(/quota/.test(m)?quHit():/72h|edit window/.test(m)?'عدّى '+soEditH()+' ساعة على تسجيل التوريد، فأصبح التعديل للمدير أو صاحب الموقع. التعديل محفوظ على جهازك في صفحة الحركات.':/locked period/.test(m)?lockMsg():/later stock count|locked/.test(m)?'الحركة مقفولة لأن بعدها جرد. اطلب من صاحب الموقع تعديلها.':/no access/.test(m)?'ليس لديك صلاحية على مخزن هذا الموقع.':/only the owner/.test(m)?'حذف الخامات من القائمة للمدير فقط.':m.slice(0,120)))}
     }
   }finally{soBusy=false}
   if(done)await soLoad();else SO.d=soData();
@@ -2536,8 +2550,8 @@ function soMovesHTML(site){
   const seenB=new Set(),bonHead=m=>{if(m.kind!=='in')return '';const k=soInvKey(m),x=invs.get(k);if(!x||seenB.has(k))return '';seenB.add(k);const all=soInvLines(m),canAll=all.every(soCanEdit),ph=soInvPhoto(all);
     return `<tr class="ct-sec${soDelReq(all)?' del-row':''}${SO.focus&&SO.focus.key===k?' hl':''}" id="inv_${esc(m.id)}"><td colspan="5">${soDelBtns(m,all,canAll)}${canAll?`<button type="button" class="ghost inv-ed" data-so="invedit" data-id="${esc(m.id)}">تعديل الفاتورة</button>`:''}${ph?`<button type="button" class="ghost inv-ed rcpt" data-receipt="${esc(ph.id)}" data-rtype="${esc(ph.type)}">📎 نسخة الفاتورة</button>`:''}<b>${esc(soInvTitle(x,nos.get(x.k)))}</b>${x.sitem&&nos.get(x.k)&&x.inv?' · فاتورة المورد '+esc(x.inv):''} · ${esc(x.date)}${x.sup?' — '+esc(x.sup):''}${all.some(o=>(o.data||{}).supPend)?' <span class="pend-sup">⏳ المورد بانتظار التسجيل</span>':''}${typeof ocLockOf==='function'&&all.some(o=>ocLockOf('mv:'+o.id))?' <span class="kind-tag">🔒 في مستخلص المالك</span>':''}${all.some(soPxOpen)?` <span class="chip no" title="${esc(all.filter(soPxOpen).map(o=>soLabel((o.data||{}).item)+': '+soPxTxt(o.data.pxFlag)).join(' · '))}">⚠ فرق سعر</span>${appr?` <button type="button" class="ghost" data-so="pxok" data-id="${esc(m.id)}">السعر صحيح</button>`:''}`:''} · ${x.lines.length===2?'خامتين':x.lines.length+' '+(x.lines.length>2?'خامات':'خامة')}${x.gross?' · القيمة '+fmt(x.gross):''}${x.disc?' · خصم '+fmt(x.disc)+' · الصافي '+fmt(x.net):''}${x.tax?' · ضريبة '+fmt(x.rate)+'% = '+fmt(x.tax)+' · <b>بالضريبة '+fmt(x.due)+'</b>':''}${x.gross?' '+CUR:''}</td></tr>`};
   const rej=(appLs(LS_SOREJ)||[]).filter(o=>o.row&&o.row.site_id===site.id);
-  const rejH=rej.length?`<div class="card due-card"><div class="sec-h">تعديلات لم تُحفظ (${rej.length})</div><p class="note">رفض الخادم هذه التعديلات: إما انتهت مدة التعديل المسموحة على تسجيل التوريد، أو نفدت تعديلات اليوم. وهي محفوظة هنا على جهازك. أرسلها إلى المدير أو صاحب الموقع ليعدّلها، ثم احذفها من هنا.</p>
-    <div class="tbl-wrap"><table><tbody>${rej.map(o=>`<tr><td class="date">${esc(o.row.date||'')}</td><td>${o.row.deleted?'<b class="neg">حذف</b> ':''}${soMoveText(o.row)}</td><td class="acts"><button class="ghost" data-so="rejdel" data-id="${esc(o.qid)}">امسح</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
+  const rejH=rej.length?`<div class="card due-card"><div class="sec-h">تعديلات لم تُحفظ (${rej.length})</div><p class="note">رفض الخادم هذه التعديلات، وهي محفوظة هنا على جهازك. صحّح السبب ثم اضغط «إعادة المحاولة»، أو أرسلها إلى المدير أو صاحب الموقع، ثم احذفها من هنا.</p>
+    <div class="tbl-wrap"><table><tbody>${rej.map(o=>`<tr><td class="date">${esc(o.row.date||'')}</td><td>${o.row.deleted?'<b class="neg">حذف</b> ':''}${soMoveText(o.row)}${o.why?`<br><span class="neg">السبب: ${esc(o.why)}</span>`:''}</td><td class="acts">${o.op!=='del'?`<button class="primary" data-so="rejretry" data-id="${esc(o.qid)}">إعادة المحاولة</button> `:''}<button class="ghost" data-so="rejdel" data-id="${esc(o.qid)}">امسح</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
   if(SO.focus&&!SO.mvOpen)SO.mvOpen=true;
   if(!SO.mvOpen)return rejH+`<div class="card so-mv"><div class="sec-h" style="margin:0">${soTog('mvtog',false,'حركات المخزن',live.length+' حركة')}</div></div>`;
   return rejH+`<div class="card so-mv"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">${soTog('mvtog',true,'حركات المخزن',live.length+' حركة')}</div>${appr&&del.length?`<button class="ghost" data-so="showdel">${SO.showDel?'إخفاء المحذوفات':'المحذوفات ('+del.length+')'}</button>`:''}</div>
@@ -2997,6 +3011,7 @@ document.addEventListener('click',async ev=>{
   if(a==='purge'){const pm=(SO.d.moves||[]).find(x=>x.id===id);if(pm&&!soCanAppr(pm.site_id))return;if(!confirm('حذف نهائي؟ لا يمكن استرجاعه.'))return;soQueue('store_moves','del',id,null);await soFlush();render();return}
   if(a==='mfclear'){SO.mf={date:'',q:''};render();return}
   if(a==='rejdel'){appLs(LS_SOREJ,(appLs(LS_SOREJ)||[]).filter(o=>o.qid!==id));render();return}
+  if(a==='rejretry'){const o=(appLs(LS_SOREJ)||[]).find(x=>x.qid===id);appLs(LS_SOREJ,(appLs(LS_SOREJ)||[]).filter(x=>x.qid!==id));if(o){appLs(LS_SOQ,soQ().filter(x=>x.id!==o.id).concat([{qid:newId(),t:o.t,op:o.op,id:o.id,row:o.row}]));SO.d=soData();await soFlush()}render();return}
   if(a==='showdel'){SO.showDel=!SO.showDel;render();return}
   if(a==='more'){SO.lim+=50;render();return}
   if(a==='enable'){soEnable(id,true);return}
@@ -4442,6 +4457,85 @@ function spInvSec(invs,o){
 }
 function spIsortHTML(showSup,multi){const L=spIsortOpts(showSup,multi);let v=SP.isort||'no';if(!L.some(([k])=>k===v))v='no';
   return `<div class="f c2"><label for="sp_isort">ترتيب الفواتير</label><select id="sp_isort">${L.map(([k,t])=>`<option value="${k}"${k===v?' selected':''}>${t}</option>`).join('')}</select></div>`}
+/* ===================== تقرير «فحص البيانات» (11 نوفمبر) — للمدير وصاحب الموقع =====================
+   بيحسب في المتصفح من البيانات المحمّلة: فواتير من غير بند توريد، دفعات لمورد على بند مالوش فواتير، أسماء «أخرى»،
+   مكرر محتمل، أصناف من غير سعر، مصروفات من غير بند، شيكات متأخرة. + تعيين بند التوريد للفواتير اللي من غيره. */
+const CHK={open:'',pick:{},sel:new Set(),msg:null,bulk:'',busy:false};
+const chkCan=()=>APP&&!appIsEngineer()&&(APPU.owner||(myRole()==='user'&&!(typeof isAcct==='function'&&isAcct())));
+function chkSugg(x){
+  const sk=spN(x.sup),c=new Map();
+  for(const y of spInvoices(new Set([x.site])))if(y.k!==x.k&&String(y.sitem||'').trim()&&spN(y.sup)===sk){const k=String(y.sitem).trim();c.set(k,(c.get(k)||0)+1)}
+  if(c.size)return [...c.entries()].sort((a,b)=>b[1]-a[1])[0][0];
+  for(const m of x.lines){const it=soItem((m.data||{}).item),p=it&&it.parent?soItem(it.parent):it;if(p&&p.sitem)return p.sitem;if(it&&it.sitem)return it.sitem}
+  return '';
+}
+const chkLocked=x=>typeof ocLockOf==='function'&&x.lines.some(m=>{const l=ocLockOf('mv:'+m.id);return l&&l.appr});
+function chkData(){
+  const sites=spScope(),ids=new Set(sites.map(s=>s.id)),to=spTo(),td=cairoToday();
+  const invs=spInvoices(ids),exps=(S.exp||[]).filter(e=>!e._priv&&!e.deleted&&ids.has(e.siteId)&&(e.date||'')<=to);
+  const TI=r2(invs.filter(x=>!x.bad).reduce((a,x)=>a+x.net,0)),TE=spSum(exps);
+  const iv=x=>({site:x.site,date:x.date,txt:(spShow(x.sup)||'—')+(x.inv?' · فاتورة المورد '+x.inv:'')+(x.sitem?' · '+x.sitem:''),amt:x.bad?null:x.net,nav:{k:'inv',id:x.lines[0].id,site:x.site,mode:'edit',label:'فحص البيانات'},x});
+  const ex=e=>({site:e.siteId,date:e.date||'',txt:[spShow(e.contractor||'')||'—',e.item||'من دون بند',e.notes||''].filter(Boolean).join(' · '),amt:amt(e),edit:'expenses:'+e.id});
+  const supItems=new Map();for(const x of invs){const k=x.site+'|'+spN(x.sup);if(!supItems.has(k))supItems.set(k,new Set());if(String(x.sitem||'').trim())supItems.get(k).add(soNorm(x.sitem))}
+  const dupM=new Map();for(const e of exps){if(!(amt(e)>0))continue;const k=[e.siteId,spN(e.contractor||''),soNorm(e.item||''),e.date||'',amt(e)].join('|');if(!dupM.has(k))dupM.set(k,[]);dupM.get(k).push(e)}
+  const dups=[...dupM.values()].filter(L=>L.length>1);
+  const C=[
+    {k:'noitem',t:'فواتير مخزن من دون بند توريد',base:'inv',why:'لا تظهر في تقرير البند ولا البند العام، وليس لها رقم في البند.',rows:invs.filter(x=>!String(x.sitem||'').trim()).map(iv)},
+    {k:'paymis',t:'دفعات لمورد على بند ليس له عليه فواتير في الموقع نفسه',base:'exp',why:'تظهر في كشف المورد «على بنود أخرى» ولا تُخصم من متبقي فواتيره. غالبًا اسم البند في الدفعة غير بند الفاتورة، أو الفاتورة من دون بند.',
+      rows:exps.filter(e=>{const s=supItems.get(e.siteId+'|'+spN(e.contractor||''));return !!e.contractor&&!!s&&!s.has(soNorm(e.item||''))}).map(ex)},
+    {k:'pendinv',t:'فواتير بمورد «أخرى» (غير مسجّل)',base:'inv',why:'غير محسوبة على أي مورد إلى أن يُربط الاسم من «أسماء بانتظار التسجيل».',rows:invs.filter(x=>x.pend).map(iv)},
+    {k:'pendexp',t:'مصروفات باسم مقاول/مورد غير مسجّل',base:'exp',why:'لا تُحسب على أي مقاول أو مورد إلى أن يُربط الاسم.',rows:exps.filter(e=>e.conPend).map(ex)},
+    {k:'dup',t:'مصروفات قد تكون مكررة (نفس الموقع والاسم والبند والتاريخ والمبلغ)',base:'exp',why:'قد تكون دفعتين حقيقيتين؛ راجعها وتأكد.',n:dups.reduce((a,L)=>a+L.length-1,0),sum:r2(dups.reduce((a,L)=>a+amt(L[0])*(L.length-1),0)),rows:dups.flat().map(ex)},
+    {k:'noprice',t:'فواتير فيها أصناف من دون سعر',base:'inv',why:'غير محسوبة في أي إجمالي إلى أن يُكتب السعر.',rows:invs.filter(x=>x.bad).map(iv)},
+    {k:'noitemexp',t:'مصروفات من دون بند',base:'exp',why:'لا تظهر في تقارير البنود.',rows:exps.filter(e=>!String(e.item||'').trim()).map(ex)},
+    {k:'chq',t:'شيكات صادرة مرّ استحقاقها ولم يُؤكَّد تحصيلها',base:'exp',why:'غير مخصومة من الرصيد إلى أن يُؤكَّد التحصيل.',rows:exps.filter(e=>e.method==='deferred'&&!e.coll&&(e.due||e.date||'')<td).map(ex)}];
+  for(const c of C){if(c.n==null)c.n=c.rows.length;if(c.sum==null)c.sum=r2(c.rows.reduce((a,r)=>a+(r.amt||0),0));c.pct=(c.base==='inv'?TI:TE)>0?Math.round(c.sum/(c.base==='inv'?TI:TE)*1000)/10:0}
+  return {sites,ids,to,invs,exps,TI,TE,C};
+}
+function chkEditor(D,multi){const c=D.C[0];if(!c.rows.length){const m=CHK.msg;CHK.msg=null;return m?`<div class="card"><p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p></div>`:''}
+  const L=c.rows.map(r=>r.x).sort((a,b)=>(a.date||'').localeCompare(b.date||'')),opts=site=>soSitemList(site);
+  const allOpts=[...new Set(D.sites.flatMap(s=>opts(s.id)))];
+  const mats=x=>{const n=[...new Set(x.lines.map(m=>soLabel((m.data||{}).item)))];return n.slice(0,3).join('، ')+(n.length>3?' +'+(n.length-3):'')};
+  const nPick=L.filter(x=>CHK.pick[x.k]).length,m=CHK.msg;CHK.msg=null;
+  return `<div class="card" id="chkEd"><div class="sec-h">تعيين بند التوريد للفواتير التي من دونه (${L.length})</div>
+  <p class="note">اختر لكل فاتورة بندها. «المقترح» من فواتير المورد نفسه أو من شجرة الخامات، ولا يُطبَّق إلا إذا اخترته. يمكنك تحديد أكثر من فاتورة وتطبيق بند واحد عليها، ثم «حفظ».</p>
+  ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><span class="note">المحدد: <b>${CHK.sel.size}</b></span><select id="chk_bulk"><option value="">اختر بندًا للمحدد…</option>${allOpts.map(n=>`<option ${soNorm(n)===soNorm(CHK.bulk)?'selected':''}>${esc(n)}</option>`).join('')}</select><button type="button" class="ghost" data-chk="apply" ${CHK.sel.size?'':'disabled'}>تطبيق على المحدد</button><button type="button" class="ghost" data-chk="sugg">اختر المقترح للكل</button><span class="grow"></span><button type="button" class="primary" data-chk="save" ${nPick&&!CHK.busy?'':'disabled'}>${CHK.busy?'جاري الحفظ…':'حفظ ('+nPick+')'}</button></div>
+  <div class="tbl-wrap"><table class="tbl chk-ed"><thead><tr><th><input type="checkbox" data-chkall aria-label="تحديد الكل" ${CHK.sel.size&&CHK.sel.size===L.filter(x=>!chkLocked(x)).length?'checked':''}></th><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>المورد</th><th>رقم فاتورة المورد</th><th>الخامات</th><th class="num">الإجمالي</th><th>المقترح</th><th>بند التوريد</th></tr></thead><tbody>
+  ${L.map(x=>{const lk=chkLocked(x),sg=chkSugg(x),cur=CHK.pick[x.k]||'';return `<tr${cur?' class="cd-pick"':''}><td>${lk?'🔒':`<input type="checkbox" data-chksel="${esc(x.k)}" ${CHK.sel.has(x.k)?'checked':''} aria-label="تحديد">`}</td><td class="date">${esc(x.date)}</td>${multi?`<td>${esc(spSiteName(x.site))}</td>`:''}<td>${esc(spShow(x.sup)||'—')}${x.pend?' <span class="oth">أخرى</span>':''}</td><td dir="ltr">${esc(x.inv||'—')}</td><td class="note">${esc(mats(x))}</td><td class="num">${x.bad?'—':fmt(x.net)}</td><td>${sg?`<button type="button" class="linkish" data-chk="one" data-k="${esc(x.k)}" data-v="${esc(sg)}">${esc(sg)}</button>`:'—'}</td>
+    <td>${lk?'<span class="note">داخلة في مستخلص مالك معتمد</span>':`<select data-chkpick="${esc(x.k)}"><option value="">—</option>${opts(x.site).map(n=>`<option ${soNorm(n)===soNorm(cur)?'selected':''}>${esc(n)}</option>`).join('')}</select>`}</td></tr>`}).join('')}</tbody></table></div></div>`}
+function spCheck(){
+  if(!chkCan())return null;const D=chkData(),multi=D.sites.length>1;
+  const tot=D.C.filter(c=>c.n),xl=[['الفحص','العدد','المبلغ','النسبة %']],xt=[0];
+  const rowsH=c=>`<table class="inv-t"><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البيان</th><th>المبلغ</th><th class="no-print"></th></tr></thead><tbody>${c.rows.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(r=>`<tr><td class="d">${esc(r.date)}</td>${multi?`<td class="tl">${esc(spSiteName(r.site))}</td>`:''}<td class="tl">${esc(r.txt)}</td><td class="n">${r.amt==null?'—':money0(r.amt)}</td><td class="no-print">${r.nav?`<button type="button" class="ghost ni-x" data-nav="${esc(JSON.stringify(r.nav))}">فتح</button>`:r.edit?`<button type="button" class="ghost ni-x" data-edit="${esc(r.edit)}">فتح</button>`:''}</td></tr>`).join('')}</tbody></table>`;
+  let body=`<div class="tiles"><div><span>فواتير المخزن</span><b>${money0(D.TI)}</b><small>${D.invs.length} فاتورة</small></div><div><span>المصروفات</span><b>${money0(D.TE)}</b><small>${D.exps.length} حركة</small></div><div><span>عدد الملاحظات</span><b class="${tot.length?'neg':'in'}">${tot.reduce((a,c)=>a+c.n,0)}</b></div></div>
+  <table><thead><tr><th>الفحص</th><th>العدد</th><th>المبلغ</th><th>النسبة</th><th class="no-print"></th></tr></thead><tbody>${D.C.map(c=>`<tr${c.n?'':' class="ok-row"'}><td class="tl">${esc(c.t)}${c.n?`<br><small class="note">${esc(c.why)}</small>`:''}</td><td class="n${c.n?' b neg':''}">${c.n||'✓'}</td><td class="n">${c.n?money0(c.sum):'—'}</td><td class="n">${c.n?c.pct+'% من '+(c.base==='inv'?'الفواتير':'المصروفات'):'—'}</td><td class="no-print">${c.n?`<button type="button" class="ghost ni-x" data-chk="open" data-k="${c.k}">${CHK.open===c.k?'إخفاء':'عرض'}</button>`:''}</td></tr>`).join('')}</tbody></table>`;
+  for(const c of D.C){xl.push([c.t,c.n,c.sum,c.pct]);if(c.n&&CHK.open===c.k)body+=`<div class="keep"><h4>${esc(c.t)} (${c.n})</h4>${rowsH(c)}</div>`}
+  xl.push([]);for(const c of tot){xl.push([c.t+' ('+c.n+')']);xt.push(xl.length-1);xl.push(['التاريخ',...(multi?['الموقع']:[]),'البيان','المبلغ']);for(const r of c.rows)xl.push([r.date,...(multi?[spSiteName(r.site)]:[]),r.txt,r.amt==null?'':r.amt]);xl.push([])}
+  SP.xl={rows:xl,tot:xt,title:'فحص البيانات - '+spScopeTxt(D.sites),sheet:'فحص البيانات',widths:[50,12,30,16,16]};
+  body+=`<p class="note">الفحص من البيانات المحمّلة على هذا الجهاز، حتى ${esc(D.to)}. «المكرر» قد يكون دفعتين حقيقيتين، فراجعه قبل الحذف.${spScopeNote(D.sites)}</p>`;
+  return {title:'فحص البيانات',sub:spScopeTxt(D.sites)+' · حتى '+D.to,body,extra:chkEditor(D,multi)};
+}
+document.addEventListener('change',ev=>{const t=ev.target;if(!t)return;
+  if(t.dataset&&t.dataset.chkpick!=null){if(t.value)CHK.pick[t.dataset.chkpick]=t.value;else delete CHK.pick[t.dataset.chkpick];S.justSaved=true;render();return}
+  if(t.dataset&&t.dataset.chksel!=null){if(t.checked)CHK.sel.add(t.dataset.chksel);else CHK.sel.delete(t.dataset.chksel);S.justSaved=true;render();return}
+  if(t.hasAttribute&&t.hasAttribute('data-chkall')){CHK.sel.clear();if(t.checked)for(const r of chkData().C[0].rows)if(!chkLocked(r.x))CHK.sel.add(r.x.k);S.justSaved=true;render();return}
+  if(t.id==='chk_bulk'){CHK.bulk=t.value}});
+document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-chk]');if(!b)return;const a=b.dataset.chk;
+  if(a==='open'){CHK.open=CHK.open===b.dataset.k?'':b.dataset.k;S.justSaved=true;render();return}
+  if(a==='one'){CHK.pick[b.dataset.k]=b.dataset.v;S.justSaved=true;render();return}
+  if(a==='apply'){const v=CHK.bulk||($('#chk_bulk')||{}).value||'';if(!v)return;for(const k of CHK.sel)CHK.pick[k]=v;CHK.sel.clear();S.justSaved=true;render();return}
+  if(a==='sugg'){for(const r of chkData().C[0].rows){if(chkLocked(r.x)||CHK.pick[r.x.k])continue;const s=chkSugg(r.x);if(s)CHK.pick[r.x.k]=s}S.justSaved=true;render();return}
+  if(a==='save'){if(CHK.busy)return;const rows=chkData().C[0].rows.filter(r=>CHK.pick[r.x.k]&&!chkLocked(r.x));if(!rows.length)return;
+    if(!confirm('حفظ بند التوريد لـ '+rows.length+(rows.length===1?' فاتورة':' فواتير')+'؟'))return;
+    CHK.busy=true;S.justSaved=true;render();let n=0;
+    for(const r of rows){const v=CHK.pick[r.x.k];for(const m of r.x.lines){soQueue('store_moves','put',m.id,{...m,data:{...(m.data||{}),sitem:v}});n++}}
+    try{await soFlush()}catch(e){}
+    const left=chkData().C[0].rows.filter(r=>CHK.pick[r.x.k]).length;
+    for(const r of rows)if(!chkData().C[0].rows.some(z=>z.x.k===r.x.k))delete CHK.pick[r.x.k];
+    CHK.busy=false;CHK.sel.clear();CHK.msg=left?{t:'حُفظ جزء. '+left+' لم تُحفظ بعد (لا يوجد اتصال أو رفض الخادم) — ستظهر في «تعديلات لم تُحفظ» في المخزن، أو ستُرفع تلقائيًا عند عودة الاتصال.'}:{ok:1,t:'تم حفظ بند التوريد لـ '+rows.length+(rows.length===1?' فاتورة.':' فواتير.')};
+    logChange('edit','files',{details:'تعيين بند التوريد لـ '+rows.length+' فاتورة مخزن من «فحص البيانات»'});S.justSaved=true;render();return}
+});
 /* ---------- (د) كشف بند عام ---------- */
 function spGroupNames(){const sc=spScope();const pf=sc.length?igPfOfSite(sc[0].id):igMyPf();return igNames(pf)}
 function spGroup(one){
@@ -4470,6 +4564,11 @@ function spGroup(one){
         const ord=one?[g]:(()=>{const pf=sites.length?igPfOfSite(sites[0].id):igMyPf();const G=[...igGroups(pf),...igGroups('')].find(x=>regNormK(x.name)===regNormK(g));return G?(G.items||[]):[]})();
         const IS=spInvSec(IV,{showSup:true,allSup:true,multi:new Set(IV.map(x=>x.site)).size>1,order:ord,gname:one?'':g});
         if(IS.html){bs+=IS.html;const off=SP.xl.rows.length+1;SP.xl.rows.push([],...IS.xl);SP.xl.tot.push(...IS.tot.map(i=>i+off));SP.xl.widths=[24,20,13,26,18,16]}}
+      /* الدفعات بتاريخها (طلب 11 نوفمبر: أي حركة في المختصر جنبها تاريخها) */
+      if(L.length){const cols=['التاريخ',...(multi?['الموقع']:[]),...(one?[]:['البند']),'المقاول / المورد','المبلغ'],nc=cols.length;
+        bs+=`<div class="keep"><h3 class="inv-sec-h">الدفعات</h3><table class="inv-t"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${L.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}${one?'':`<td class="tl">${esc(String(e.item||'').trim())}</td>`}<td class="tl">${esc(spShow(e.contractor||''))||'—'}</td><td class="n">${money0(amt(e))}</td></tr>`).join('')}<tr class="sub-t itm-t"><td colspan="${nc-1}" class="tl">إجمالي الدفعات (${L.length})</td><td class="n">${money0(GT)}</td></tr></tbody></table></div>`;
+        SP.xl.rows.push([],['الدفعات']);SP.xl.tot.push(SP.xl.rows.length-1);SP.xl.rows.push(cols);for(const e of L)SP.xl.rows.push([e.date||'',...(multi?[spSiteName(e.siteId)]:[]),...(one?[]:[String(e.item||'').trim()]),spShow(e.contractor||''),amt(e)]);
+        SP.xl.rows.push(['إجمالي الدفعات',...Array(nc-2).fill(''),GT]);SP.xl.tot.push(SP.xl.rows.length-1)}
       return {title:'تقرير مختصر — '+(one?'بند':'بند عام')+': '+g,sub:spScopeTxt(sites)+' · '+(from?'من '+from+' ':'من البداية ')+'إلى '+to,body:bs}}
     body=(items.length?body+`<div class="keep"><h3>${one?'الملخص حسب المقاول / المورد':'الملخص'}</h3><table style="width:60%"><tbody>${sumRows.map(([k,v])=>`<tr><td class="tl">${esc(k)}</td><td class="n">${money0(v)}</td></tr>`).join('')}<tr class="tot"><td class="tl b">إجمالي ${esc(g)}</td><td class="n b">${money0(GT)}</td></tr></tbody></table>${!one&&typeof itType==='function'&&items.some(([k])=>itType(k))?`<h3>حسب النوع</h3><table style="width:60%"><tbody>${[...IT_TYPES,['','من دون نوع']].map(([t,l])=>{const v=r2(items.filter(([k])=>(itType(k)||'')===t).reduce((a,[,es])=>a+spSum(es),0));return v?`<tr><td class="tl">${l}</td><td class="n">${money0(v)}</td><td class="n">${GT?Math.round(v/GT*100)+'%':''}</td></tr>`:''}).join('')}</tbody></table>`:''}</div>`:`<p>${one?'لا توجد مصروفات على هذا البند في هذه الفترة.':'لا توجد مصروفات على بنود هذا البند العام في هذه الفترة.'}</p>`)+`<p class="note">${one?'المصروفات الفعلية المسجّلة على بند «'+esc(g)+'»'+(sites[0]&&parentOf(sites[0].id)?' (تابع لـ«'+esc(parentOf(sites[0].id))+'»)':'')+'.':'المصروفات الفعلية المسجّلة على البنود التابعة لـ«'+esc(g)+'».'}${spScopeNote(sites)}</p>`;
     if(one){xl.push([]);xl.push(['الملخص حسب المقاول / المورد','',...(multi?['']:[]),'','','','']);for(const [k,v] of sumRows)xl.push([k,'',...(multi?['']:[]),'','','',v])}
@@ -4566,6 +4665,8 @@ function spContractor(){
   </tbody>${R.length?`<tfoot><tr><td colspan="${multi?3:2}">الإجمالي</td><td class="n">${money0(W)}</td><td class="n">${money0(RET)}</td><td class="n">${DED?money0(DED):'—'}</td><td class="n">${money0(AF)}</td><td class="n">${money0(PD)}</td><td class="n">${LF<0?'('+money0(-LF)+') مقدم':money0(LF)}</td></tr></tfoot>`:''}</table>`;
   if(pend.length)body+=`<p class="warn-box">ℹ️ ${pend.map(c=>'مستخلص رقم '+c.no+' — '+esc(ctItem(c))+(multi?' ('+esc(spSiteName(c.site_id))+')':'')+(c.status==='submitted'?' قيد الاعتماد':' مسودة')).join('، ')} — غير محسوب حتى يُعتمد.</p>`;
   if(other.length)body+=`<p class="warn-box">⚠ ${other.length} ${other.length===1?'دفعة':'دفعات'} باسمه (${money0(spSum(other))}) على بنود ليس لها مستخلص معتمد: ${[...new Set(other.map(e=>esc(e.item||'من دون بند')))].join('، ')} — غير محسوبة في المتبقي.${conKind(nm)==='both'?' (هو «مقاول ومورد»: دفعات التوريد تظهر في تقرير المورد.)':''}</p>`;
+  if(!full&&onCert.length){const P=onCert.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(e.item||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="${multi?3:2}">الإجمالي</td><td class="n">${money0(spSum(P))}</td></tr></tfoot></table>`}
   if(full){
     const P=onCert.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>طريقة الدفع</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(e.item||'')}</td><td>${esc(spMethTxt(e))}</td><td class="tl">${esc(e.notes||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')||`<tr><td colspan="${multi?6:5}">لا توجد دفعات.</td></tr>`}</tbody>${P.length?`<tfoot><tr><td colspan="${multi?5:4}">الإجمالي</td><td class="n">${money0(spSum(P))}</td></tr></tfoot>`:''}</table>`;
@@ -4583,13 +4684,13 @@ function spSiteFull(){
   <h3>دفعات المالك (${Dp.length})</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البيان</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${Dp.map(d=>`<tr><td class="d">${esc(d.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(d.siteId))}</td>`:''}<td class="tl">${esc(d.notes||'')}</td><td>${esc(spMethTxt(d))}</td><td class="n in">${money0(amt(d))}</td></tr>`).join('')||`<tr><td colspan="${multi?5:4}">—</td></tr>`}</tbody>${Dp.length?`<tfoot><tr><td colspan="${multi?4:3}">الإجمالي</td><td class="n">${money0(spSum(Dp))}</td></tr></tfoot>`:''}</table>`;
 }
 /* المواضيع في صفحة «التقارير» */
-const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['co','مصاريف الشركة','على حساب الشركة'],['store','المخزن','أرصدة وحركات'],['journal','اليومية','حركة يوم أو فترة'],['all','ملخص المواقع','كل المواقع']];
+const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['co','مصاريف الشركة','على حساب الشركة'],['store','المخزن','أرصدة وحركات'],['journal','اليومية','حركة يوم أو فترة'],['all','ملخص المواقع','كل المواقع'],['chk','فحص البيانات','ملاحظات تحتاج مراجعة']];
 /* مواقع المخزن المفعّلة اللي ليه صلاحية عليها */
 const spStoreSites=()=>typeof soMySites==='function'&&typeof SO!=='undefined'&&SO.d?soMySites().filter(s=>s.enabled):[];
 /* المواضيع المسموح بيها لكل دور (قرار 30 أكتوبر): المكتب الفني مقاول/مورد/دفعات (+ المخزن لو له صلاحية)، أمين المخزن ومهندس الموقع المخزن والخامة، المحاسب وصاحب الموقع والمدير الكل */
 function spSubjects(){
   const st=spStoreSites().length>0,eng=APP&&typeof appIsEngineer==='function'&&appIsEngineer();
-  if(!eng)return SP_SUBJ.map(x=>x[0]).filter(v=>v!=='store'||st);
+  if(!eng)return SP_SUBJ.map(x=>x[0]).filter(v=>(v!=='store'||st)&&(v!=='chk'||chkCan()));
   const out=[];if(spTech())out.push('con','sup','grp','item','pay');if(st)out.push('store','mat');return out;
 }
 const SP_SHAPED=['site','sup','con','grp','item','mat','pay','co','store','journal','all'];
@@ -4618,7 +4719,7 @@ function spStoreShort(){const L=spStoreSites(),sel=SP.site?L.filter(s=>s.id===SP
   return {title:'تقرير مختصر — المخزن: أرصدة الخامات',sub:(sel.length===1?'موقع: '+sel[0].name:'كل المخازن ('+sel.length+')')+' · حتى '+to,body:`<table><thead><tr><th>الخامة</th><th>الوحدة</th><th>الوارد (صافي)</th><th>المنصرف</th><th>الرصيد</th></tr></thead><tbody>${R.map(x=>`<tr><td class="tl">${esc(x.n)}</td><td>${esc(x.u)}</td><td class="n">${fmt(x.inQ)}</td><td class="n">${fmt(x.out)}</td><td class="n ${x.bal<0?'neg':''}">${fmt(x.bal)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد حركات مخزن حتى هذا التاريخ.</td></tr>'}</tbody></table>
    <p class="note">المختصر: رصيد كل خامة من غير الحركات. الوارد = التوريد ناقص المرتجع، والمنصرف = الوارد ناقص الرصيد (من الجرد). الرصيد بالسالب بالأحمر للمراجعة. «عادي (تفصيلي)» = تقرير المخزن بالحركات.</p>`}}
 function spDoc(){SP.xl=null;if(SP.type==='journal')return spJournalShort();if(SP.type==='all')return spAllShort();if(SP.type==='store')return spStoreShort();
-  const d=SP.type==='co'?spCompany():SP.type==='con'?spContractor():SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite();
+  const d=SP.type==='chk'?spCheck():SP.type==='co'?spCompany():SP.type==='con'?spContractor():SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite();
   if(d&&SP.type==='site'&&typeof ocCoSum==='function'){const sc=spScope(),v=r2(sc.reduce((a,s)=>a+ocCoSum(s.id,SP.to||today()),0));if(v>0.004)d.body=`<p class="sub">منها على حساب الشركة: <b>${money0(v)}</b></p>`+d.body}
   if(d&&SP.shape==='full'&&SP_SHAPED.includes(SP.type)){d.title=d.title.replace('تقرير مختصر','تقرير تفصيلي');if(SP.type==='site')d.body+=spSiteFull()}return d}
 
@@ -4661,9 +4762,9 @@ function spRenderPage(){
     ${SP.type==='sup'&&SP.name?(()=>{const L=spSupItems();if(SP.item&&!L.some(n=>soNorm(n)===soNorm(SP.item)))SP.item='';return `<div class="f c2"><label for="sp_item">البند</label><select id="sp_item">${opt('','كل البنود',SP.item)}${L.map(n=>opt(n,n,SP.item)).join('')}</select></div>`})():''}
     ${SP.type==='pay'||SP.type==='mat'||SP.type==='co'||SP.type==='journal'||((SP.type==='grp'||SP.type==='item')&&SP.mode!=='debts')?`<div class="f c1"><label for="sp_from">من تاريخ</label><input id="sp_from" type="date" value="${esc(SP.from||(SP.type==='journal'?spTo().slice(0,8)+'01':''))}"></div>`:''}
     <div class="f c1"><label for="sp_to">حتى تاريخ</label><input id="sp_to" type="date" value="${esc(SP.to||today())}"></div>
-    <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}${d&&(['grp','item','mat','co'].includes(SP.type)||(SP.shape!=='full'&&['pay','journal','all','store','sup'].includes(SP.type)))&&SP.xl?'<button type="button" class="ghost" data-sp="xl">Excel</button>':''}</div>
+    <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}${d&&(['grp','item','mat','co','chk'].includes(SP.type)||(SP.shape!=='full'&&['pay','journal','all','store','sup'].includes(SP.type)))&&SP.xl?'<button type="button" class="ghost" data-sp="xl">Excel</button>':''}</div>
   </form></div>
-  ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>`:'<div class="card blank" style="padding:24px"><p>اختر الاسم ليظهر الكشف.</p></div>'}
+  ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>${d.extra||''}`:'<div class="card blank" style="padding:24px"><p>اختر الاسم ليظهر الكشف.</p></div>'}
   `;
   const on=(id,k,re)=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SP[k]=e.value;if(re)re();render()}};
   on('sp_site','site');on('sp_isort','isort',()=>{try{localStorage.setItem('adc_sp_isort',document.getElementById('sp_isort').value)}catch(e){}});on('sp_owner','owner',()=>{SP.site=''});on('sp_name','name',()=>{SP.item=''});on('sp_item','item');on('sp_grp','gname');on('sp_iname','iname');on('sp_mmain','mmain',()=>{SP.msub=''});on('sp_msub','msub');on('sp_party','party',()=>{SP.name=''});dfBind(document.getElementById('sp_from'),v=>{SP.from=v;render()});dfBind(document.getElementById('sp_to'),v=>{SP.to=v;render()});
@@ -5557,8 +5658,8 @@ async function flush(){
         if(APP&&p.base!==undefined&&ref.get){const g=await withTimeout(ref.get(),12000),sv=g.exists?g.data():null;if(cfIs(p,sv)){S.pending=S.pending.filter(x=>x!==p);savePending();cfAdd(p,sv);continue}}
         await withTimeout(ref.set(p.data),12000)}
       catch(e){
-        if(e&&e.code==='invalid_argument'){S.pending=S.pending.filter(x=>x!==p);savePending();showBanner('توجد عملية لم تُرفع لأن حسابك غير مسموح له بالتعديل في هذا المكان. التعديل في مواقع غيرك متاح للمستخدم الرئيسي فقط.');continue}
-        if(APP&&e&&/quota|locked period/.test(String(e.message||''))){S.pending=S.pending.filter(x=>x!==p);savePending();merge();showBanner(/quota/.test(e.message)?quHit():lockMsg());continue}
+        if(e&&e.code==='invalid_argument'){S.pending=S.pending.filter(x=>x!==p);savePending();rejKeep(p,'حسابك غير مسموح له بالتعديل في هذا المكان.');merge();showBanner('توجد عملية لم تُرفع لأن حسابك غير مسموح له بالتعديل في هذا المكان. هي محفوظة على جهازك في «حركات لم تُحفظ».');continue}
+        if(APP&&e&&/quota|locked period|row-level|permission|violates|future|owner cert|locked/i.test(String(e.message||''))){const m=String(e.message||'');S.pending=S.pending.filter(x=>x!==p);savePending();rejKeep(p,/quota/.test(m)?'نفدت تعديلات اليوم.':/locked period/.test(m)?'الفترة مقفولة.':/future/.test(m)?'تاريخ الحركة في المستقبل.':/owner cert|locked/.test(m)?'الحركة داخلة في مستخلص مالك أو مقفولة.':'حسابك غير مسموح له بهذه العملية.');merge();showBanner((/quota/.test(m)?quHit():/locked period/.test(m)?lockMsg():'تعذّر حفظ حركة.')+' الحركة محفوظة على جهازك في «حركات لم تُحفظ».');continue}
         if(APP&&navigator.onLine&&e&&(e.message||e.code))showBanner('تعذّر رفع التعديلات حتى الآن ('+String(e.message||e.code).slice(0,160)+'). ستتم المحاولة تلقائيًا كل 30 ثانية.');
         break;
       }
@@ -7984,7 +8085,7 @@ body{margin:0;font-family:Tahoma,"Segoe UI",Arial,sans-serif;color:#111;font-siz
 .hd .meta{text-align:left;font-size:10px;color:#444;direction:rtl}
 .sub{margin:0 0 8px;color:#333;font-size:11px}
 tr.grp-h td{background:#e6e6e6;font-weight:700}tr.grp-free td{background:#f2f2f2;font-weight:700;color:#444}tr.grp-i td:first-child{padding-right:18px}tr.sub-t td{font-weight:700;border-top:1.5px solid #555}tr.cr td.n{color:#a00}
-h4{font-size:12px;margin:10px 0 3px}h3.inv-sec-h{border-top:1.5px solid #555;padding-top:6px}table.inv-t{table-layout:fixed}td.no{color:#444}tr.itm-t td{background:#eee}table.inv-sup{width:auto;min-width:50%;margin:2px 0 10px}tr.grp-oth td{color:#8a5a00}.oth{border:1px solid #b7791f;border-radius:6px;padding:0 4px;font-size:9px;color:#8a5a00}
+.no-print,.ni-x{display:none!important}h4{font-size:12px;margin:10px 0 3px}h3.inv-sec-h{border-top:1.5px solid #555;padding-top:6px}table.inv-t{table-layout:fixed}td.no{color:#444}tr.itm-t td{background:#eee}table.inv-sup{width:auto;min-width:50%;margin:2px 0 10px}tr.grp-oth td{color:#8a5a00}.oth{border:1px solid #b7791f;border-radius:6px;padding:0 4px;font-size:9px;color:#8a5a00}
 .tiles{display:flex;gap:8px;margin:0 0 10px}
 .tiles div{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
 .tiles span{font-size:10px;color:#555}.tiles b{font-size:14px}.tiles small{font-size:9px;color:#555}
@@ -9068,6 +9169,7 @@ function render(){
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   if(APP&&typeof entBar==='function'){const cur=S.sites.some(x=>x.id===S.sel)?S.sel:((S.sel==='__store'||appIsEngineer())&&typeof SO!=='undefined'?SO.site:'');const eb=entBar(cur);if(eb)$('#pane').insertAdjacentHTML('afterbegin',eb)}
+  if(APP&&typeof rejCard==='function'&&(S.sel==='__all'||S.sites.some(x=>x.id===S.sel))){const c=rejCard(S.sel==='__all'?'':S.sel);if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof custFailCard==='function'&&(appIsEngineer()||S.sel==='__custody'||S.sites.some(x=>x.id===S.sel))){const c=custFailCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   {const eng=APP&&appIsEngineer(),bar=eng?'':excelBar();if(bar&&bar.includes('xbar ok'))$('#pane').insertAdjacentHTML('afterbegin',bar);uiNoticeBtn(eng?[]:uiNotices());uiBottom();if(APP&&typeof backBar==='function'){const bb=backBar();if(bb)$('#pane').insertAdjacentHTML('afterbegin',bb);else if(S.back&&S.back.at!==navAt()){S.back=null;navClear()}}}
   if(S.printMsg){S.pflash={text:S.printMsg,until:Date.now()+10000};S.printMsg=''}
