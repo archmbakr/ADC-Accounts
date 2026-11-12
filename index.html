@@ -411,6 +411,13 @@ th.pk,td.pk{width:34px;text-align:center}
 .sp-prev table.inv-t{table-layout:fixed}.sp-prev td.no{font-weight:600;color:var(--muted)}.sp-prev tr.sub-t td{font-weight:700}.sp-prev tr.itm-t td{background:var(--sunk)}
 .sp-prev tr.grp-h td{background:var(--accent-soft,var(--sunk));font-weight:700}.sp-prev tr.grp-oth td{color:#c27a1a}
 .sp-prev .inv-ss{margin:-4px 0 14px;display:flex;flex-direction:column;align-items:flex-start;gap:3px}.sp-prev table.inv-sup{width:auto;min-width:min(420px,100%);font-size:12.5px;margin:0}
+.ch-card{border:1px solid var(--line);border-radius:10px;margin:10px 0;padding:0 12px;background:var(--surface)}
+.ch-card>summary{list-style:none;cursor:pointer;padding:10px 0}.ch-card>summary::-webkit-details-marker{display:none}
+.ch-card[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
+.ch-t1{font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.ch-t1::before{content:'▸';color:var(--muted)}.ch-card[open] .ch-t1::before{content:'▾'}
+.ch-figs{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px;font-size:13px;color:var(--muted)}.ch-figs b{display:block;color:var(--fg);font-size:15px;font-variant-numeric:tabular-nums}.ch-figs b.in{color:var(--ok)}.ch-figs b.neg{color:var(--danger)}
+.ch-card h4{font-size:13px;margin:10px 0 4px}.ch-card .tbl-wrap{margin-bottom:6px}
+.sp-prev tr.un td{background:rgba(217,130,43,.07)}
 .oth{display:inline-block;font-size:11px;line-height:1.5;padding:0 6px;border-radius:8px;background:rgba(217,130,43,.18);color:#c27a1a;margin-inline-end:4px}
 @media (max-width:560px){.sp-prev table{font-size:12px}.sp-prev th,.sp-prev td{padding:4px 5px}.sp-prev table.inv-t{table-layout:auto}}
 .sp-prev .in{color:#2e7d4f}.sp-prev tr.pay td{background:rgba(46,125,79,.07)}.sp-prev tr.warn-row td{background:rgba(217,130,43,.12)}.sp-prev tr.tot td{font-weight:700;background:var(--sunk)}.warn-box{border:1px solid #e0b252;background:rgba(217,130,43,.1);padding:8px 10px;border-radius:8px;font-size:13px;margin:8px 0}
@@ -1294,6 +1301,13 @@ function custChannel(){
   if(CU.ch||!SB)return;
   CU.ch=SB.channel('adc-cust').on('postgres_changes',{event:'*',schema:'public',table:'custody'},()=>custRefresh()).subscribe();
 }
+/* حفظ صف: تعديل للموجود وإضافة للجديد بدل upsert (upsert بيطبّق قاعدة الإضافة حتى على الموجود) — 12 نوفمبر */
+async function sbPutRow(t,row,known){
+  const id=row.id,upd=async()=>{const {id:_,...rest}=row;const r=await SB.from(t).update(rest).eq('id',id).select('id');if(r.error)return r;if(!(r.data||[]).length)return {error:{message:'row-level security: update not allowed (0 rows)'}};return r};
+  const ins=()=>SB.from(t).insert(row);
+  const dup=e=>!!e&&(e.code==='23505'||/duplicate key/i.test(e.message||''));
+  if(known){const r=await upd();if(!r.error||!/0 rows/.test(r.error.message||''))return r;const r2=await ins();return dup(r2.error)?r:r2}
+  const r=await ins();if(dup(r.error))return upd();return r}
 async function custFlush(){
   if(CU.busy||!SB||!navigator.onLine||!(await appHasSes()))return;
   let q=custQ();if(!q.length)return;CU.busy=true;
@@ -1305,7 +1319,7 @@ async function custFlush(){
         else{
           const row={...op.row};delete row._local;delete row.updated_at;
           if(row.data&&String(row.data.receipt||'').startsWith('Q')){const raw=await rcGetRaw(row.data.receipt);if(raw&&raw.blob){const up=await APPASSETS.upload(raw.blob,{type:raw.type});await rcDelRaw(row.data.receipt);row.data={...row.data,receipt:up.id}}}
-          const {error}=await SB.from('custody').upsert(row,{onConflict:'id'});if(error)throw error;
+          const {error}=await sbPutRow('custody',row,(CU.rows||[]).some(x=>x.id===row.id));if(error)throw error;
         }
         q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);
       }catch(e){const m=String(e&&e.message||'');if(/row-level|permission|violates|locked period|quota|invoice required|future|check constraint|foreign key/i.test(m)){const why=custErrText(m);q=custQ().map(x=>x.qid===op.qid?{...x,err:why,errRaw:m.slice(0,300),errAt:Date.now()}:x);appLs(LS_CUSTQ,q);showBanner('تعذّر حفظ حركة عهدة: '+why+' الحركة محفوظة على هذا الجهاز في «حركات عهدة لم تُحفظ».');continue}break}
@@ -1322,9 +1336,14 @@ const rejList=()=>lsGet(LS_REJX)||[];
 function rejKeep(p,why){const L=rejList().filter(x=>!(x.col===p.col&&x.id===p.id));L.push({rid:newId(),col:p.col,id:p.id,data:p.data,pfx:p.pfx,why,at:Date.now()});lsSet(LS_REJX,L.slice(-200))}
 function rejCard(siteId){const L=rejList().filter(x=>!siteId||(x.data||{}).siteId===siteId||(x.col==='sites'&&x.id===siteId));if(!L.length)return '';
   const K={expenses:'مصروف',deposits:'إيداع',counts:'جرد',sites:'موقع',contractors:'مقاول/مورد',items:'بند'};
-  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h">⚠ حركات لم تُحفظ على الخادم (${L.length})</div><p class="note">رفض الخادم هذه الحركات، وهي محفوظة على هذا الجهاز فقط. صحّح السبب ثم اضغط «إعادة المحاولة»، أو احذفها.</p>
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h">⚠ حركات لم تُحفظ على الخادم (${L.length})</div><p class="note">رفض الخادم هذه الحركات، وهي محفوظة على هذا الجهاز فقط. صحّح السبب ثم اضغط «إعادة المحاولة»، أو احذفها.</p>${L.length>1?'<div class="row" style="margin-bottom:6px"><button type="button" class="primary" data-rejall="'+esc(siteId||'')+'">إعادة المحاولة للكل ('+L.length+')</button></div>':''}
   ${L.map(x=>{const d=x.data||{};return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:8px 0"><div style="flex:1;min-width:200px"><b>${d.deleted?'حذف ':''}${esc(K[x.col]||x.col)}</b>${d.date?' · '+esc(d.date):''}${d.amount!=null?' · <b>'+fmt(amt(d))+'</b>':''}${d.contractor?' · '+esc(d.contractor):''}${d.item?' · '+esc(d.item):''}${!siteId&&d.siteId?' · '+esc(siteNameOf(d.siteId)):''}<br><span class="neg">السبب: ${esc(x.why)}</span></div>
     <button type="button" class="primary" data-rejx="retry" data-r="${esc(x.rid)}">إعادة المحاولة</button><button type="button" class="ghost danger" data-rejx="del" data-r="${esc(x.rid)}">حذف</button></div>`}).join('')}</div>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-rejall]');if(!b)return;const sid=b.dataset.rejall;
+  const L=rejList().filter(x=>!sid||(x.data||{}).siteId===sid||(x.col==='sites'&&x.id===sid));if(!L.length)return;
+  const ids=new Set(L.map(x=>x.rid));lsSet(LS_REJX,rejList().filter(x=>!ids.has(x.rid)));
+  for(const r of L){S.pending=S.pending.filter(p=>!(p.col===r.col&&p.id===r.id));S.pending.push({col:r.col,id:r.id,data:{...r.data,updated:Date.now()},pfx:r.pfx})}
+  savePending();merge();flush();S.justSaved=true;render()});
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-rejx]');if(!b)return;const r=rejList().find(x=>x.rid===b.dataset.r);if(!r)return;
   if(b.dataset.rejx==='del'&&!confirm('حذف هذه الحركة من الجهاز؟ لن تُحفظ على الخادم.'))return;
   lsSet(LS_REJX,rejList().filter(x=>x.rid!==r.rid));
@@ -1342,12 +1361,13 @@ function custErrText(m){m=String(m||'');
 const custFailed=()=>custQ().filter(x=>x.err);
 function custFailCard(){const L=custFailed();if(!L.length)return '';
   const K={claim:'مصروف من العهدة',issue:'صرف عهدة',return:'رد عهدة'};
-  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h">⚠ حركات عهدة لم تُحفظ على السيرفر (${L.length})</div><p class="note">هذه الحركات محفوظة على هذا الجهاز فقط. عدّلها ثم اضغط «إعادة المحاولة»، أو احذفها.</p>
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h">⚠ حركات عهدة لم تُحفظ على السيرفر (${L.length})</div><p class="note">هذه الحركات محفوظة على هذا الجهاز فقط. عدّلها ثم اضغط «إعادة المحاولة»، أو احذفها.</p>${L.length>1?'<div class="row" style="margin-bottom:6px"><button type="button" class="primary" data-cufail="all">إعادة المحاولة للكل ('+L.length+')</button></div>':''}
   ${L.map(op=>{const r=op.row||{},d=r.data||{};const lab=op.op==='del'?'حذف حركة':(K[r.kind]||'حركة');
     return `<div class="cf-row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:8px 0"><div style="flex:1;min-width:200px"><b>${esc(lab)}</b>${d.date?' · '+esc(d.date):''}${d.amount?' · <b>'+fmt(+d.amount||0)+'</b> '+CUR:''}${d.item?' · '+esc(d.item):''}${d.siteName?' · '+esc(d.siteName):''}<br><span class="neg">السبب: ${esc(op.err)}</span></div>
     <button type="button" class="primary" data-cufail="retry" data-q="${esc(op.qid)}">إعادة المحاولة</button><button type="button" class="ghost danger" data-cufail="del" data-q="${esc(op.qid)}">حذف</button></div>`}).join('')}</div>`}
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-cufail]');if(!b)return;const qid=b.dataset.q;
-  if(b.dataset.cufail==='retry'){appLs(LS_CUSTQ,custQ().map(x=>x.qid===qid?(({err,errRaw,errAt,...y})=>y)(x):x));custFlush()}
+  if(b.dataset.cufail==='all'){appLs(LS_CUSTQ,custQ().map(x=>x.err?(({err,errRaw,errAt,...y})=>y)(x):x));custFlush()}
+  else if(b.dataset.cufail==='retry'){appLs(LS_CUSTQ,custQ().map(x=>x.qid===qid?(({err,errRaw,errAt,...y})=>y)(x):x));custFlush()}
   else{appLs(LS_CUSTQ,custQ().filter(x=>x.qid!==qid))}
   try{render()}catch(e){}});
 /* site money: custody issued from / returned to a site (for balances) */
@@ -1477,8 +1497,9 @@ function appRenderCustody(){
   <div class="card"><div class="sec-h">أرصدة العُهد</div>
   ${sum.length?`<div class="tbl-wrap"><table><thead><tr><th>المهندس</th><th class="num">المصروف له</th><th class="num">المعتمد</th><th class="num">قيد المراجعة</th><th class="num">المردود</th><th class="num">المتبقي معه</th><th></th></tr></thead><tbody>
     ${sum.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="num">${fmt(s.issued)}</td><td class="num">${fmt(s.approved)}</td><td class="num">${fmt(s.pending)}</td><td class="num">${fmt(s.returned)}</td><td class="num strong${s.left<0?' neg':''}">${fmt(s.left)}</td>
-      <td class="acts">${CU.returning===s.eng?`<input id="cu_ret" type="number" inputmode="decimal" min="0" step="0.01" placeholder="المبلغ المردود" style="width:130px"><button class="primary" data-cu="retyes" data-eng="${esc(s.eng)}">حفظ</button><button data-cu="retno">إلغاء</button>`:`<button class="ghost" data-cu="ret" data-eng="${esc(s.eng)}">تسجيل رد مبلغ</button>`}</td></tr>`).join('')}
+      <td class="acts">${CU.returning===s.eng?`<input id="cu_ret" type="number" inputmode="decimal" min="0" step="0.01" placeholder="المبلغ المردود" style="width:130px"><button class="primary" data-cu="retyes" data-eng="${esc(s.eng)}">حفظ</button><button data-cu="retno">إلغاء</button>`:`<button class="ghost" data-cu="ret" data-eng="${esc(s.eng)}">تسجيل رد مبلغ</button>`}<button class="ghost" data-chist="open" data-eng="${esc(s.eng)}">سجل العُهد</button></td></tr>`).join('')}
     </tbody></table></div>`:'<p class="note">لم تُصرف عُهد بعد.</p>'}</div>
+  ${CU.histEng&&sum.some(x=>x.eng===CU.histEng)?custHistCard(CU.histEng,(sum.find(x=>x.eng===CU.histEng)||{}).name||'',rows):''}
   <div class="card"><div class="sec-h">آخر حركات العُهد</div>
   ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
     ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,60).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.engName||'')}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${r.status==='rejected'&&d.reason?`<span class="note"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}</td></tr>`}).join('')}
@@ -1508,6 +1529,56 @@ function custBatchCard(b,L){
       <div class="row"><button class="primary" data-cu="approveb" data-mode="carry" data-b="${esc(b)}">↪ اعتماد وترحيل ${left>0?'الباقي':'الفرق'} إلى العهدة التالية</button><button class="primary" data-cu="approveb" data-mode="settle" data-b="${esc(b)}">✓ اعتماد وتصفية — ${left>0?'رد '+fmt(left)+' إلى الخزنة':'صرف '+fmt(-left)+' للمهندس'}</button><button class="ghost" data-cu="backb" data-b="${esc(b)}">رجّعها للمهندس</button></div>
       <p class="note" style="margin:0">الترحيل: تُقفل هذه العهدة ويظهر ${left>0?'الباقي':'الفرق'} في العهدة التالية «مُرحَّل من عهدة سابقة»، ولا يتغيّر الرصيد. التصفية: يُسجَّل ${left>0?'رد المبلغ':'صرف الفرق للمهندس'} من الخزنة، ويصبح سطر العهدة صفرًا.</p></div>`}`})()}</div>`;
 }
+/* ===== «عُهدي السابقة»: كل عهدة لوحدها — المُرحَّل إليها ومنها والتصفيات — 12 نوفمبر ===== */
+function custHist(eng,o){o=o||{};const all=(o.rows||custMerged()).filter(r=>r.engineer===eng),out=[];
+  const G=new Map();for(const r of all){if(o.site&&r.site_id!==o.site)continue;if(!G.has(r.site_id))G.set(r.site_id,[]);G.get(r.site_id).push(r)}
+  const grp=typeof custGroups==='function'?custGroups():[];
+  for(const [site,rows] of G){const g=grp.find(x=>x.site===site&&x.eng===eng);if(!g)continue;const lots=g.lots,n=lots.length;
+    const lotIx=date=>{let i=0;lots.forEach((l,j)=>{if(l.date<=date)i=j});return i};
+    const per=lots.map(()=>({claims:[],rets:[]}));
+    for(const r of rows){const d=r.data||{};if(r.kind==='claim'&&r.status!=='draft')per[lotIx(d.date||'')].claims.push(r);else if(r.kind==='return')per[lotIx(d.date||'')].rets.push(r)}
+    lots.forEach((l,i)=>{const last=i===n-1,d=l.r.data||{},pend=r2(per[i].claims.filter(r=>r.status==='pending').reduce((a,r)=>a+(+(r.data||{}).amount||0),0)),rej=per[i].claims.filter(r=>r.status==='rejected');
+      const out_=last?0:l.cout,left=last?l.left:0;
+      const st=last?(Math.abs(left)<0.005&&!pend?'done':'open'):(Math.abs(out_)<0.005?'done':'carry');
+      out.push({site,siteName:d.siteName||siteNameOf(site),no:i+1,n,r:l.r,date:l.date,amount:l.amount,diff:!!d.diff,notes:d.notes||'',cin:l.cin,spent:l.spent,ret:l.ret,cout:out_,left,pend,rej,st,last,claims:per[i].claims,rets:per[i].rets,nextDate:last?'':lots[i+1].date})})}
+  return out.filter(x=>(!o.from||x.date>=o.from)&&(!o.to||x.date<=o.to)).sort((a,b)=>b.date.localeCompare(a.date)||a.siteName.localeCompare(b.siteName,'ar'));
+}
+const CH_ST={open:['مفتوحة','pill-over'],done:['مصفّاة بالكامل','pill-ok'],carry:['اتقفلت بالترحيل','pill-none']};
+const custSgn=v=>'<bdi dir="ltr">'+(v>0?'+':'−')+fmt(Math.abs(v))+'</bdi>';
+function custHistBody(L,print){
+  const dd=v=>`<bdi dir="ltr">${esc(v||'')}</bdi>`;
+  return L.map(x=>{const s=CH_ST[x.st];
+    const B=new Map();for(const r of x.claims){const d=r.data||{},k=d.batch||'';if(!B.has(k))B.set(k,[]);B.get(k).push(r)}
+    const bl=[...B.entries()].sort((a,b)=>(a[0]===''?1:0)-(b[0]===''?1:0)||String((a[1][0].data||{}).sentAt||'').localeCompare(String((b[1][0].data||{}).sentAt||'')));
+    const stp=r=>r.status==='approved'?'<span class="pill-ok">معتمد</span>':r.status==='pending'?'<span class="pill-over">قيد المراجعة</span>':'<span class="pill-neg">مرفوض</span>';
+    const det=bl.map(([k,rs])=>{const d0=rs[0].data||{},tot=r2(rs.reduce((a,r)=>a+(+(r.data||{}).amount||0),0)),sd=d0.sentAt?stamp(d0.sentAt).slice(0,10):'',ad=rs.map(r=>(r.data||{}).approvedAt||0).filter(Boolean);
+      return `<h4>${k?'تصفية'+(sd?' أُرسلت '+dd(sd):''):'مصروفات منفردة'}${k&&ad.length?' · اعتُمدت '+dd(stamp(Math.max(...ad)).slice(0,10)):''} — ${rs.length} ${rs.length===1?'مصروف':'مصروفات'} · ${fmt(tot)}</h4>
+      <div class="tbl-wrap"><table class="ch-t"><thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th class="num">المبلغ</th><th>الحالة</th></tr></thead><tbody>${rs.sort((a,b)=>((a.data||{}).date||'').localeCompare((b.data||{}).date||'')).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${esc(d.item||'')}</td><td>${esc(d.notes||'')}${d.contractor?`<span class="note"> · ${esc(d.contractor)}</span>`:''}${r.status==='rejected'&&d.reason?`<br><span class="neg">سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="num">${fmt(+d.amount||0)}</td><td>${stp(r)}</td></tr>`}).join('')}</tbody></table></div>`}).join('')
+      +(x.rets.length?`<h4>المردود للخزنة</h4><div class="tbl-wrap"><table class="ch-t"><tbody>${x.rets.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${esc(d.notes||'رد')}</td><td class="num">${fmt(+d.amount||0)}</td></tr>`}).join('')}</tbody></table></div>`:'');
+    const fig=(l,v,c)=>`<div><span>${l}</span><b class="${c||''}">${v}</b></div>`;
+    const head=`<div class="ch-head"><div class="ch-t1"><b>عهدة ${x.no} من ${x.n}</b>${x.diff?' <span class="oth">صرف فرق</span>':''} · ${esc(x.siteName)} · ${dd(x.date)} <span class="${s[1]}">${s[0]}</span></div>
+      <div class="ch-figs">${fig('المبلغ',fmt(x.amount))}${x.cin?fig('مُرحَّل إليها من السابقة',custSgn(x.cin),x.cin<0?'neg':'in'):''}${fig('المصروفات المعتمدة',fmt(x.spent))}${x.pend?fig('قيد المراجعة',fmt(x.pend)):''}${x.ret?fig('المردود',fmt(x.ret)):''}${x.last?fig(x.left<0?'صرف من ماله (له)':'الباقي معه',fmt(Math.abs(x.left)),x.left<0?'neg':'bal'):fig('مُرحَّل منها للتالية',custSgn(x.cout),x.cout<0?'neg':'')}</div></div>`;
+    return print?`<div class="ch-card">${head}${det||'<p class="note">لا توجد مصروفات على هذه العهدة.</p>'}</div>`
+      :`<details class="ch-card"><summary>${head}</summary>${det||'<p class="note">لا توجد مصروفات على هذه العهدة.</p>'}${x.st==='carry'?`<p class="note">اتقفلت هذه العهدة ورُحِّل ${x.cout>0?'الباقي':'الفرق'} (${fmt(Math.abs(x.cout))}) إلى العهدة التالية بتاريخ ${dd(x.nextDate)}.</p>`:''}</details>`}).join('');
+}
+function custHistCard(eng,name,rows){
+  const f=CU.hf=CU.hf||{site:'',from:'',to:''};
+  const sites=new Map();for(const r of (rows||custMerged()))if(r.engineer===eng&&r.kind==='issue')sites.set(r.site_id,(r.data||{}).siteName||siteNameOf(r.site_id));
+  if(f.site&&!sites.has(f.site))f.site='';
+  const L=custHist(eng,{...f,rows});
+  const T=k=>r2(L.reduce((a,x)=>a+x[k],0));
+  return `<div class="card ch-wrap" id="chCard"><div class="sec-h" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><span>${name?'سجل عُهد م. '+esc(name):'عُهدي السابقة'} (${L.length})</span><span class="row" style="gap:6px">${L.length?'<button type="button" class="ghost" data-chist="print">طباعة / PDF</button>':''}${name?'<button type="button" class="ghost" data-chist="close">إغلاق</button>':''}</span></div>
+  <div class="filters">${sites.size>1?`<div class="f"><label for="ch_site">الموقع</label><select id="ch_site" data-chf="site"><option value="">كل المواقع</option>${[...sites].map(([id,n])=>`<option value="${esc(id)}" ${f.site===id?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
+    <div class="f"><label for="ch_from">من</label><input id="ch_from" type="date" data-chf="from" value="${esc(f.from)}"></div><div class="f"><label for="ch_to">إلى</label><input id="ch_to" type="date" data-chf="to" value="${esc(f.to)}"></div>${f.site||f.from||f.to?'<button type="button" class="ghost" data-chist="clear">مسح</button>':''}</div>
+  ${L.length?`<p class="note">كل عهدة لوحدها، والأحدث فوق. اضغط على العهدة لعرض التصفيات والمصروفات. الإجمالي: صُرف ${fmt(T('amount'))} · معتمد ${fmt(T('spent'))}${T('ret')?' · مردود '+fmt(T('ret')):''}.</p>${custHistBody(L,false)}`:'<p class="note">لا توجد عُهد في هذا النطاق.</p>'}</div>`;
+}
+document.addEventListener('change',ev=>{const t=ev.target.closest&&ev.target.closest('[data-chf]');if(!t)return;CU.hf=CU.hf||{};CU.hf[t.dataset.chf]=t.value;S.justSaved=true;render();const c=$('#chCard');if(c)c.scrollIntoView({block:'start'})});
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-chist]');if(!b)return;const a=b.dataset.chist;
+  if(a==='clear'){CU.hf={site:'',from:'',to:''};S.justSaved=true;render();return}
+  if(a==='close'){CU.histEng='';S.justSaved=true;render();return}
+  if(a==='open'){CU.histEng=b.dataset.eng;CU.hf={site:'',from:'',to:''};S.justSaved=true;render();const c=$('#chCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(a==='print'){const eng=CU.histEng||(APPU.me||{}).id,f=CU.hf||{},L=custHist(eng,{...f,rows:CU.histEng&&typeof custMine==='function'?custMine():null});const nm=CU.histEng?((custSummary(custMerged().filter(r=>r.engineer===eng))[0]||{}).name||''):(S.myName||(APPU.me||{}).name||'');
+    CU.printing={title:'سجل العُهد — م. '+nm,sub:(f.site?siteNameOf(f.site):'كل المواقع')+(f.from?' · من '+f.from:'')+(f.to?' · إلى '+f.to:'')+' · حتى '+today(),body:custHistBody(L,true)};printReport('cust')}});
 async function custApprove(id){
   const r=custMerged().find(x=>x.id===id);if(!r)return;const d=r.data||{};
   const st=S.sites.find(s=>s.id===r.site_id);
@@ -1649,6 +1720,7 @@ function appRenderCustEng(){
     <div class="f c4"><label for="en_rem">ملاحظات (اختياري)</label><input id="en_rem" maxlength="200"></div>
     <div class="form-foot"><button class="primary" type="submit" id="enSave">حفظ في المسودة</button>${CU.edit?'<button type="button" class="ghost" data-cu="dcancel">إلغاء التعديل</button>':''}${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
   </form></div>`:'<div class="card blank"><h3>لا توجد عهدة مصروفة لك بعد</h3><p>عندما يصرف لك المدير أو صاحب الموقع عهدة ستظهر هنا، ويمكنك بعدها تسجيل مصروفاتك منها.</p></div>'}
+  ${sites.size?custHistCard(me.id):''}
   <div class="card"><div class="sec-h">حركات عهدتي</div>
   ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
   ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.kind==='claim'&&r.status==='pending'&&!isLocked(d.date)?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
@@ -1730,7 +1802,7 @@ async function ctFlush(){
   try{
     for(const op of ctQ()){
       let err=null;
-      try{const r=op.op==='del'?await SB.from('certs').delete().eq('id',op.id):await SB.from('certs').upsert((()=>{const x={...op.row};delete x._local;delete x.updated_at;return x})(),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
+      try{const r=op.op==='del'?await SB.from('certs').delete().eq('id',op.id):await sbPutRow('certs',(()=>{const x={...op.row};delete x._local;delete x.updated_at;return x})(),(CT.rows||[]).some(x=>x.id===op.id&&!x._local));err=r&&r.error}catch(e){err=e}
       if(err&&ctNetErr(err))break;
       appLs(LS_CTQ,ctQ().filter(x=>x.qid!==op.qid));done++;
       if(err){const m=String(err.message||'');fail[op.id]=/quota/.test(m)?quHit():/locked period/.test(m)?lockMsg():/locked/.test(m)?'هذا المستخلص معتمد. اطلب من صاحب الموقع فتحه للتعديل.':/access/.test(m)?'ليس لديك صلاحية على هذا الموقع.':'تعذّر الحفظ: '+m.slice(0,120);showBanner('مستخلص لم يُحفظ: '+fail[op.id])}
@@ -2293,7 +2365,7 @@ async function soFlush(){
   try{
     for(const op of soQ()){
       let err=null;
-      try{const r=op.op==='del'?await SB.from(op.t).delete().eq('id',op.id):await SB.from(op.t).upsert(soClean(op.row),{onConflict:'id'});err=r&&r.error}catch(e){err=e}
+      try{const r=op.op==='del'?await SB.from(op.t).delete().eq('id',op.id):await sbPutRow(op.t,soClean(op.row));err=r&&r.error}catch(e){err=e}
       if(err&&ctNetErr(err))break;
       appLs(LS_SOQ,soQ().filter(x=>x.qid!==op.qid));done++;
       if(err){SO.err=SO.err||{};SO.err[op.id]=String(err.message||err).slice(0,160)}
@@ -2550,7 +2622,7 @@ function soMovesHTML(site){
   const seenB=new Set(),bonHead=m=>{if(m.kind!=='in')return '';const k=soInvKey(m),x=invs.get(k);if(!x||seenB.has(k))return '';seenB.add(k);const all=soInvLines(m),canAll=all.every(soCanEdit),ph=soInvPhoto(all);
     return `<tr class="ct-sec${soDelReq(all)?' del-row':''}${SO.focus&&SO.focus.key===k?' hl':''}" id="inv_${esc(m.id)}"><td colspan="5">${soDelBtns(m,all,canAll)}${canAll?`<button type="button" class="ghost inv-ed" data-so="invedit" data-id="${esc(m.id)}">تعديل الفاتورة</button>`:''}${ph?`<button type="button" class="ghost inv-ed rcpt" data-receipt="${esc(ph.id)}" data-rtype="${esc(ph.type)}">📎 نسخة الفاتورة</button>`:''}<b>${esc(soInvTitle(x,nos.get(x.k)))}</b>${x.sitem&&nos.get(x.k)&&x.inv?' · فاتورة المورد '+esc(x.inv):''} · ${esc(x.date)}${x.sup?' — '+esc(x.sup):''}${all.some(o=>(o.data||{}).supPend)?' <span class="pend-sup">⏳ المورد بانتظار التسجيل</span>':''}${typeof ocLockOf==='function'&&all.some(o=>ocLockOf('mv:'+o.id))?' <span class="kind-tag">🔒 في مستخلص المالك</span>':''}${all.some(soPxOpen)?` <span class="chip no" title="${esc(all.filter(soPxOpen).map(o=>soLabel((o.data||{}).item)+': '+soPxTxt(o.data.pxFlag)).join(' · '))}">⚠ فرق سعر</span>${appr?` <button type="button" class="ghost" data-so="pxok" data-id="${esc(m.id)}">السعر صحيح</button>`:''}`:''} · ${x.lines.length===2?'خامتين':x.lines.length+' '+(x.lines.length>2?'خامات':'خامة')}${x.gross?' · القيمة '+fmt(x.gross):''}${x.disc?' · خصم '+fmt(x.disc)+' · الصافي '+fmt(x.net):''}${x.tax?' · ضريبة '+fmt(x.rate)+'% = '+fmt(x.tax)+' · <b>بالضريبة '+fmt(x.due)+'</b>':''}${x.gross?' '+CUR:''}</td></tr>`};
   const rej=(appLs(LS_SOREJ)||[]).filter(o=>o.row&&o.row.site_id===site.id);
-  const rejH=rej.length?`<div class="card due-card"><div class="sec-h">تعديلات لم تُحفظ (${rej.length})</div><p class="note">رفض الخادم هذه التعديلات، وهي محفوظة هنا على جهازك. صحّح السبب ثم اضغط «إعادة المحاولة»، أو أرسلها إلى المدير أو صاحب الموقع، ثم احذفها من هنا.</p>
+  const rejH=rej.length?`<div class="card due-card"><div class="sec-h">تعديلات لم تُحفظ (${rej.length})</div><p class="note">رفض الخادم هذه التعديلات، وهي محفوظة هنا على جهازك. صحّح السبب ثم اضغط «إعادة المحاولة»، أو أرسلها إلى المدير أو صاحب الموقع، ثم احذفها من هنا.</p>${rej.filter(o=>o.op!=='del').length>1?`<div class="row" style="margin-bottom:6px"><button class="primary" data-so="rejall" data-id="${esc(site.id)}">إعادة المحاولة للكل (${rej.filter(o=>o.op!=='del').length})</button></div>`:''}
     <div class="tbl-wrap"><table><tbody>${rej.map(o=>`<tr><td class="date">${esc(o.row.date||'')}</td><td>${o.row.deleted?'<b class="neg">حذف</b> ':''}${soMoveText(o.row)}${o.why?`<br><span class="neg">السبب: ${esc(o.why)}</span>`:''}</td><td class="acts">${o.op!=='del'?`<button class="primary" data-so="rejretry" data-id="${esc(o.qid)}">إعادة المحاولة</button> `:''}<button class="ghost" data-so="rejdel" data-id="${esc(o.qid)}">امسح</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
   if(SO.focus&&!SO.mvOpen)SO.mvOpen=true;
   if(!SO.mvOpen)return rejH+`<div class="card so-mv"><div class="sec-h" style="margin:0">${soTog('mvtog',false,'حركات المخزن',live.length+' حركة')}</div></div>`;
@@ -3011,6 +3083,7 @@ document.addEventListener('click',async ev=>{
   if(a==='purge'){const pm=(SO.d.moves||[]).find(x=>x.id===id);if(pm&&!soCanAppr(pm.site_id))return;if(!confirm('حذف نهائي؟ لا يمكن استرجاعه.'))return;soQueue('store_moves','del',id,null);await soFlush();render();return}
   if(a==='mfclear'){SO.mf={date:'',q:''};render();return}
   if(a==='rejdel'){appLs(LS_SOREJ,(appLs(LS_SOREJ)||[]).filter(o=>o.qid!==id));render();return}
+  if(a==='rejall'){const all=appLs(LS_SOREJ)||[],L=all.filter(o=>o.row&&o.row.site_id===id&&o.op!=='del');const ids=new Set(L.map(o=>o.qid));appLs(LS_SOREJ,all.filter(o=>!ids.has(o.qid)));const keep=new Set(L.map(o=>o.id));appLs(LS_SOQ,soQ().filter(x=>!keep.has(x.id)).concat(L.map(o=>({qid:newId(),t:o.t,op:o.op,id:o.id,row:o.row}))));SO.d=soData();await soFlush();render();return}
   if(a==='rejretry'){const o=(appLs(LS_SOREJ)||[]).find(x=>x.qid===id);appLs(LS_SOREJ,(appLs(LS_SOREJ)||[]).filter(x=>x.qid!==id));if(o){appLs(LS_SOQ,soQ().filter(x=>x.id!==o.id).concat([{qid:newId(),t:o.t,op:o.op,id:o.id,row:o.row}]));SO.d=soData();await soFlush()}render();return}
   if(a==='showdel'){SO.showDel=!SO.showDel;render();return}
   if(a==='more'){SO.lim+=50;render();return}
@@ -4279,7 +4352,9 @@ function spSupplier(){
   /* من محرك الحساب الواحد (accSup) */
   const E=accSup(nm,{ids,to,item:it,exps:spExp().filter(e=>!e._priv)});if(!E)return null;
   const invs=E.invs,pays=E.pays,crs=E.crs,otherPays=E.otherPays,noItemInv=E.noItemInv;
-  const rows=[...invs.map(x=>({d:x.date,k:'inv',x})),...crs.map(c=>({d:c.date,k:'cr',c})),...pays.map(e=>({d:e.date||'',k:'pay',e}))].sort((a,b)=>a.d.localeCompare(b.d)||(a.k==='inv'?-1:1));
+  /* كل دفعاته تظهر، حتى اللي مش محسوبة في الرصيد (على بند تاني أو «مقاول ومورد» بلا مستخلص ولا فاتورة) — 12 nov */
+  const itN=it?soNorm(it):'',XP=[...otherPays,...(E.loose||[]).filter(e=>!itN||soNorm(e.item||'')===itN)],XT=spSum(XP);
+  const rows=[...invs.map(x=>({d:x.date,k:'inv',x})),...crs.map(c=>({d:c.date,k:'cr',c})),...pays.map(e=>({d:e.date||'',k:'pay',e})),...XP.map(e=>({d:e.date||'',k:'x',e}))].sort((a,b)=>a.d.localeCompare(b.d)||(a.k==='inv'?-1:1));
   let run=0;const NOS={};const tr=rows.map(r=>{
     if(r.k==='inv'){const x=r.x;const no=(NOS[x.site]||(NOS[x.site]=soInvNos(x.site))).get(x.k),lab=(x.sitem&&no?esc(soInvTitle(x,no))+(x.inv?' · فاتورة المورد '+esc(x.inv):''):x.inv?'فاتورة رقم '+esc(x.inv):'بون')+(x.disc?' (خصم '+money0(x.disc)+')':'')+(x.tax?' (ضريبة '+fmt(x.rate)+'% = '+money0(x.tax)+')':'');
       if(x.bad)return `<tr class="warn-row"><td class="d">${esc(x.date)}</td><td class="tl">${lab} <b class="neg">· ${x.bad} ${x.bad===1?'صنف':'أصناف'} من دون سعر</b></td><td class="tl">${esc(spSiteName(x.site))}</td><td class="n">—</td><td></td><td class="n b">${money0(run)}</td></tr>`+spInvLines(x);
@@ -4287,17 +4362,18 @@ function spSupplier(){
     if(r.k==='cr'){const c=r.c,lab=c.k==='ret'?'↩ مرتجع'+(c.inv?' '+esc(c.inv):'')+(c.ref?' (على فاتورة '+esc(c.ref)+')':''):'− إشعار خصم'+(c.inv?' '+esc(c.inv):'')+(c.notes?' · '+esc(c.notes):'');
       if(c.bad)return `<tr class="warn-row"><td class="d">${esc(c.date)}</td><td class="tl">${lab} <b class="neg">· ${c.bad} ${c.bad===1?'صنف':'أصناف'} من دون سعر</b></td><td class="tl">${esc(spSiteName(c.site))}</td><td class="n">—</td><td></td><td class="n b">${money0(run)}</td></tr>`;
       run-=c.val;return `<tr class="cr"><td class="d">${esc(c.date)}</td><td class="tl">${lab}</td><td class="tl">${esc(spSiteName(c.site))}</td><td class="n neg-v">(${money0(c.val)})</td><td></td><td class="n b">${money0(run)}</td></tr>`}
+    if(r.k==='x'){const e=r.e;return `<tr class="pay un"><td class="d">${esc(e.date||'')}</td><td class="tl"><span class="oth">غير محسوبة</span>دفعة — ${esc(spMethTxt(e))}${e.item?' · بند '+esc(e.item):''}${e.notes?' · '+esc(e.notes):''}</td><td class="tl">${esc(spSiteName(e.siteId))}</td><td></td><td class="n in">${money0(amt(e))}</td><td class="n b">${money0(run)}</td></tr>`}
     const e=r.e;run-=amt(e);return `<tr class="pay"><td class="d">${esc(e.date||'')}</td><td class="tl">دفعة — ${esc(spMethTxt(e))}${e.notes?' · '+esc(e.notes):''}</td><td class="tl">${esc(spSiteName(e.siteId))}</td><td></td><td class="n in">${money0(amt(e))}</td><td class="n b">${money0(run)}</td></tr>`}).join('');
   const goodCr=crs.filter(c=>!c.bad),TC=r2(goodCr.reduce((a,c)=>a+c.val,0)),good=invs.filter(x=>!x.bad),TI=r2(good.reduce((a,x)=>a+x.net,0)-TC),TP=spSum(pays),nd=spSum(pays.filter(e=>notDue(e,to))),bad=invs.filter(x=>x.bad);
   const left=r2(TI-TP),noInv=sites.filter(s=>pays.some(e=>e.siteId===s.id)&&!invs.some(x=>x.site===s.id));
   const IS=SP.shape!=='full'?spInvSec(invs,{showSup:false,multi:new Set(invs.map(x=>x.site)).size>1}):{html:'',xl:[],tot:[]};
   const body=`<div class="tiles"><div><span>إجمالي الفواتير (${good.length})${TC?' بعد المرتجعات والخصومات':''}</span><b>${money0(TI)}</b>${TC?`<small>منها مرتجعات وإشعارات خصم (${money0(TC)})</small>`:''}</div><div><span>إجمالي المدفوع (${pays.length} ${pays.length===1?'دفعة':'دفعات'})</span><b class="in">${money0(TP)}</b>${nd?`<small>منها شيكات لم تستحق ${money0(nd)}</small>`:''}</div><div><span>${left<0?'دفعة مقدمة / رصيد لصالحنا':'المتبقي للمورد'}</span><b class="${left>0?'neg':''}">${money0(Math.abs(left))}</b></div></div>${IS.html}${IS.html?'<h3>الحركات بالتاريخ</h3>':''}
   <table><thead><tr><th>التاريخ</th><th>البيان</th><th>الموقع</th><th>قيمة الفاتورة (بعد الخصم، شاملة الضريبة)</th><th>المدفوع</th><th>الرصيد</th></tr></thead><tbody>${tr||'<tr><td colspan="6">لا توجد فواتير ولا دفعات لهذا المورد.</td></tr>'}</tbody>
-  <tfoot><tr><td colspan="3">الإجمالي</td><td class="n">${money0(TI)}</td><td class="n">${money0(TP)}</td><td class="n">${left<0?'('+money0(-left)+') مقدم':money0(left)}</td></tr></tfoot></table>
+  <tfoot><tr><td colspan="3">الإجمالي</td><td class="n">${money0(TI)}</td><td class="n">${money0(TP)}</td><td class="n">${left<0?'('+money0(-left)+') مقدم':money0(left)}</td></tr>${XP.length?`<tr><td colspan="4">دفعات غير محسوبة في الرصيد (${XP.length})</td><td class="n">${money0(XT)}</td><td></td></tr><tr><td colspan="4">إجمالي المدفوع له</td><td class="n">${money0(r2(TP+XT))}</td><td></td></tr>`:''}</tfoot></table>${XP.length?`<p class="note">ℹ️ الدفعات المعلَّمة «غير محسوبة»${it?' على بنود غير البند المختار، أو':''} على بنود ليس لها فواتير ولا مستخلص معتمد — ظاهرة للمراجعة ولا تدخل في الرصيد.</p>`:''}
   ${bad.length?`<p class="warn-box">⚠ <b>تحتاج مراجعة:</b> ${bad.map(x=>(x.inv?'فاتورة رقم '+esc(x.inv):'بون')+' ('+esc(x.date)+') فيها '+x.bad+' '+(x.bad===1?'صنف':'أصناف')+' من دون سعر').join('، ')}. هذه الفواتير غير محسوبة في الإجمالي إلى حين مراجعتها.</p>`:''}
   ${noInv.length?`<p class="warn-box">⚠ توجد دفعات لهذا المورد في ${noInv.map(s=>esc(s.name)).join('، ')} ولا توجد له فواتير مخزن في الموقع نفسه.</p>`:''}
   <p class="note">الفواتير من «توريدات المخزن» (الصافي بعد الخصم)، وتُخصم منها المرتجعات وإشعارات الخصم، والدفعات من المصروفات المسجّلة باسم المورد.${spScopeNote(sites)}</p>`;
-  const extra=(otherPays.length?`<p class="warn-box">ℹ️ توجد ${otherPays.length} ${otherPays.length===1?'دفعة':'دفعات'} لهذا المورد (${money0(spSum(otherPays))}) على بنود أخرى غير ظاهرة في هذا الكشف: ${[...new Set(otherPays.map(e=>esc(e.item||'من دون بند')))].join('، ')}.</p>`:'')+(noItemInv.length?`<p class="warn-box">ℹ️ توجد ${noItemInv.length} ${noItemInv.length===1?'فاتورة':'فواتير'} قديمة لهذا المورد بلا «بند توريد» غير ظاهرة هنا. اختر «كل البنود» لرؤيتها، أو حدّد لها البند من «تعديل الفاتورة».</p>`:'');
+  const extra=(noItemInv.length?`<p class="warn-box">ℹ️ توجد ${noItemInv.length} ${noItemInv.length===1?'فاتورة':'فواتير'} قديمة لهذا المورد بلا «بند توريد» غير ظاهرة هنا. اختر «كل البنود» لرؤيتها، أو حدّد لها البند من «تعديل الفاتورة».</p>`:'');
   let gsum='';
   if(igAnyGroups()){const G=new Map(),add=(site,sitem,v,k)=>{const g=igOf(sitem,igPfOfSite(site))||'';let x=G.get(g);if(!x)G.set(g,x={g,inv:0,cr:0,paid:0});x[k]+=v};
     for(const x of good)add(x.site,x.sitem,x.net,'inv');for(const c of goodCr)add(c.site,c.sitem,c.val,'cr');for(const e of pays)add(e.siteId,e.item,amt(e),'paid');
@@ -4504,6 +4580,57 @@ function chkEditor(D,multi){const c=D.C[0];if(!c.rows.length){const m=CHK.msg;CH
   <div class="tbl-wrap"><table class="tbl chk-ed"><thead><tr><th><input type="checkbox" data-chkall aria-label="تحديد الكل" ${CHK.sel.size&&CHK.sel.size===L.filter(x=>!chkLocked(x)).length?'checked':''}></th><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>المورد</th><th>رقم فاتورة المورد</th><th>الخامات</th><th class="num">الإجمالي</th><th>المقترح</th><th>بند التوريد</th></tr></thead><tbody>
   ${L.map(x=>{const lk=chkLocked(x),sg=chkSugg(x),cur=CHK.pick[x.k]||'';return `<tr${cur?' class="cd-pick"':''}><td>${lk?'🔒':`<input type="checkbox" data-chksel="${esc(x.k)}" ${CHK.sel.has(x.k)?'checked':''} aria-label="تحديد">`}</td><td class="date">${esc(x.date)}</td>${multi?`<td>${esc(spSiteName(x.site))}</td>`:''}<td>${esc(spShow(x.sup)||'—')}${x.pend?' <span class="oth">أخرى</span>':''}</td><td dir="ltr">${esc(x.inv||'—')}</td><td class="note">${esc(mats(x))}</td><td class="num">${x.bad?'—':fmt(x.net)}</td><td>${sg?`<button type="button" class="linkish" data-chk="one" data-k="${esc(x.k)}" data-v="${esc(sg)}">${esc(sg)}</button>`:'—'}</td>
     <td>${lk?'<span class="note">داخلة في مستخلص مالك معتمد</span>':`<select data-chkpick="${esc(x.k)}"><option value="">—</option>${opts(x.site).map(n=>`<option ${soNorm(n)===soNorm(cur)?'selected':''}>${esc(n)}</option>`).join('')}</select>`}</td></tr>`}).join('')}</tbody></table></div></div>`}
+/* ===== المطابقة: كل مصروف لازم يقع في كشف — 12 نوفمبر ===== */
+const REC_B=[['con','في كشوف المقاولين (محسوبة)'],['sup','في كشوف الموردين'],['out','دفعات غير محسوبة في أي كشف'],['gen','مصروفات عامة (من غير اسم)']];
+function recData(sites,to){
+  to=to||today();const ids=new Set(sites.map(s=>s.id));
+  const exps=spExp().filter(e=>!e._priv&&!e.deleted&&ids.has(e.siteId)&&(e.date||'')<=to);
+  const apr=new Set(),aprCon=new Map();
+  for(const c of (typeof CT!=='undefined'?CT.rows:[])||[])if(c.status==='approved'&&ids.has(c.site_id)&&((c.data||{}).date||'')<=to){apr.add(c.site_id+'|'+accN(c.contractor)+'|'+ctItem(c))}
+  const sitemsOf=new Map(),sitems=(site,name)=>{const k=site+'|'+accN(name);if(!sitemsOf.has(k)){const E=typeof accSup==='function'?accSup(name,{ids:new Set([site]),to}):null;sitemsOf.set(k,E?E.sitems:new Set())}return sitemsOf.get(k)};
+  const SA=typeof accSupAll==='function'?accSupAll({ids,to,exps}):[],supN=new Set(SA.map(x=>accN(x.name)));
+  const bucket=e=>{const n=String(e.contractor||'').trim();if(!n)return 'gen';const k=conKind(n),it=String(e.item||'').trim(),hasC=apr.has(e.siteId+'|'+accN(n)+'|'+it);
+    if(k==='supplier'||(k!=='both'&&supN.has(accN(n))&&!hasC))return 'sup';if(k==='both'){const sd=supPaySide(e,n,sitems(e.siteId,n));if(sd==='sup')return 'sup'}return hasC?'con':'out'};
+  const S_=new Map(sites.map(s=>[s.id,{s,tot:0,con:0,sup:0,out:0,gen:0,n:0}])),OUT=new Map();
+  for(const e of exps){const b=bucket(e),y=S_.get(e.siteId),a=amt(e);y.tot=r2(y.tot+a);y[b]=r2(y[b]+a);y.n++;
+    if(b==='out'){const k=e.siteId+'|'+accN(e.contractor);let o=OUT.get(k);if(!o)OUT.set(k,o={site:e.siteId,name:spShow(e.contractor),items:new Map(),sum:0,n:0});o.sum=r2(o.sum+a);o.n++;o.items.set(String(e.item||'').trim()||'من دون بند',r2((o.items.get(String(e.item||'').trim()||'من دون بند')||0)+a))}}
+  /* مراجعة مع محرك الكشوف */
+  const conEng=r2(accConRows({ids,to}).reduce((a,x)=>a+x.paid,0));
+  const supNames=new Map();for(const e of exps){const n=String(e.contractor||'').trim();if(n&&bucket(e)==='sup'&&!supNames.has(accN(n)))supNames.set(accN(n),n)}
+  let supEng=0;for(const n of supNames.values()){const E=accSup(n,{ids,to,exps});if(E)supEng=r2(supEng+E.paid)}
+  const R=[...S_.values()].filter(y=>y.n),T=k=>r2(R.reduce((a,y)=>a+y[k],0));
+  const bals=sites.map(s=>{const b=bal(s.id),r=recon(s.id);return {s,dep:b.dep,exp:b.exp,book:b.total,cnt:r.st==='none'?null:r.c,actual:r.st==='none'?null:r.actual,d:r.st==='none'?null:r.d}});
+  return {R,T:{tot:T('tot'),con:T('con'),sup:T('sup'),out:T('out'),gen:T('gen'),n:R.reduce((a,y)=>a+y.n,0)},OUT:[...OUT.values()].sort((a,b)=>b.sum-a.sum),conEng,supEng,bals};
+}
+function spRec(){
+  if(!chkCan())return null;const sites=spScope(),to=spTo(),multi=sites.length>1,D=recData(sites,to),T=D.T;
+  const dC=r2(T.con-D.conEng),dS=r2(T.sup-D.supEng),pct=v=>T.tot?Math.round(v/T.tot*1000)/10+'%':'—';
+  const xl=[['المطابقة — '+spScopeTxt(sites)+' · حتى '+to],[]],xt=[0];
+  let body=`<div class="tiles"><div><span>إجمالي المصروفات</span><b>${money0(T.tot)}</b><small>${T.n} حركة</small></div><div><span>في كشوف المقاولين والموردين</span><b class="in">${money0(r2(T.con+T.sup))}</b><small>${pct(r2(T.con+T.sup))}</small></div><div><span>دفعات غير محسوبة</span><b class="${T.out?'neg':''}">${money0(T.out)}</b><small>${pct(T.out)}</small></div><div><span>مصروفات عامة</span><b>${money0(T.gen)}</b><small>${pct(T.gen)}</small></div></div>
+  <h3>توزيع المصروفات على الكشوف</h3><table><thead><tr>${multi?'<th>الموقع</th>':''}<th>إجمالي المصروفات</th>${REC_B.map(b=>`<th>${b[1]}</th>`).join('')}<th>الفرق</th></tr></thead><tbody>
+  ${D.R.map(y=>{const df=r2(y.tot-y.con-y.sup-y.out-y.gen);return `<tr>${multi?`<td class="tl">${esc(y.s.name)}</td>`:''}<td class="n">${money0(y.tot)}</td><td class="n">${money0(y.con)}</td><td class="n">${money0(y.sup)}</td><td class="n ${y.out?'neg':''}">${money0(y.out)}</td><td class="n">${money0(y.gen)}</td><td class="n">${Math.abs(df)<0.01?'✓':money0(df)}</td></tr>`}).join('')||`<tr><td colspan="${multi?7:6}">لا توجد مصروفات.</td></tr>`}</tbody>
+  ${D.R.length>1?`<tfoot><tr>${multi?'<td>الإجمالي</td>':''}<td class="n">${money0(T.tot)}</td><td class="n">${money0(T.con)}</td><td class="n">${money0(T.sup)}</td><td class="n">${money0(T.out)}</td><td class="n">${money0(T.gen)}</td><td></td></tr></tfoot>`:''}</table>
+  <h3>مطابقة مع الكشوف</h3><table style="width:auto;min-width:60%"><thead><tr><th>البيان</th><th>من المصروفات</th><th>من الكشوف</th><th>الحالة</th></tr></thead><tbody>
+  <tr><td class="tl">المدفوع للمقاولين على بنود بمستخلص معتمد</td><td class="n">${money0(T.con)}</td><td class="n">${money0(D.conEng)}</td><td>${Math.abs(dC)<0.01?'✓ مطابق':'<b class="neg">فرق '+money0(dC)+'</b>'}</td></tr>
+  <tr><td class="tl">المدفوع للموردين</td><td class="n">${money0(T.sup)}</td><td class="n">${money0(D.supEng)}</td><td>${Math.abs(dS)<0.01?'✓ مطابق':'<b class="neg">فرق '+money0(dS)+'</b>'}</td></tr></tbody></table>`;
+  xl.push(['توزيع المصروفات على الكشوف']);xt.push(xl.length-1);xl.push([...(multi?['الموقع']:[]),'إجمالي المصروفات',...REC_B.map(b=>b[1])]);xt.push(xl.length-1);
+  for(const y of D.R)xl.push([...(multi?[y.s.name]:[]),y.tot,y.con,y.sup,y.out,y.gen]);
+  xl.push([...(multi?['الإجمالي']:[]),T.tot,T.con,T.sup,T.out,T.gen]);xt.push(xl.length-1);
+  if(D.OUT.length){body+=`<h3>الدفعات غير المحسوبة حسب الاسم (${D.OUT.length})</h3><table><thead><tr>${multi?'<th>الموقع</th>':''}<th>الاسم</th><th>البنود</th><th>عدد الدفعات</th><th>المبلغ</th><th class="no-print"></th></tr></thead><tbody>${D.OUT.map(o=>`<tr>${multi?`<td class="tl">${esc(spSiteName(o.site))}</td>`:''}<td class="tl">${esc(o.name)}</td><td class="tl">${[...o.items].map(([i,v])=>esc(i)+' ('+money0(v)+')').join('، ')}</td><td class="n">${o.n}</td><td class="n neg">${money0(o.sum)}</td><td class="no-print"><button type="button" class="ghost" data-recopen="${esc(o.name)}" data-site="${esc(o.site)}">الكشف</button></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="${multi?4:3}">الإجمالي</td><td class="n">${money0(T.out)}</td><td class="no-print"></td></tr></tfoot></table>
+    <p class="note">الدفعة غير المحسوبة = باسم مقاول على بند ليس له مستخلص معتمد (أو «مقاول ومورد» على بند ليس له فواتير ولا مستخلص). الحل: اعتماد مستخلص البند، أو تصحيح البند أو الاسم في الحركة. لو الاسم عامل يومية من غير مستخلصات فالدفعة سليمة وتفضل هنا للعلم.</p>`;
+    xl.push([],['الدفعات غير المحسوبة حسب الاسم']);xt.push(xl.length-1);xl.push([...(multi?['الموقع']:[]),'الاسم','البنود','عدد الدفعات','المبلغ']);xt.push(xl.length-1);for(const o of D.OUT)xl.push([...(multi?[spSiteName(o.site)]:[]),o.name,[...o.items.keys()].join('، '),o.n,o.sum])}
+  body+=`<h3>الرصيد مع آخر جرد</h3><table><thead><tr><th>الموقع</th><th>الإيداعات</th><th>المصروفات</th><th>الرصيد الدفتري</th><th>آخر جرد</th><th>الموجود فعلًا</th><th>الفرق</th></tr></thead><tbody>${D.bals.map(x=>`<tr><td class="tl">${esc(x.s.name)}</td><td class="n in">${money0(x.dep)}</td><td class="n">${money0(x.exp)}</td><td class="n b">${money0(x.book)}</td><td class="d">${x.cnt?esc(x.cnt.date):'—'}</td><td class="n">${x.actual==null?'—':money0(x.actual)}</td><td class="n ${x.d&&Math.abs(x.d)>=0.01?'neg':''}">${x.d==null?'—':Math.abs(x.d)<0.01?'✓':money0(x.d)}</td></tr>`).join('')}</tbody></table>
+  <p class="note">الرصيد الدفتري الحالي (كل الحركات)، والفرق من آخر جرد مسجّل. المصروفات العامة = مصروفات من غير مقاول أو مورد (زي النثريات). البنود الخاصة غير داخلة.</p>`;
+  SP.xl={rows:xl,tot:xt,title:'المطابقة - '+spScopeTxt(sites),sheet:'المطابقة',widths:[multi?22:18,18,18,18,18,18,14]};
+  return {title:'المطابقة — كل مصروف في كشف',sub:spScopeTxt(sites)+' · حتى '+to,body};
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-recopen]');if(!b)return;SP.type=conKind(b.dataset.recopen)==='supplier'?'sup':'con';SP.name=b.dataset.recopen;SP.item='';SP.site=b.dataset.site||'';SP.shape='full';S.justSaved=true;render();window.scrollTo({top:0})});
+/* تنبيه في الملخص: مبالغ بره الكشوف */
+function recNote(){if(!chkCan()||typeof spScope!=='function')return '';let sites;try{sites=S.sites.filter(s=>!s.hidden)}catch(e){return ''}if(!sites.length)return '';
+  const key=sites.length+'|'+S.exp.length+'|'+((typeof CT!=='undefined'&&CT.rows)||[]).length;if(!recNote.c||recNote.c.k!==key){try{const D=recData(sites,today());recNote.c={k:key,out:D.T.out,n:D.OUT.reduce((a,o)=>a+o.n,0),names:D.OUT.length,dC:r2(D.T.con-D.conEng),dS:r2(D.T.sup-D.supEng)}}catch(e){return ''}}
+  const c=recNote.c;if(!(c.out>0.004)&&Math.abs(c.dC)<0.01&&Math.abs(c.dS)<0.01)return '';
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>⚠ ${c.out>0.004?`<b>${fmt(c.out)}</b> ${CUR} (${c.n} ${c.n===1?'دفعة':'دفعات'} لـ${c.names} ${c.names===1?'اسم':'أسماء'}) خارج إجماليات كشوف المقاولين والموردين — على بنود ليس لها مستخلص معتمد أو فواتير.`:''}${Math.abs(c.dC)>=0.01||Math.abs(c.dS)>=0.01?' في فرق بين المصروفات والكشوف.':''}</span><button type="button" class="primary" data-recgo>عرض المطابقة</button></div></div>`}
+document.addEventListener('click',ev=>{if(!ev.target.closest('[data-recgo]'))return;SP.type='rec';SP.site='';SP.name='';SP.to='';S.sel='__stmts';S.justSaved=true;render();window.scrollTo({top:0})});
 function spCheck(){
   if(!chkCan())return null;const D=chkData(),multi=D.sites.length>1;
   const tot=D.C.filter(c=>c.n),xl=[['الفحص','العدد','المبلغ','النسبة %']],xt=[0];
@@ -4656,23 +4783,50 @@ function spContractor(){
   const keys=new Set(R.map(x=>x.c.site_id+'|'+ctItem(x.c)));
   const pend=certs.filter(c=>c.status!=='approved'&&!R.some(x=>ctKey(x.c)===ctKey(c)&&x.c.no>c.no));
   const exps=spExp().filter(e=>!e._priv&&ids.has(e.siteId)&&(e.date||'')<=to&&e.contractor&&accN(e.contractor)===k);
-  const onCert=exps.filter(e=>keys.has(e.siteId+'|'+String(e.item||'').trim())),other=exps.filter(e=>!keys.has(e.siteId+'|'+String(e.item||'').trim()));
-  const T=f=>r2(R.reduce((a,x)=>a+f(x),0)),W=T(x=>x.k.works),RET=T(x=>x.k.ret),DED=T(x=>x.k.dedCum),AF=T(x=>x.k.after),PD=T(x=>x.paid),LF=r2(AF-PD),nd=spSum(onCert.filter(e=>notDue(e,to)));
+  const onCert=exps.filter(e=>keys.has(e.siteId+'|'+String(e.item||'').trim())),other0=exps.filter(e=>!keys.has(e.siteId+'|'+String(e.item||'').trim()));
+  /* «مقاول ومورد»: دفعات التوريد محسوبة في كشف المورد */
+  const SE=conKind(nm)==='both'&&typeof accSup==='function'?accSup(nm,{ids,to,exps:spExp().filter(e=>!e._priv)}):null,supIds=new Set(SE?SE.allPays.map(e=>e.id):[]);
+  const other=other0.filter(e=>!supIds.has(e.id)),otherSup=other0.filter(e=>supIds.has(e.id));
+  const T=f=>r2(R.reduce((a,x)=>a+f(x),0)),W=T(x=>x.k.works),RET=T(x=>x.k.ret),DED=T(x=>x.k.dedCum),AF=T(x=>x.k.after),PD=T(x=>x.paid),LF=r2(AF-PD),nd=spSum(onCert.filter(e=>notDue(e,to))),OT=spSum(other),ALL=r2(PD+OT);
   const code=n=>typeof cdTxt==='function'&&cdTxt(n,'item')?' <span class="code">'+esc(cdTxt(n,'item'))+'</span>':'';
-  let body=`<div class="tiles"><div><span>الأعمال حتى تاريخه</span><b>${money0(W)}</b></div><div><span>تأمين الأعمال المحجوز</span><b>${money0(RET)}</b>${DED?`<small>والخصومات ${money0(DED)}</small>`:''}</div><div><span>الصافي المستحق</span><b>${money0(AF)}</b></div><div><span>المدفوع على بنود مستخلصاته</span><b class="in">${money0(PD)}</b>${nd?`<small>منها شيكات لم تستحق ${money0(nd)}</small>`:''}</div><div><span>${LF<0?'مدفوع بالزيادة (مقدم)':'المتبقي للمقاول'}</span><b class="${LF>0?'neg':''}">${money0(Math.abs(LF))}</b></div></div>
-  <table><thead><tr>${multi?'<th>الموقع</th>':''}<th>البند</th><th>آخر مستخلص معتمد</th><th>الأعمال حتى تاريخه</th><th>التأمين</th><th>الخصومات</th><th>الصافي المستحق</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>
-  ${R.map(x=>`<tr>${multi?`<td class="tl">${esc(spSiteName(x.c.site_id))}</td>`:''}<td class="tl">${esc(ctItem(x.c))||'—'}${code(ctItem(x.c))}</td><td class="tl">رقم ${x.c.no}${x.k.fin?' (ختامي)':''} — ${esc((x.c.data||{}).date||'')}</td><td class="n">${money0(x.k.works)}</td><td class="n">${money0(x.k.ret)}</td><td class="n">${x.k.dedCum?money0(x.k.dedCum):'—'}</td><td class="n">${money0(x.k.after)}</td><td class="n in">${money0(x.paid)}</td><td class="n b">${x.left<0?'('+money0(-x.left)+') مقدم':money0(x.left)}</td></tr>`).join('')||`<tr><td colspan="${multi?9:8}">لا توجد مستخلصات معتمدة لهذا المقاول${to!==today()?' حتى هذا التاريخ':''}.</td></tr>`}
-  </tbody>${R.length?`<tfoot><tr><td colspan="${multi?3:2}">الإجمالي</td><td class="n">${money0(W)}</td><td class="n">${money0(RET)}</td><td class="n">${DED?money0(DED):'—'}</td><td class="n">${money0(AF)}</td><td class="n">${money0(PD)}</td><td class="n">${LF<0?'('+money0(-LF)+') مقدم':money0(LF)}</td></tr></tfoot>`:''}</table>`;
-  if(pend.length)body+=`<p class="warn-box">ℹ️ ${pend.map(c=>'مستخلص رقم '+c.no+' — '+esc(ctItem(c))+(multi?' ('+esc(spSiteName(c.site_id))+')':'')+(c.status==='submitted'?' قيد الاعتماد':' مسودة')).join('، ')} — غير محسوب حتى يُعتمد.</p>`;
-  if(other.length)body+=`<p class="warn-box">⚠ ${other.length} ${other.length===1?'دفعة':'دفعات'} باسمه (${money0(spSum(other))}) على بنود ليس لها مستخلص معتمد: ${[...new Set(other.map(e=>esc(e.item||'من دون بند')))].join('، ')} — غير محسوبة في المتبقي.${conKind(nm)==='both'?' (هو «مقاول ومورد»: دفعات التوريد تظهر في تقرير المورد.)':''}</p>`;
-  if(!full&&onCert.length){const P=onCert.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(e.item||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="${multi?3:2}">الإجمالي</td><td class="n">${money0(spSum(P))}</td></tr></tfoot></table>`}
+  /* سطر لكل بند اشتغل فيه (معتمد أو قيد الاعتماد أو مسودة أو دفعات بس) — 12 نوفمبر */
+  const B=new Map(),bk=(site,item)=>site+'|'+String(item||'').trim(),bget=(site,item)=>{const kk=bk(site,item);if(!B.has(kk))B.set(kk,{site,item:String(item||'').trim(),r:null,last:null,paid:0,n:0});return B.get(kk)};
+  for(const x of R)bget(x.c.site_id,ctItem(x.c)).r=x;
+  for(const c of certs){const y=bget(c.site_id,ctItem(c));if(!y.last||c.no>y.last.no)y.last=c}
+  for(const e of other){const y=bget(e.siteId,e.item);y.paid=r2(y.paid+amt(e));y.n++}
+  const BL=[...B.values()].sort((a,b)=>spSiteName(a.site).localeCompare(spSiteName(b.site),'ar')||a.item.localeCompare(b.item,'ar'));
+  const stTxt=y=>{const L=y.last,ap=y.r;if(ap){let t='معتمد رقم '+ap.c.no+(ap.k.fin?' (ختامي)':'')+' — '+((ap.c.data||{}).date||'');if(L&&L.no>ap.c.no&&L.status!=='approved')t+=' · رقم '+L.no+(L.status==='submitted'?' قيد الاعتماد':' مسودة');return t}
+    if(L)return 'رقم '+L.no+' '+(L.status==='submitted'?'قيد الاعتماد':'مسودة')+' — '+((L.data||{}).date||'');return 'لا يوجد مستخلص'};
+  const dash='<td class="n">—</td>';
+  let body=`<div class="tiles"><div><span>الأعمال حتى تاريخه</span><b>${money0(W)}</b></div><div><span>تأمين الأعمال المحجوز</span><b>${money0(RET)}</b>${DED?`<small>والخصومات ${money0(DED)}</small>`:''}</div><div><span>الصافي المستحق</span><b>${money0(AF)}</b></div><div><span>المدفوع على بنود مستخلصاته</span><b class="in">${money0(PD)}</b>${nd?`<small>منها شيكات لم تستحق ${money0(nd)}</small>`:''}${OT?`<small>+ دفعات غير محسوبة ${money0(OT)}</small>`:''}</div><div><span>${LF<0?'مدفوع بالزيادة (مقدم)':'المتبقي للمقاول'}</span><b class="${LF>0?'neg':''}">${money0(Math.abs(LF))}</b></div></div>
+  <h3>البنود</h3><table><thead><tr>${multi?'<th>الموقع</th>':''}<th>البند</th><th>آخر مستخلص</th><th>الأعمال حتى تاريخه</th><th>التأمين</th><th>الخصومات</th><th>الصافي المستحق</th><th>المدفوع على البند</th><th>المتبقي</th></tr></thead><tbody>
+  ${BL.map(y=>{const x=y.r;return `<tr${x?'':' class="un"'}>${multi?`<td class="tl">${esc(spSiteName(y.site))}</td>`:''}<td class="tl">${esc(y.item)||'من دون بند'}${code(y.item)}</td><td class="tl">${esc(stTxt(y)).replace(/(\d{4}-\d{2}-\d{2})/g,'<bdi dir="ltr">$1</bdi>')}</td>${x?`<td class="n">${money0(x.k.works)}</td><td class="n">${money0(x.k.ret)}</td><td class="n">${x.k.dedCum?money0(x.k.dedCum):'—'}</td><td class="n">${money0(x.k.after)}</td><td class="n in">${money0(x.paid)}</td><td class="n b">${x.left<0?'('+money0(-x.left)+') مقدم':money0(x.left)}</td>`:`${dash}${dash}${dash}${dash}<td class="n in">${y.paid?money0(y.paid)+' <span class="oth">غير محسوبة</span>':'—'}</td>${dash}`}</tr>`}).join('')||`<tr><td colspan="${multi?9:8}">لا توجد مستخلصات ولا دفعات لهذا المقاول${to!==today()?' حتى هذا التاريخ':''}.</td></tr>`}
+  </tbody>${BL.length?`<tfoot><tr><td colspan="${multi?3:2}">الإجمالي (المستخلصات المعتمدة)</td><td class="n">${money0(W)}</td><td class="n">${money0(RET)}</td><td class="n">${DED?money0(DED):'—'}</td><td class="n">${money0(AF)}</td><td class="n">${money0(PD)}</td><td class="n">${LF<0?'('+money0(-LF)+') مقدم':money0(LF)}</td></tr>${OT?`<tr><td colspan="${multi?7:6}">دفعات على بنود بلا مستخلص معتمد (غير محسوبة في المتبقي)</td><td class="n">${money0(OT)}</td><td></td></tr><tr><td colspan="${multi?7:6}">إجمالي المدفوع له</td><td class="n">${money0(ALL)}</td><td></td></tr>`:''}</tfoot>`:''}</table>`;
+  /* ملخص حسب البند لما يكون في أكتر من موقع */
+  let SUM=null;if(multi){const M=new Map();for(const y of BL){const kk=y.item;if(!M.has(kk))M.set(kk,{item:kk,af:0,pd:0,ot:0,ap:false});const z=M.get(kk);if(y.r){z.af=r2(z.af+y.r.k.after);z.pd=r2(z.pd+y.r.paid);z.ap=true}else z.ot=r2(z.ot+y.paid)}
+    SUM=[...M.values()].sort((a,b)=>a.item.localeCompare(b.item,'ar'));
+    if(SUM.length>1)body+=`<h3>ملخص حسب البند</h3><table><thead><tr><th>البند</th><th>الصافي المستحق</th><th>المدفوع (محسوب)</th><th>المتبقي</th><th>دفعات غير محسوبة</th></tr></thead><tbody>${SUM.map(z=>`<tr><td class="tl">${esc(z.item)||'من دون بند'}</td><td class="n">${z.ap?money0(z.af):'—'}</td><td class="n in">${z.ap?money0(z.pd):'—'}</td><td class="n b">${z.ap?money0(r2(z.af-z.pd)):'—'}</td><td class="n">${z.ot?money0(z.ot):'—'}</td></tr>`).join('')}</tbody></table>`}
+  if(other.length)body+=`<p class="note">ℹ️ الدفعات المعلَّمة «غير محسوبة» على بنود ليس لها مستخلص معتمد بعد، فلا تدخل في المتبقي حتى يُعتمد مستخلص البند.${conKind(nm)==='both'?' (هو «مقاول ومورد»: دفعات التوريد تظهر في تقرير المورد.)':''}</p>`;
+  /* الدفعات: كلها، والمحسوب والغير محسوب منفصلين */
+  const P=onCert.concat(other,otherSup).sort((a,b)=>(a.date||'').localeCompare(b.date||'')),isO=new Set(other);
+  const isS=new Set(otherSup),mark=e=>isO.has(e)?'<span class="oth">غير محسوبة</span>':isS.has(e)?'<span class="oth">في كشف المورد</span>':'';
+  const pfoot=n=>P.length?`<tfoot>${OT||otherSup.length?`<tr><td colspan="${n}">المحسوبة في المتبقي</td><td class="n">${money0(spSum(onCert))}</td></tr><tr><td colspan="${n}">غير محسوبة (لا يوجد مستخلص معتمد)</td><td class="n">${money0(OT)}</td></tr>`:''}${otherSup.length?`<tr><td colspan="${n}">دفعات توريد (محسوبة في كشف المورد)</td><td class="n">${money0(spSum(otherSup))}</td></tr>`:''}<tr><td colspan="${n}">الإجمالي</td><td class="n">${money0(spSum(P))}</td></tr></tfoot>`:'';
+  if(!full)body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr${isO.has(e)?' class="un"':''}><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${mark(e)}${esc(e.item||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')||`<tr><td colspan="${multi?4:3}">لا توجد دفعات.</td></tr>`}</tbody>${pfoot(multi?3:2)}</table>`;
   if(full){
-    const P=onCert.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>طريقة الدفع</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${esc(e.item||'')}</td><td>${esc(spMethTxt(e))}</td><td class="tl">${esc(e.notes||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')||`<tr><td colspan="${multi?6:5}">لا توجد دفعات.</td></tr>`}</tbody>${P.length?`<tfoot><tr><td colspan="${multi?5:4}">الإجمالي</td><td class="n">${money0(spSum(P))}</td></tr></tfoot>`:''}</table>`;
-    const A=certs.filter(c=>c.status==='approved').sort((a,b)=>ctKey(a).localeCompare(ctKey(b))||a.no-b.no);
-    body+=`<h3>المستخلصات المعتمدة</h3><table><thead><tr>${multi?'<th>الموقع</th>':''}<th>البند</th><th>رقم</th><th>التاريخ</th><th>الأعمال حتى تاريخه</th><th>الصافي بعد التأمين والخصومات</th></tr></thead><tbody>${A.map(c=>{const kc=ctCalc(c);return `<tr>${multi?`<td class="tl">${esc(spSiteName(c.site_id))}</td>`:''}<td class="tl">${esc(ctItem(c))}</td><td class="n">${c.no}${kc.fin?' (ختامي)':''}</td><td class="d">${esc((c.data||{}).date||'')}</td><td class="n">${money0(kc.works)}</td><td class="n">${money0(kc.after)}</td></tr>`}).join('')||`<tr><td colspan="${multi?6:5}">—</td></tr>`}</tbody></table>`;
+    body+=`<h3>الدفعات</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البند</th><th>طريقة الدفع</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>${P.map(e=>`<tr${isO.has(e)?' class="un"':''}><td class="d">${esc(e.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(e.siteId))}</td>`:''}<td class="tl">${mark(e)}${esc(e.item||'')}</td><td>${esc(spMethTxt(e))}</td><td class="tl">${esc(e.notes||'')}</td><td class="n in">${money0(amt(e))}</td></tr>`).join('')||`<tr><td colspan="${multi?6:5}">لا توجد دفعات.</td></tr>`}</tbody>${pfoot(multi?5:4)}</table>`;
+    const A=certs.slice().sort((a,b)=>ctKey(a).localeCompare(ctKey(b))||a.no-b.no);
+    body+=`<h3>المستخلصات</h3><table><thead><tr>${multi?'<th>الموقع</th>':''}<th>البند</th><th>رقم</th><th>التاريخ</th><th>الحالة</th><th>الأعمال حتى تاريخه</th><th>الصافي بعد التأمين والخصومات</th></tr></thead><tbody>${A.map(c=>{const kc=ctCalc(c);return `<tr${c.status==='approved'?'':' class="un"'}>${multi?`<td class="tl">${esc(spSiteName(c.site_id))}</td>`:''}<td class="tl">${esc(ctItem(c))}</td><td class="n">${c.no}${kc.fin?' (ختامي)':''}</td><td class="d">${esc((c.data||{}).date||'')}</td><td>${c.status==='approved'?'معتمد':c.status==='submitted'?'قيد الاعتماد':'مسودة'}</td><td class="n">${money0(kc.works)}</td><td class="n">${money0(kc.after)}</td></tr>`}).join('')||`<tr><td colspan="${multi?7:6}">—</td></tr>`}</tbody></table>`;
   }
+  /* Excel */
+  {const xl=[['تقرير '+(full?'تفصيلي':'مختصر')+' — مقاول: '+spShow(nm)],[spScopeTxt(sites)+' · حتى '+to],[]],tot=[0];
+    xl.push([...(multi?['الموقع']:[]),'البند','آخر مستخلص','الأعمال حتى تاريخه','التأمين','الخصومات','الصافي المستحق','المدفوع على البند','المتبقي']);tot.push(xl.length-1);
+    for(const y of BL){const x=y.r;xl.push([...(multi?[spSiteName(y.site)]:[]),y.item||'من دون بند',stTxt(y),...(x?[x.k.works,x.k.ret,x.k.dedCum||0,x.k.after,x.paid,x.left]:['','','','',y.paid?y.paid:'',''])])}
+    xl.push([...(multi?['']:[]),'الإجمالي (المستخلصات المعتمدة)','',W,RET,DED,AF,PD,LF]);tot.push(xl.length-1);
+    if(OT){xl.push([...(multi?['']:[]),'دفعات غير محسوبة','','','','','',OT,'']);xl.push([...(multi?['']:[]),'إجمالي المدفوع له','','','','','',ALL,'']);tot.push(xl.length-1)}
+    xl.push([],['الدفعات']);tot.push(xl.length-1);xl.push(['التاريخ',...(multi?['الموقع']:[]),'البند',...(full?['طريقة الدفع','البيان']:[]),'المبلغ','ملاحظة']);tot.push(xl.length-1);
+    for(const e of P)xl.push([e.date||'',...(multi?[spSiteName(e.siteId)]:[]),String(e.item||''),...(full?[spMethTxt(e),String(e.notes||'')]:[]),amt(e),isO.has(e)?'غير محسوبة':isS.has(e)?'في كشف المورد':'']);
+    xl.push(['الإجمالي',...(multi?['']:[]),'',...(full?['','']:[]),spSum(P),'']);tot.push(xl.length-1);
+    SP.xl={rows:xl,tot,title:'تقرير مقاول - '+spShow(nm),sheet:'مقاول',widths:[multi?20:26,26,30,14,14,14,14,14,14]}}
   body+=`<p class="note">المستحق = «إجمالي الأعمال بعد التأمين والخصومات» في آخر مستخلص معتمد لكل بند في كل موقع، والمدفوع = المصروفات باسمه على البند نفسه في الموقع نفسه.${spScopeNote(sites)}</p>`;
   return {title:'تقرير مختصر — مقاول: '+spShow(nm),sub:spScopeTxt(sites)+' · حتى '+to,body};
 }
@@ -4684,13 +4838,13 @@ function spSiteFull(){
   <h3>دفعات المالك (${Dp.length})</h3><table><thead><tr><th>التاريخ</th>${multi?'<th>الموقع</th>':''}<th>البيان</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${Dp.map(d=>`<tr><td class="d">${esc(d.date||'')}</td>${multi?`<td class="tl">${esc(spSiteName(d.siteId))}</td>`:''}<td class="tl">${esc(d.notes||'')}</td><td>${esc(spMethTxt(d))}</td><td class="n in">${money0(amt(d))}</td></tr>`).join('')||`<tr><td colspan="${multi?5:4}">—</td></tr>`}</tbody>${Dp.length?`<tfoot><tr><td colspan="${multi?4:3}">الإجمالي</td><td class="n">${money0(spSum(Dp))}</td></tr></tfoot>`:''}</table>`;
 }
 /* المواضيع في صفحة «التقارير» */
-const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['co','مصاريف الشركة','على حساب الشركة'],['store','المخزن','أرصدة وحركات'],['journal','اليومية','حركة يوم أو فترة'],['all','ملخص المواقع','كل المواقع'],['chk','فحص البيانات','ملاحظات تحتاج مراجعة']];
+const SP_SUBJ=[['site','موقع','حساب الموقع كله'],['con','مقاول','مستخلصات ودفعات'],['sup','مورد','فواتير ودفعات'],['grp','بند عام','البنود التابعة له'],['item','بند','بند واحد'],['mat','خامة','كميات وموردين'],['pay','دفعات','مقاول أو مورد أو المالك'],['co','مصاريف الشركة','على حساب الشركة'],['store','المخزن','أرصدة وحركات'],['journal','اليومية','حركة يوم أو فترة'],['all','ملخص المواقع','كل المواقع'],['chk','فحص البيانات','ملاحظات تحتاج مراجعة'],['rec','المطابقة','كل مصروف في كشف']];
 /* مواقع المخزن المفعّلة اللي ليه صلاحية عليها */
 const spStoreSites=()=>typeof soMySites==='function'&&typeof SO!=='undefined'&&SO.d?soMySites().filter(s=>s.enabled):[];
 /* المواضيع المسموح بيها لكل دور (قرار 30 أكتوبر): المكتب الفني مقاول/مورد/دفعات (+ المخزن لو له صلاحية)، أمين المخزن ومهندس الموقع المخزن والخامة، المحاسب وصاحب الموقع والمدير الكل */
 function spSubjects(){
   const st=spStoreSites().length>0,eng=APP&&typeof appIsEngineer==='function'&&appIsEngineer();
-  if(!eng)return SP_SUBJ.map(x=>x[0]).filter(v=>(v!=='store'||st)&&(v!=='chk'||chkCan()));
+  if(!eng)return SP_SUBJ.map(x=>x[0]).filter(v=>(v!=='store'||st)&&((v!=='chk'&&v!=='rec')||chkCan()));
   const out=[];if(spTech())out.push('con','sup','grp','item','pay');if(st)out.push('store','mat');return out;
 }
 const SP_SHAPED=['site','sup','con','grp','item','mat','pay','co','store','journal','all'];
@@ -4719,7 +4873,7 @@ function spStoreShort(){const L=spStoreSites(),sel=SP.site?L.filter(s=>s.id===SP
   return {title:'تقرير مختصر — المخزن: أرصدة الخامات',sub:(sel.length===1?'موقع: '+sel[0].name:'كل المخازن ('+sel.length+')')+' · حتى '+to,body:`<table><thead><tr><th>الخامة</th><th>الوحدة</th><th>الوارد (صافي)</th><th>المنصرف</th><th>الرصيد</th></tr></thead><tbody>${R.map(x=>`<tr><td class="tl">${esc(x.n)}</td><td>${esc(x.u)}</td><td class="n">${fmt(x.inQ)}</td><td class="n">${fmt(x.out)}</td><td class="n ${x.bal<0?'neg':''}">${fmt(x.bal)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد حركات مخزن حتى هذا التاريخ.</td></tr>'}</tbody></table>
    <p class="note">المختصر: رصيد كل خامة من غير الحركات. الوارد = التوريد ناقص المرتجع، والمنصرف = الوارد ناقص الرصيد (من الجرد). الرصيد بالسالب بالأحمر للمراجعة. «عادي (تفصيلي)» = تقرير المخزن بالحركات.</p>`}}
 function spDoc(){SP.xl=null;if(SP.type==='journal')return spJournalShort();if(SP.type==='all')return spAllShort();if(SP.type==='store')return spStoreShort();
-  const d=SP.type==='chk'?spCheck():SP.type==='co'?spCompany():SP.type==='con'?spContractor():SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite();
+  const d=SP.type==='rec'?spRec():SP.type==='chk'?spCheck():SP.type==='co'?spCompany():SP.type==='con'?spContractor():SP.type==='sup'?spSupplier():SP.type==='pay'?spPayments():SP.type==='grp'?spGroup():SP.type==='item'?spGroup(true):SP.type==='mat'?spMat():spSite();
   if(d&&SP.type==='site'&&typeof ocCoSum==='function'){const sc=spScope(),v=r2(sc.reduce((a,s)=>a+ocCoSum(s.id,SP.to||today()),0));if(v>0.004)d.body=`<p class="sub">منها على حساب الشركة: <b>${money0(v)}</b></p>`+d.body}
   if(d&&SP.shape==='full'&&SP_SHAPED.includes(SP.type)){d.title=d.title.replace('تقرير مختصر','تقرير تفصيلي');if(SP.type==='site')d.body+=spSiteFull()}return d}
 
@@ -4762,7 +4916,7 @@ function spRenderPage(){
     ${SP.type==='sup'&&SP.name?(()=>{const L=spSupItems();if(SP.item&&!L.some(n=>soNorm(n)===soNorm(SP.item)))SP.item='';return `<div class="f c2"><label for="sp_item">البند</label><select id="sp_item">${opt('','كل البنود',SP.item)}${L.map(n=>opt(n,n,SP.item)).join('')}</select></div>`})():''}
     ${SP.type==='pay'||SP.type==='mat'||SP.type==='co'||SP.type==='journal'||((SP.type==='grp'||SP.type==='item')&&SP.mode!=='debts')?`<div class="f c1"><label for="sp_from">من تاريخ</label><input id="sp_from" type="date" value="${esc(SP.from||(SP.type==='journal'?spTo().slice(0,8)+'01':''))}"></div>`:''}
     <div class="f c1"><label for="sp_to">حتى تاريخ</label><input id="sp_to" type="date" value="${esc(SP.to||today())}"></div>
-    <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}${d&&(['grp','item','mat','co','chk'].includes(SP.type)||(SP.shape!=='full'&&['pay','journal','all','store','sup'].includes(SP.type)))&&SP.xl?'<button type="button" class="ghost" data-sp="xl">Excel</button>':''}</div>
+    <div class="form-foot">${d?'<button type="button" class="primary" data-print="short">طباعة / PDF</button>':''}${d&&(['grp','item','mat','co','chk','con','rec'].includes(SP.type)||(SP.shape!=='full'&&['pay','journal','all','store','sup'].includes(SP.type)))&&SP.xl?'<button type="button" class="ghost" data-sp="xl">Excel</button>':''}</div>
   </form></div>
   ${d?`<div class="card sp-prev"><div class="sp-title"><b>${esc(d.title)}</b><span class="note">${esc(d.sub)}</span></div>${d.body}</div>${d.extra||''}`:'<div class="card blank" style="padding:24px"><p>اختر الاسم ليظهر الكشف.</p></div>'}
   `;
@@ -6291,6 +6445,24 @@ function supHintRender(siteId){
   const chips=[...by.entries()].map(([n,o])=>`<button type="button" class="chip${n===item?' on':''}" data-supitem="${esc(n)}">${esc(n)} (${o.n} ${o.n===1?'فاتورة':'فواتير'} · باقي ${fmt(Math.round(o.v*100)/100)})</button>`).join('');
   box.innerHTML=`<div class="chips"><span class="note" style="margin:0">بنود لها فواتير لـ${esc(con)}:</span>${chips}</div>${item&&!by.has(item)?`<p class="warn-box">ℹ️ البند «${esc(item)}» ليس له فواتير لـ${esc(con)} في هذا الموقع. إذا كانت هذه الدفعة لفواتير التوريد فاختر بند التوريد لتتطابق في كشف المورد. (يمكنك الحفظ كالمعتاد).)</p>`:''}`;
 }
+/* تنبيه وقت التسجيل: حركة شكلها مكررة، أو دفعة لمقاول على بند مالوش مستخلص معتمد وهو عنده مستخلصات على بنود تانية — 12 نوفمبر */
+function entryWarn(siteId,rec,old){
+  if(!APP||!rec||!rec.date||!(+rec.amount>0))return null;
+  if(old&&old.date===rec.date&&+old.amount===+rec.amount&&(old.contractor||'')===(rec.contractor||'')&&(old.item||'')===(rec.item||''))return null;
+  const W=[],keys=[];const dd=(a,b)=>Math.abs(Date.parse(a)-Date.parse(b))/864e5;
+  const con=String(rec.contractor||'').trim(),it=String(rec.item||'').trim();
+  const dup=(S.exp||[]).filter(e=>!e.deleted&&e.siteId===siteId&&(!old||e.id!==old.id)&&Math.abs(amt(e)-(+rec.amount))<0.005&&String(e.contractor||'').trim()===con&&e.date&&dd(e.date,rec.date)<=3);
+  if(dup.length){const e=dup[0];keys.push('d'+e.id);W.push(`ممكن تكون مكررة: يوجد مصروف بنفس المبلغ (${fmt(amt(e))})${con?' لـ'+esc(con):''} بتاريخ ${esc(e.date)}${e.item?' على بند '+esc(e.item):''}${e.notes?' — '+esc(e.notes):''}${dup.length>1?' (و'+(dup.length-1)+' غيره)':''}.`)}
+  if(con&&it&&it!==PAY_ITEM&&typeof CT!=='undefined'&&CT.loaded&&typeof conKind==='function'){
+    const k=conKind(con),apr=(CT.rows||[]).filter(c=>c.site_id===siteId&&c.status==='approved'&&accN(c.contractor)===accN(con));
+    let side='con';if(k==='supplier')side='sup';else if(k==='both'&&typeof supPaySide==='function'&&typeof accSup==='function'){const E=accSup(con,{ids:new Set([siteId])});side=supPaySide({item:it},con,E?E.sitems:new Set())}
+    if(side==='con'&&apr.length&&!apr.some(c=>ctItem(c)===it)){const its=[...new Set(apr.map(ctItem))];keys.push('c'+it);W.push(`${esc(con)} له مستخلصات معتمدة في هذا الموقع على: ${its.map(esc).join('، ')} — وليس على «${esc(it)}». الدفعة هتظهر في كشفه «غير محسوبة» لحد ما يُعتمد مستخلص على هذا البند. تأكد من البند.`)}
+    else if(side==='none'){keys.push('n'+it);W.push(`«${esc(it)}» مالوش فواتير توريد ولا مستخلص معتمد لـ${esc(con)} في هذا الموقع، فالدفعة هتظهر في كشوفه «غير محسوبة».`)}
+  }
+  return W.length?{key:keys.join('|')+'|'+rec.date+'|'+rec.amount,html:W.map(x=>'<span style="display:block">⚠ '+x+'</span>').join('')}:null;
+}
+function ewBox(w,form){return `<span class="warn-box" style="display:block">${w.html}<button type="button" class="primary" data-ewok="${esc(w.key)}" data-ewf="${form}">حفظ على أي حال</button></span>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-ewok]');if(!b)return;S.ewOk=b.dataset.ewok;const f=document.getElementById(b.dataset.ewf);if(f)f.requestSubmit()});
 /* دفعة بتاريخ قبل مستخلص معتمد لنفس المقاول والبند */
 function preCertWarn(siteId,rec,old){
   if(!APP||typeof CT==='undefined'||!CT.loaded||!rec.contractor||!rec.date)return null;
@@ -6323,7 +6495,8 @@ function bindSite(site){
     const miss=[];if(!rec.date)miss.push('التاريخ');if(kind==='exp'&&!rec.contractor&&!(old&&old.custodyId)&&!(APP&&itNameOpt(rec.item)))miss.push(APP&&(rec.item===PAY_ITEM||itNeedSup(rec.item))?'المورد':'المقاول');if(kind==='exp'&&!rec.item)miss.push('البند');if(!rec.notes)miss.push('البيان');dueRead('e',rec,miss);
     if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const first={'التاريخ':'#e_date','المقاول':'#e_contractor','المورد':'#e_contractor','البند':'#e_item','البيان':'#e_notes','تاريخ الاستحقاق':'#e_due'}[miss[0]];if(first==='#e_contractor'&&$('#e_contractor').value==='__new')$('#e_contractor_new').focus();const el=$(first);if(el)el.focus();return}
     if(kind==='exp'&&APP&&rec.item===PAY_ITEM&&!conIsSup(rec.contractor)){msg.className='msg err';msg.textContent='«'+PAY_ITEM+'» لمورد مسجّل كمورد (أو مقاول ومورد) فقط. اختر المورد.';return}
-    if(kind==='exp'){const w=preCertWarn(site.id,rec,old);if(w&&S.pcOk!==w.key){msg.className='msg';msg.innerHTML=`<span class="warn-box" style="display:block">⚠ ${w.html}<br><button type="button" class="primary" data-pcok="${esc(w.key)}">حفظ على أي حال</button> <button type="button" class="ghost" data-pcdate>تعديل التاريخ</button></span>`;return}}
+    if(kind==='exp'){const w=preCertWarn(site.id,rec,old);if(w&&S.pcOk!==w.key){msg.className='msg';msg.innerHTML=`<span class="warn-box" style="display:block">⚠ ${w.html}<br><button type="button" class="primary" data-pcok="${esc(w.key)}">حفظ على أي حال</button> <button type="button" class="ghost" data-pcdate>تعديل التاريخ</button></span>`;return}
+      const w2=entryWarn(site.id,rec,old);if(w2&&S.ewOk!==w2.key){msg.className='msg';msg.innerHTML=ewBox(w2,'entryForm');return}}
     if(!moneyCheck(kind,rec,old)){msg.className='msg';msg.textContent='لم يُحفظ. راجع البيانات.';return}
     if(kind==='exp')commitNewRegs([['e_contractor','contractors'],['e_item','items']]);
     const file=S.pickedFile;
@@ -6566,6 +6739,7 @@ function bindJournal(){
     const miss=[];if(!site)miss.push('الموقع');if(!(amount>0))miss.push('المبلغ');if(!rec.date)miss.push('التاريخ');if(!rec.notes)miss.push('البيان');if(type==='exp'&&!rec.item)miss.push('البند');if(type==='exp'&&!rec.contractor&&!(APP&&itNameOpt(rec.item,site)))miss.push(APP&&(rec.item===PAY_ITEM||itNeedSup(rec.item))?'المورد':'المقاول');dueRead('j',rec,miss);
     if(miss.length){msg.className='msg err';msg.textContent='يجب أن تكتب: '+miss.join('، ')+'.';const el=$({'الموقع':'#j_site','المبلغ':'#j_amount','التاريخ':'#j_date','البيان':'#j_notes','البند':'#j_item','المقاول':'#j_contractor','المورد':'#j_contractor','تاريخ الاستحقاق':'#j_due'}[miss[0]]);if(el)el.focus();return}
     if(type==='exp'&&APP&&rec.item===PAY_ITEM&&!conIsSup(rec.contractor)){msg.className='msg err';msg.textContent='«'+PAY_ITEM+'» لمورد مسجّل كمورد (أو مقاول ومورد) فقط. اختر المورد.';return}
+    if(type==='exp'){const w2=entryWarn(site,rec,null);if(w2&&S.ewOk!==w2.key){msg.className='msg';msg.innerHTML=ewBox(w2,'jForm');return}}
     if(!moneyCheck(type,rec,null)){msg.className='msg';msg.textContent='لم يُحفظ. راجع البيانات.';return}
     if(type==='exp')commitNewRegs([['j_contractor','contractors'],['j_item','items']]);
     if(S.pickedFile){
@@ -8044,6 +8218,8 @@ function reportDoc(kind){
     body=`<table><thead><tr>${R.head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${R.rows.map(r=>`<tr>${r.map((v,i)=>td(typeof v==='number'?money(v):esc(v),typeof v==='number'?'n':(i===0?'tl b':'tl'))).join('')}</tr>`).join('')}</tbody><tfoot><tr>${R.tot.map((v,i)=>td(typeof v==='number'?money(v):esc(v||''),typeof v==='number'?'n':'tl')).join('')}</tr></tfoot></table>`;
   }else if(kind==='store'&&APP&&SO.printing){
     const x=soDocBody(SO.printing);title=x.title;sub=x.sub;body=x.body;signs=x.signs;if(x.land)land=true;
+  }else if(kind==='cust'&&APP&&CU.printing){
+    const x=CU.printing;title=x.title;sub=x.sub;body=x.body;
   }else if(kind==='short'&&APP&&typeof spDoc==='function'){
     const x=spDoc();if(!x)return '';title=x.title;sub=x.sub;body=x.body;land=true;
   }else if(kind==='ocert'&&APP&&OC.printing){
@@ -8085,7 +8261,7 @@ body{margin:0;font-family:Tahoma,"Segoe UI",Arial,sans-serif;color:#111;font-siz
 .hd .meta{text-align:left;font-size:10px;color:#444;direction:rtl}
 .sub{margin:0 0 8px;color:#333;font-size:11px}
 tr.grp-h td{background:#e6e6e6;font-weight:700}tr.grp-free td{background:#f2f2f2;font-weight:700;color:#444}tr.grp-i td:first-child{padding-right:18px}tr.sub-t td{font-weight:700;border-top:1.5px solid #555}tr.cr td.n{color:#a00}
-.no-print,.ni-x{display:none!important}h4{font-size:12px;margin:10px 0 3px}h3.inv-sec-h{border-top:1.5px solid #555;padding-top:6px}table.inv-t{table-layout:fixed}td.no{color:#444}tr.itm-t td{background:#eee}table.inv-sup{width:auto;min-width:50%;margin:2px 0 10px}tr.grp-oth td{color:#8a5a00}.oth{border:1px solid #b7791f;border-radius:6px;padding:0 4px;font-size:9px;color:#8a5a00}
+.no-print,.ni-x{display:none!important}tr.un td{background:#fbf3e8}.ch-card{border:1px solid #999;border-radius:6px;padding:6px 8px;margin:8px 0}.ch-figs{display:flex;gap:4px 16px;flex-wrap:wrap;font-size:11px;color:#444}.ch-figs b{display:block;font-size:13px;color:#000}.ch-t1{font-size:13px}.ch-t1 span{border:1px solid #888;border-radius:6px;padding:0 5px;font-size:10px}h4{font-size:12px;margin:10px 0 3px}h3.inv-sec-h{border-top:1.5px solid #555;padding-top:6px}table.inv-t{table-layout:fixed}td.no{color:#444}tr.itm-t td{background:#eee}table.inv-sup{width:auto;min-width:50%;margin:2px 0 10px}tr.grp-oth td{color:#8a5a00}.oth{border:1px solid #b7791f;border-radius:6px;padding:0 4px;font-size:9px;color:#8a5a00}
 .tiles{display:flex;gap:8px;margin:0 0 10px}
 .tiles div{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
 .tiles span{font-size:10px;color:#555}.tiles b{font-size:14px}.tiles small{font-size:9px;color:#555}
@@ -8148,6 +8324,7 @@ function reportName(kind){
   const d=today();
   if(kind==='stmt'&&S.stmt){const R=REG[S.stmt.col];return R.stmt+(isMulti(S.stmt.name)?' مجمّع':'')+' - '+nmLabel(S.stmt.name)+' - '+d}
   if(kind==='site')return 'كشف حساب موقع - '+siteNameOf(S.sel)+' - '+d;
+  if(kind==='cust'&&APP&&CU.printing)return CU.printing.title.replace(/ — /g,' - ')+' - '+d;
   if(kind==='short'&&APP&&typeof spDoc==='function'){const x=spDoc();return (x?x.title.replace(/ — /g,' - '):'تقرير مختصر')+' - '+d}
   if(kind==='regs')return (S.regKind==='supplier'?'قائمة الموردين':S.regKind==='contractor'?'قائمة مقاولين الباطن':'قائمة المقاولين والموردين')+' - '+d;
   if(kind==='store'&&APP&&SO.printing)return soRepName(SO.printing);
@@ -9169,6 +9346,7 @@ function render(){
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   if(APP&&typeof entBar==='function'){const cur=S.sites.some(x=>x.id===S.sel)?S.sel:((S.sel==='__store'||appIsEngineer())&&typeof SO!=='undefined'?SO.site:'');const eb=entBar(cur);if(eb)$('#pane').insertAdjacentHTML('afterbegin',eb)}
+  if(APP&&S.sel==='__all'&&typeof recNote==='function'){const c=recNote();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof rejCard==='function'&&(S.sel==='__all'||S.sites.some(x=>x.id===S.sel))){const c=rejCard(S.sel==='__all'?'':S.sel);if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof custFailCard==='function'&&(appIsEngineer()||S.sel==='__custody'||S.sites.some(x=>x.id===S.sel))){const c=custFailCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   {const eng=APP&&appIsEngineer(),bar=eng?'':excelBar();if(bar&&bar.includes('xbar ok'))$('#pane').insertAdjacentHTML('afterbegin',bar);uiNoticeBtn(eng?[]:uiNotices());uiBottom();if(APP&&typeof backBar==='function'){const bb=backBar();if(bb)$('#pane').insertAdjacentHTML('afterbegin',bb);else if(S.back&&S.back.at!==navAt()){S.back=null;navClear()}}}
