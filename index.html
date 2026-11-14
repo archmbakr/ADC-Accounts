@@ -533,9 +533,10 @@ let SB=null,installEvt=null;
 let appLockQ=Promise.resolve();
 function appAuthLock(name,timeout,fn){const run=appLockQ.then(()=>fn(),()=>fn());appLockQ=run.catch(()=>{});return run}
 const APPU={me:null,owner:false,approved:false,mode:'login',msg:'',info:'',email:'',offline:false,members:null,membersBusy:false,pwMsg:'',copyMsg:''};
+const DEV_ID=(()=>{let v='';try{v=localStorage.getItem('adc_dev_id')||''}catch(e){}if(!/^[A-Za-z0-9-]{8,80}$/.test(v)){v=(crypto.randomUUID?crypto.randomUUID():('d'+Date.now().toString(36)+Math.random().toString(36).slice(2,12)));try{localStorage.setItem('adc_dev_id',v)}catch(e){}}return v})();
 function sbClient(){
   if(!SB&&window.supabase&&window.supabase.createClient){
-    try{SB=window.supabase.createClient(APPCFG.url,APPCFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'adc-app-auth',lock:appAuthLock}})}catch(e){SB=null}
+    try{SB=window.supabase.createClient(APPCFG.url,APPCFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'adc-app-auth',lock:appAuthLock},global:{headers:{'x-adc-device':DEV_ID}}})}catch(e){SB=null}
   }
   return SB;
 }
@@ -597,6 +598,10 @@ function appLockHTML(){
       <button class="primary" type="button" data-app="bio-go" id="apBioBtn">افتح بالبصمة</button>
       ${APPU.bioPw?`<form id="apForm" class="lk-form" novalidate data-kind="unlock"><label for="ap_pw">كلمة المرور</label><input id="ap_pw" type="password" autocomplete="current-password" dir="ltr"><button type="submit" id="apBtn">افتح بكلمة المرور</button></form>`:'<button type="button" class="ghost" data-app="bio-pw">سجّل الدخول بكلمة المرور بدلًا من ذلك</button>'}
       <button type="button" class="ghost" data-app="signout">تسجيل الخروج</button>`;
+  else if(m==='device')b=`<h2>جهاز جديد — بانتظار موافقة المدير</h2><p class="lk-sub">حسابك (<b>${esc(APPU.me&&APPU.me.name||'')}</b>) مفتوح من جهاز أو متصفح جديد: <b>${esc(devLabel())}</b>. لحماية بيانات الشركة لازم المدير يوافق على الجهاز ده الأول. اتصل بيه، وبعد ما يوافق هيفتح لوحده أو اضغط «حاول مرة أخرى».</p>${err}${info}
+      <button class="primary" type="button" data-app="recheck">حاول مرة أخرى</button><button type="button" class="ghost" data-app="signout">خروج</button>`;
+  else if(m==='devblock')b=`<h2>الجهاز ده مرفوض</h2><p class="lk-sub">المدير رفض فتح حسابك (<b>${esc(APPU.me&&APPU.me.name||'')}</b>) من الجهاز ده. لو ده غلط اتصل بالمدير.</p>${err}${info}
+      <button class="primary" type="button" data-app="recheck">حاول مرة أخرى</button><button type="button" class="ghost" data-app="signout">خروج</button>`;
   else if(m==='wait')b=`<h2>بانتظار موافقة المدير</h2><p class="lk-sub">تم إنشاء حسابك باسم <b>${esc(APPU.me&&APPU.me.name||'')}</b> (<span dir="ltr">${esc(APPU.me&&APPU.me.email||'')}</span>). اطلب من المدير الموافقة عليه من «الإعدادات»، ثم اضغط «حاول مرة أخرى».</p>${err}${info}
       <button class="primary" type="button" data-app="recheck">حاول مرة أخرى</button><button type="button" class="ghost" data-app="signout">خروج</button>`;
   else b=`<h2>تسجيل الدخول</h2><p class="lk-sub">سجّل الدخول بالبريد الإلكتروني وكلمة المرور الخاصة بك.</p>
@@ -627,6 +632,8 @@ async function appResolve(session){
   if(!owner&&!row){const r3=await SB.from('members').insert({id:u.id,email:me.email,name:me.name});if(r3.error&&!/duplicate/i.test(r3.error.message||''))throw r3.error;row={approved:false,name:me.name}}
   if(row&&row.name)me.name=row.name;
   APPU.me=me;APPU.owner=owner;APPU.approved=owner||!!(row&&row.approved);APPU.role=owner?'owner':((row&&row.role)||'user');me.role=APPU.role;
+  APPU.dev='';
+  if(APPU.approved&&devNeeds()){const st=await devHello();APPU.dev=st;if(st==='pending'||st==='blocked'){appLs(LS_ME,{...me,owner,approved:false});return false}}
   appLs(LS_ME,{...me,owner,approved:APPU.approved});
   return APPU.approved;
 }
@@ -651,7 +658,7 @@ async function appTryEnter(session){
       if(appNetErr(e)&&c&&c.id===session.user.id&&c.approved){appEnterOffline(c);return true}
       throw e;
     }
-    if(!ok){APPU.mode='wait';appShow();return false}
+    if(!ok){APPU.mode=APPU.dev==='pending'?'device':APPU.dev==='blocked'?'devblock':'wait';appShow();if(APPU.mode==='device'){clearTimeout(APPU.devT);APPU.devT=setTimeout(()=>{if(APPU.mode==='device'){const b=document.querySelector('[data-app=recheck]');if(b)b.click()}},30000)}return false}
     appHide();if(appEnter){const f=appEnter;appEnter=null;f()}return true;
   }catch(e){APPU.msg=authErr(e);APPU.mode='login';appShow();return false}
 }
@@ -752,6 +759,39 @@ async function appLoadMembers(){
   if(waiting&&S.sel!=='__settings')showBanner('يوجد '+waiting+' مستخدم بانتظار موافقتك. افتح «الإعدادات» للموافقة عليهم.');
   try{render()}catch(e){}
 }
+/* ===== موافقة المدير على الأجهزة الجديدة (14 نوفمبر) ===== */
+function devLabel(){const u=navigator.userAgent||'';const os=/Windows/.test(u)?'Windows':/Android/.test(u)?'Android':/iPhone|iPad/.test(u)?'iPhone/iPad':/Mac OS/.test(u)?'Mac':/Linux/.test(u)?'Linux':'جهاز';
+  const br=/Edg\//.test(u)?'Edge':/OPR\//.test(u)?'Opera':/Firefox\//.test(u)?'Firefox':/Chrome\//.test(u)?'Chrome':/Safari\//.test(u)?'Safari':'متصفح';
+  const app=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)?' (تطبيق)':'';return os+' · '+br+app}
+const devNeeds=()=>!APPU.owner&&(APPU.role||'user')!=='user';
+async function devHello(){if(!SB)return 'skip';try{const r=await SB.rpc('device_hello',{dev:DEV_ID,lbl:devLabel()});if(r.error)return 'skip';return r.data||'skip'}catch(e){return 'skip'}}
+/* بعد الدخول: لو الجهاز اتلغى أثناء الشغل نرجع لشاشة الانتظار */
+setInterval(async()=>{if(!SB||!APPU.approved||APPU.offline||!devNeeds()||document.hidden||!navigator.onLine)return;const st=await devHello();if(st==='pending'||st==='blocked'){try{appLs(LS_ME,{...(appLs(LS_ME)||{}),approved:false})}catch(e){}location.reload()}},5*60*1000);
+/* المدير: الأجهزة */
+const DV={rows:null,busy:false,missing:false,ch:null};
+async function devLoad(){if(DV.busy||!SB||!APPU.owner)return;DV.busy=true;try{const {data,error}=await SB.from('member_devices').select('*').order('last_seen',{ascending:false});if(error){DV.missing=/member_devices|does not exist|schema cache/i.test(error.message||'');DV.rows=[]}else{DV.rows=data||[];DV.missing=false}}catch(e){}DV.busy=false;
+  if(!DV.ch&&SB&&!DV.missing){try{DV.ch=SB.channel('adc-devices').on('postgres_changes',{event:'*',schema:'public',table:'member_devices'},p=>{const n=(p&&p.new)||{};if(p.eventType==='INSERT'&&n.status==='pending'){const m=(APPU.members||[]).find(x=>x.id===n.user_id)||{};showBanner('🔔 '+(m.name||'مستخدم')+' فتح حسابه من جهاز جديد ('+(n.label||'')+') — بانتظار موافقتك.');try{if(window.Notification&&Notification.permission==='granted')new Notification('ADC CONSTRUCTION — جهاز جديد',{body:(m.name||'')+' · '+(n.label||'')})}catch(e){}}DV.rows=null;devLoad()}).subscribe()}catch(e){}}
+  try{render()}catch(e){}}
+const devName=id=>{const m=(APPU.members||[]).find(x=>x.id===id);return m?(m.name||m.email):'مستخدم'};
+const devBtns=d=>`${d.status!=='approved'?`<button type="button" class="primary" data-dev="approved" data-u="${esc(d.user_id)}" data-d="${esc(d.device_id)}">قبول</button>`:''}${d.status!=='blocked'?`<button type="button" class="ghost danger" data-dev="blocked" data-u="${esc(d.user_id)}" data-d="${esc(d.device_id)}">${d.status==='approved'?'إلغاء الجهاز':'رفض'}</button>`:''}${d.status==='blocked'?`<button type="button" class="ghost" data-dev="del" data-u="${esc(d.user_id)}" data-d="${esc(d.device_id)}">حذف</button>`:''}`;
+function devPendCard(){if(!APPU.owner)return '';if(DV.rows===null){setTimeout(devLoad,0);return ''}const L=(DV.rows||[]).filter(d=>d.status==='pending');if(!L.length)return '';
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h" style="margin:0 0 6px">🔔 ${L.length===1?'جهاز جديد بانتظار موافقتك':L.length+' أجهزة جديدة بانتظار موافقتك'}</div>
+  ${L.map(d=>`<div class="row" style="align-items:center;gap:8px;border-top:1px solid var(--line);padding:6px 0"><span style="flex:1;min-width:200px"><b>${esc(devName(d.user_id))}</b> · ${esc(d.label||'جهاز')} · <span class="note">${esc(stamp(Date.parse(d.first_seen)))}</span></span>${devBtns(d)}</div>`).join('')}
+  <p class="note" style="margin:6px 0 0">لو مش متأكد إن الجهاز ده بتاع الشخص نفسه، ارفض واتصل بيه الأول.</p></div>`}
+function devCard(){if(!APPU.owner)return '';if(DV.rows===null){setTimeout(devLoad,0);return '<div class="sec-h" style="margin-top:14px">الأجهزة</div><p class="note">جاري التحميل…</p>'}
+  if(DV.missing)return '<div class="sec-h" style="margin-top:14px">الأجهزة</div><p class="note">شغّل «ADC-الدفعة-3-الأجهزة-وتضييق-القراءة.sql» في Supabase لتفعيل موافقة الأجهزة.</p>';
+  const ST={pending:'<span class="pill-over">بانتظار الموافقة</span>',approved:'<span class="pill-ok">معتمد</span>',blocked:'<span class="pill-neg">مرفوض</span>'};
+  const L=(DV.rows||[]).slice().sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)||devName(a.user_id).localeCompare(devName(b.user_id),'ar'));
+  return `<div class="sec-h" style="margin-top:14px">الأجهزة</div><p class="note">المهندسين والمكتب الفني وأمين المخزن والمحاسب: أي جهاز (أو متصفح) جديد بيستنى موافقتك. إنت وأصحاب المواقع مش محتاجين موافقة.</p>
+  ${L.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>المستخدم</th><th>الجهاز</th><th>أول دخول</th><th>آخر دخول</th><th>الحالة</th><th></th></tr></thead><tbody>${L.map(d=>`<tr><td>${esc(devName(d.user_id))}</td><td>${esc(d.label||'—')}</td><td class="date">${esc(stamp(Date.parse(d.first_seen)))}</td><td class="date">${esc(stamp(Date.parse(d.last_seen)))}</td><td>${ST[d.status]||esc(d.status)}${d.how==='auto'?' <span class="note">(تلقائي)</span>':''}</td><td class="acts">${devBtns(d)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">لا توجد أجهزة مسجّلة بعد.</p>'}
+  <div class="row"><button type="button" class="ghost" data-dev="reload">تحديث</button></div>`}
+document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-dev]');if(!b||!SB)return;const a=b.dataset.dev;
+  if(a==='reload'){DV.rows=null;devLoad();return}
+  const u=b.dataset.u,d=b.dataset.d;b.disabled=true;
+  if(a==='blocked'&&!confirm('رفض/إلغاء الجهاز ده؟ صاحبه مش هيقدر يشوف أي بيانات منه.')){b.disabled=false;return}
+  const r=a==='del'?await SB.from('member_devices').delete().eq('user_id',u).eq('device_id',d):await SB.from('member_devices').update({status:a,decided_by:S.uid||null,decided_at:new Date().toISOString(),how:'owner'}).eq('user_id',u).eq('device_id',d);
+  if(r.error)showBanner('تعذّر الحفظ: '+String(r.error.message||'').slice(0,100));else{logChange('edit','files',{details:(a==='approved'?'قبول جهاز ':a==='blocked'?'رفض جهاز ':'حذف جهاز ')+devName(u)})}
+  DV.rows=null;devLoad()});
 /* ===== الدفعة 3: تنبيه بالحسابات الجديدة + سجل تحديثات قاعدة البيانات (13 نوفمبر) ===== */
 const NEWACC_LS='adc_newacc_seen_v1';
 function newAccList(){if(!APPU.owner)return [];const seen=lsGet(NEWACC_LS)||[],lim=Date.now()-21*864e5;
@@ -770,7 +810,7 @@ function newAccWatch(){if(NEWACC_CH||!SB||!APPU.owner)return;
     APPU.members=null;appLoadMembers()}).subscribe()}catch(e){}}
 setInterval(()=>{if(APPU.owner&&SB&&navigator.onLine&&!document.hidden)appLoadMembers()},10*60*1000);
 /* سجل تحديثات قاعدة البيانات */
-const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql']];
+const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql'],['2026-11-14-devices-read','موافقة الأجهزة وتضييق القراءة','ADC-الدفعة-3-الأجهزة-وتضييق-القراءة.sql']];
 const MIG={rows:null,busy:false,missing:false};
 async function migLoad(){if(MIG.busy||!SB||!APPU.owner)return;MIG.busy=true;try{const {data,error}=await SB.from('adc_migrations').select('*').order('name');if(error){MIG.missing=/adc_migrations|does not exist|schema cache/i.test(error.message||'');MIG.rows=[]}else{MIG.rows=data||[];MIG.missing=false}}catch(e){}MIG.busy=false;try{render()}catch(e){}}
 function migCard(){if(!APPU.owner)return '';if(MIG.rows===null){setTimeout(migLoad,0);return ''}
@@ -828,7 +868,7 @@ function appSecurityCard(){
     :`<p class="note">${APPU.members===null?'جاري التحميل…':'لا يوجد مستخدمون غيرك بعد.'}</p>`}
     ${APPU.owner?`<div class="row" style="align-items:center;gap:8px"><span>حرف يوميتك أنت (المدير):</span>${jlInput(S.uid)}<span class="note" style="margin:0">الحرف يسبق رقم القيد في دفتر يومية كل مستخدم (مثل A-12). إن تُرك فارغًا يقترح التطبيق حرفًا غير مكرر.</span></div>`:''}
     <div class="row"><button type="button" class="ghost" data-app="members">تحديث القائمة</button></div>
-    <p class="note">««إيقاف» يمنع المستخدم من الدخول، وتبقى بياناته محفوظة لديك.</p>${migCard()}`;
+    <p class="note">««إيقاف» يمنع المستخدم من الدخول، وتبقى بياناته محفوظة لديك.</p>${devCard()}${migCard()}`;
   }
   return `<div class="card backup" id="secCard"><div class="sec-h">الحساب والأمان</div>
     <p>مسجّل الدخول باسم <b>${esc(me.name||'')}</b> (<span dir="ltr">${esc(me.email||'')}</span>)${APPU.owner?' · <b>المستخدم الرئيسي</b>':''}.</p>
@@ -9373,7 +9413,7 @@ function render(){
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   if(APP&&typeof entBar==='function'){const cur=S.sites.some(x=>x.id===S.sel)?S.sel:((S.sel==='__store'||appIsEngineer())&&typeof SO!=='undefined'?SO.site:'');const eb=entBar(cur);if(eb)$('#pane').insertAdjacentHTML('afterbegin',eb)}
-  if(APP&&!appIsEngineer()&&typeof newAccCard==='function'){const c=newAccCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
+  if(APP&&!appIsEngineer()&&typeof newAccCard==='function'){const c=newAccCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c);const d=S.sel==='__settings'?'':devPendCard();if(d)$('#pane').insertAdjacentHTML('afterbegin',d)}
   if(APP&&S.sel==='__all'&&typeof recNote==='function'){const c=recNote();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof rejCard==='function'&&(S.sel==='__all'||S.sites.some(x=>x.id===S.sel))){const c=rejCard(S.sel==='__all'?'':S.sel);if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof custFailCard==='function'&&(appIsEngineer()||S.sel==='__custody'||S.sites.some(x=>x.id===S.sel))){const c=custFailCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
