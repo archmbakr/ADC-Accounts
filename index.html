@@ -752,6 +752,33 @@ async function appLoadMembers(){
   if(waiting&&S.sel!=='__settings')showBanner('يوجد '+waiting+' مستخدم بانتظار موافقتك. افتح «الإعدادات» للموافقة عليهم.');
   try{render()}catch(e){}
 }
+/* ===== الدفعة 3: تنبيه بالحسابات الجديدة + سجل تحديثات قاعدة البيانات (13 نوفمبر) ===== */
+const NEWACC_LS='adc_newacc_seen_v1';
+function newAccList(){if(!APPU.owner)return [];const seen=lsGet(NEWACC_LS)||[],lim=Date.now()-21*864e5;
+  return (APPU.members||[]).filter(m=>!m.approved&&!seen.includes(m.id)&&(!m.created_at||Date.parse(m.created_at)>=lim))}
+function newAccCard(){const L=newAccList();if(!L.length||S.sel==='__settings')return '';
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="sec-h" style="margin:0 0 6px">🔔 ${L.length===1?'حساب جديد بانتظار موافقتك':L.length+' حسابات جديدة بانتظار موافقتك'}</div>
+  ${L.map(m=>`<div class="row" style="align-items:center;gap:8px;border-top:1px solid var(--line);padding:6px 0"><span style="flex:1;min-width:200px"><b>${esc(m.name||'بدون اسم')}</b> · <bdi dir="ltr">${esc(m.email||'')}</bdi>${m.created_at?' · <span class="note">'+esc(stamp(Date.parse(m.created_at)))+'</span>':''}</span><button type="button" class="ghost" data-newacc="hide" data-id="${esc(m.id)}">إخفاء التنبيه</button></div>`).join('')}
+  <div class="row" style="margin-top:6px"><button type="button" class="primary" data-site="__settings">افتح «الإعدادات» للموافقة واختيار نوع الحساب</button></div>
+  <p class="note" style="margin:6px 0 0">لو مش عارف الشخص ده، سيبه من غير موافقة — مش هيقدر يشوف أي بيانات.</p></div>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-newacc]');if(!b)return;const s=lsGet(NEWACC_LS)||[];s.push(b.dataset.id);lsSet(NEWACC_LS,s.slice(-200));S.justSaved=true;render()});
+let NEWACC_CH=null;
+function newAccWatch(){if(NEWACC_CH||!SB||!APPU.owner)return;
+  try{NEWACC_CH=SB.channel('adc-members').on('postgres_changes',{event:'INSERT',schema:'public',table:'members'},p=>{const m=(p&&p.new)||{};
+    showBanner('🔔 حساب جديد: '+(m.name||'')+' ('+(m.email||'')+') بانتظار موافقتك.');
+    try{if(window.Notification&&Notification.permission==='granted')new Notification('ADC CONSTRUCTION — حساب جديد',{body:(m.name||'')+' · '+(m.email||'')})}catch(e){}
+    APPU.members=null;appLoadMembers()}).subscribe()}catch(e){}}
+setInterval(()=>{if(APPU.owner&&SB&&navigator.onLine&&!document.hidden)appLoadMembers()},10*60*1000);
+/* سجل تحديثات قاعدة البيانات */
+const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql']];
+const MIG={rows:null,busy:false,missing:false};
+async function migLoad(){if(MIG.busy||!SB||!APPU.owner)return;MIG.busy=true;try{const {data,error}=await SB.from('adc_migrations').select('*').order('name');if(error){MIG.missing=/adc_migrations|does not exist|schema cache/i.test(error.message||'');MIG.rows=[]}else{MIG.rows=data||[];MIG.missing=false}}catch(e){}MIG.busy=false;try{render()}catch(e){}}
+function migCard(){if(!APPU.owner)return '';if(MIG.rows===null){setTimeout(migLoad,0);return ''}
+  const have=new Map((MIG.rows||[]).map(r=>[r.name,r])),miss=MIG_KNOWN.filter(k=>!have.has(k[0]));
+  return `<div class="sec-h" style="margin-top:14px">تحديثات قاعدة البيانات</div>${MIG.missing?'<p class="msg err">جدول السجل مش موجود. شغّل «ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql» في Supabase.</p>':''}
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>التحديث</th><th>الملف</th><th>الحالة</th></tr></thead><tbody>${MIG_KNOWN.map(k=>{const r=have.get(k[0]);return `<tr><td>${esc(k[1])}</td><td class="note">${esc(k[2])}</td><td>${r?'<span class="pill-ok">✓ '+esc(String(r.applied_at||'').slice(0,10))+'</span>':'<span class="pill-neg">لم يُشغَّل</span>'}</td></tr>`}).join('')}</tbody></table></div>
+  ${miss.length?`<p class="note neg">ناقص ${miss.length} — شغّلهم بالترتيب من فوق لتحت.</p>`:'<p class="note">كل التحديثات متشغّلة ✓</p>'}<div class="row"><button type="button" class="ghost" data-mig="reload">تحديث</button></div>`}
+document.addEventListener('click',ev=>{if(!ev.target.closest('[data-mig]'))return;MIG.rows=null;migLoad()});
 /* the owner registers engineers on sites: that decides their store and (for the technical office) certificates */
 const REG_ROLES=['engineer','tech','eng_tech','store'];
 function appRegSites(){return S.sites.map(s=>{const o=ctOwnerOf(s),m=o&&(APPU.members||[]).find(x=>x.id===o);return {id:s.id,name:s.name+(m?' ('+(m.name||m.email)+')':''),owner:o,plain:s.name}}).sort((a,b)=>a.name.localeCompare(b.name,'ar'))}
@@ -801,7 +828,7 @@ function appSecurityCard(){
     :`<p class="note">${APPU.members===null?'جاري التحميل…':'لا يوجد مستخدمون غيرك بعد.'}</p>`}
     ${APPU.owner?`<div class="row" style="align-items:center;gap:8px"><span>حرف يوميتك أنت (المدير):</span>${jlInput(S.uid)}<span class="note" style="margin:0">الحرف يسبق رقم القيد في دفتر يومية كل مستخدم (مثل A-12). إن تُرك فارغًا يقترح التطبيق حرفًا غير مكرر.</span></div>`:''}
     <div class="row"><button type="button" class="ghost" data-app="members">تحديث القائمة</button></div>
-    <p class="note">««إيقاف» يمنع المستخدم من الدخول، وتبقى بياناته محفوظة لديك.</p>`;
+    <p class="note">««إيقاف» يمنع المستخدم من الدخول، وتبقى بياناته محفوظة لديك.</p>${migCard()}`;
   }
   return `<div class="card backup" id="secCard"><div class="sec-h">الحساب والأمان</div>
     <p>مسجّل الدخول باسم <b>${esc(me.name||'')}</b> (<span dir="ltr">${esc(me.email||'')}</span>)${APPU.owner?' · <b>المستخدم الرئيسي</b>':''}.</p>
@@ -977,7 +1004,7 @@ window.claude={use:async name=>{
   if(name==='downloads')return APPDL;
   return null;
 }};
-setTimeout(()=>{if(APPU.owner&&SB)appLoadMembers()},4000);
+setTimeout(()=>{if(APPU.owner&&SB){appLoadMembers();newAccWatch()}},4000);
 
 /* ---------- fingerprint / face unlock (WebAuthn platform authenticator, local screen lock) ---------- */
 const LS_BIO='adc_bio_v1';
@@ -6877,7 +6904,6 @@ const XLSX_W=(()=>{
       r.forEach((v,ci)=>{
         if(v===null||v===undefined||v==='')return;
         const ref=col(ci)+(ri+1);
-        if(typeof v==='object'&&v.f!=null){const s2=v.st!=null?v.st:st;out+='<c r="'+ref+'" s="'+(s2===1?4:s2===3?5:2)+'"><f>'+x(v.f)+'</f>'+(typeof v.v==='number'&&isFinite(v.v)?'<v>'+v.v+'</v>':'')+'</c>';return}
         if(typeof v==='number'&&isFinite(v))out+='<c r="'+ref+'" s="'+(st===1?4:st===3?5:2)+'"><v>'+v+'</v></c>';
         else out+='<c r="'+ref+'" t="inlineStr" s="'+(st===1?1:st===3?3:0)+'"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';
       });
@@ -6889,7 +6915,7 @@ const XLSX_W=(()=>{
     const files=[];
     files.push(['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>']);
     files.push(['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>']);
-    files.push(['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>'+sheets.map((s,i)=>'<sheet name="'+x(s.name).slice(0,31)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>']);
+    files.push(['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>'+sheets.map((s,i)=>'<sheet name="'+x(s.name).slice(0,31)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>']);
     files.push(['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>']);
     files.push(['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.##"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF'+(typeof rsXlColor==='function'?rsXlColor():'1D5C86')+'"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE4E7E2"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="6"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/><xf numFmtId="164" applyNumberFormat="1"/><xf fontId="2" fillId="3" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="1" fillId="2" applyNumberFormat="1" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="2" fillId="3" applyNumberFormat="1" applyFont="1" applyFill="1"/></cellXfs></styleSheet>']);
     sheets.forEach((s,i)=>files.push(['xl/worksheets/sheet'+(i+1)+'.xml',sheetXml(s)]));
@@ -6928,78 +6954,6 @@ function wantNames(ids){
 }
 function newSinceExcel(){const t=lsGet(LS_XLSX)||0;return S.log.filter(l=>(l.at||0)>t).length}
 const dt=t=>t?stamp(t):'';
-/* ===== شيتات Excel الموقع الجديدة بالمعادلات (13 نوفمبر) — القديم زي ما هو ===== */
-const XL_MON=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-const xlMonName=k=>{const [y,m]=k.split('-');return (XL_MON[+m-1]||m)+' '+y};
-function xlExtraSheets(siteId,el,dl){
-  const multi=!siteId,sites=S.sites.filter(s=>!siteId||s.id===siteId),ids=new Set(sites.map(s=>s.id));
-  const q=s=>"'"+String(s).replace(/'/g,"''")+"'",str=s=>'"'+String(s).replace(/"/g,'""')+'"';
-  const EX=q('المصروفات'),DP=q('الإيداعات'),n1=el.length+1,d1=dl.length+1;
-  const EA=EX+'!$A$2:$A$'+Math.max(2,n1),ED=EX+'!$D$2:$D$'+Math.max(2,n1),EE=EX+'!$E$2:$E$'+Math.max(2,n1),EH=EX+'!$H$2:$H$'+Math.max(2,n1),EC=EX+'!$C$2:$C$'+Math.max(2,n1);
-  const DA=DP+'!$A$2:$A$'+Math.max(2,d1),DC=DP+'!$C$2:$C$'+Math.max(2,d1);
-  const F=(f,v,st)=>({f,v:r2(v||0),st});
-  const grpOf=e=>(typeof igOf==='function'?igOf(e.item||'',igPfOfSite(e.siteId)):'')||'';
-  /* 1) المصروفات حسب الشهر */
-  const mon={name:'المصروفات حسب الشهر',rows:[],styles:{},widths:[12,22,20,22,30,14,...(multi?[18]:[]),14],freeze:1};
-  const AC=multi?'H':'G';
-  mon.rows.push(['التاريخ','البند','البند العام','المقاول / المورد','البيان','طريقة الدفع',...(multi?['الموقع']:[]),'المبلغ']);mon.styles[0]=1;
-  const M=new Map();for(const e of el){const k=(e.date||'').slice(0,7)||'بدون تاريخ';if(!M.has(k))M.set(k,[]);M.get(k).push(e)}
-  const monTot=[];
-  for(const [k,L] of M){mon.rows.push([k==='بدون تاريخ'?k:xlMonName(k)]);mon.styles[mon.rows.length-1]=3;
-    const a=mon.rows.length+1;for(const e of L)mon.rows.push([e.date||'',e.item||'',grpOf(e),e.contractor||'',e.notes||'',mlabel(e),...(multi?[siteNameOf(e.siteId)]:[]),amt(e)]);
-    const b=mon.rows.length,v=L.reduce((s,e)=>s+amt(e),0);
-    mon.rows.push(['إجمالي '+(k==='بدون تاريخ'?k:xlMonName(k)),'','','','','',...(multi?['']:[]),F('SUBTOTAL(9,'+AC+a+':'+AC+b+')',v,3)]);mon.styles[mon.rows.length-1]=3;
-    monTot.push({k,row:mon.rows.length,v});mon.rows.push([])}
-  mon.rows.push(['الإجمالي الكلي','','','','','',...(multi?['']:[]),F('SUBTOTAL(9,'+AC+'2:'+AC+mon.rows.length+')',el.reduce((s,e)=>s+amt(e),0),3)]);mon.styles[mon.rows.length-1]=3;
-  /* 2) المقاولين والموردين */
-  const N=new Map(),key=n=>accN(n);
-  const get=n=>{const k=key(n);if(!N.has(k))N.set(k,{name:typeof spShow==='function'?spShow(n):n,raw:new Set(),cert:0,inv:0,paid:0,counted:0});return N.get(k)};
-  for(const e of el)if(String(e.contractor||'').trim()){const y=get(e.contractor);y.raw.add(e.contractor);y.paid=r2(y.paid+amt(e))}
-  try{for(const x of accConRows({ids})){const y=get(x.c.contractor);y.cert=r2(y.cert+x.k.after);y.counted=r2(y.counted+x.paid)}}catch(e){}
-  try{const exps=el;const sup=new Set([...(accSupAll({ids,exps})||[]).map(x=>key(x.name))]);for(const [k,y] of N)if(conIsSup(y.name))sup.add(k);
-    for(const k of sup){const y=N.get(k)||get((accSupAll({ids,exps})||[]).find(x=>key(x.name)===k).name);const E=accSup(y.name,{ids,exps});if(E){y.inv=r2(y.inv+E.due);y.counted=r2(y.counted+E.paid)}}}catch(e){}
-  const cs={name:'المقاولين والموردين',rows:[],styles:{},widths:[26,14,18,18,18,18,18,18],freeze:1};
-  cs.rows.push(['الاسم','النوع','المستخلصات المعتمدة (الصافي)','الفواتير (بعد المرتجعات)','إجمالي المستحق','إجمالي المنصرف له','منه غير محسوب','المتبقي له']);cs.styles[0]=1;
-  const KN={contractor:'مقاول',supplier:'مورد',both:'مقاول ومورد'};
-  const L=[...N.values()].filter(y=>y.paid||y.cert||y.inv).sort((a,b)=>(KN[conKind(a.name)]||'').localeCompare(KN[conKind(b.name)]||'','ar')||a.name.localeCompare(b.name,'ar'));
-  for(const y of L){const r=cs.rows.length+1,raws=[...y.raw];const pf=raws.length?raws.map(s=>'SUMIFS('+EA+','+EE+','+str(s)+')').join('+'):'0';const oth=r2(Math.max(0,y.paid-y.counted));
-    cs.rows.push([y.name,KN[conKind(y.name)]||'مقاول',y.cert,y.inv,F('C'+r+'+D'+r,y.cert+y.inv),F(pf,y.paid),oth,F('E'+r+'-(F'+r+'-G'+r+')',y.cert+y.inv-(y.paid-oth))])}
-  if(L.length){const a=2,b=cs.rows.length,col=c=>F('SUM('+c+a+':'+c+b+')',0,3);const tr=['الإجمالي','',col('C'),col('D'),col('E'),col('F'),col('G'),col('H')];
-    tr[2].v=r2(L.reduce((s,y)=>s+y.cert,0));tr[3].v=r2(L.reduce((s,y)=>s+y.inv,0));tr[4].v=r2(tr[2].v+tr[3].v);tr[5].v=r2(L.reduce((s,y)=>s+y.paid,0));tr[6].v=r2(L.reduce((s,y)=>s+Math.max(0,y.paid-y.counted),0));tr[7].v=r2(tr[4].v-(tr[5].v-tr[6].v));
-    cs.rows.push(tr);cs.styles[cs.rows.length-1]=3}
-  cs.rows.push([]);cs.rows.push(['المنصرف = كل المصروفات باسمه في شيت «المصروفات» (معادلة). «غير محسوب» = دفعات على بنود ليس لها مستخلص معتمد أو فواتير (زي الكشوف في التطبيق)، وما بتتخصمش من المستحق. المتبقي = المستحق − (المنصرف − غير المحسوب)، وبالسالب يعني مدفوع بالزيادة.']);
-  /* 3) البنود العامة */
-  const G=new Map();for(const e of el){const g=grpOf(e),it=String(e.item||'').trim();if(!G.has(g))G.set(g,new Map());const m=G.get(g);if(!m.has(it))m.set(it,{v:0,n:0,sites:new Set(),raws:new Set()});const z=m.get(it);z.v=r2(z.v+amt(e));z.n++;z.sites.add(siteNameOf(e.siteId));z.raws.add(String(e.item||''))}
-  const grp={name:'البنود العامة',rows:[],styles:{},widths:[34,18,12,12],freeze:1};
-  grp.rows.push(['البند العام / البند','المصروفات','عدد الحركات','النسبة من الإجمالي']);grp.styles[0]=1;
-  const heads=[],TOT=el.reduce((s,e)=>s+amt(e),0),gl=[...G.keys()].sort((a,b)=>(a===''?1:0)-(b===''?1:0)||a.localeCompare(b,'ar'));
-  const crit=(it,site)=>{const c=it?str(it):'"="';return site&&multi?'SUMIFS('+EA+','+ED+','+c+','+EH+','+str(site)+')':'SUMIFS('+EA+','+ED+','+c+')'};
-  const critN=(it,site)=>{const c=it?str(it):'"="';return site&&multi?'COUNTIFS('+ED+','+c+','+EH+','+str(site)+')':'COUNTIFS('+ED+','+c+')'};
-  const shared=new Map();for(const [g,m] of G)for(const it of m.keys())shared.set(it,(shared.get(it)||0)+1);
-  for(const g of gl){const m=G.get(g),hr=grp.rows.length+1,its=[...m.keys()].sort((a,b)=>a.localeCompare(b,'ar')),gv=r2([...m.values()].reduce((s,z)=>s+z.v,0)),gn=[...m.values()].reduce((s,z)=>s+z.n,0);
-    grp.rows.push([g||'بنود غير تابعة لبند عام',F('SUM(B'+(hr+1)+':B'+(hr+its.length)+')',gv,3),F('SUM(C'+(hr+1)+':C'+(hr+its.length)+')',gn,3),F('IF($B$TOT=0,0,ROUND(B'+hr+'/$B$TOT*100,1))',TOT?Math.round(gv/TOT*1000)/10:0,3)]);grp.styles[grp.rows.length-1]=3;heads.push(hr);
-    for(const it of its){const z=m.get(it),r=grp.rows.length+1;
-      /* البند ممكن يكون تحت بند عام مختلف في موقع تاني: نحدّد بالموقع */
-      const need=multi&&shared.get(it)>1,R=[...z.raws].map(x=>x.trim()?x:''),R2=[...new Set(R)],fs=R2.map(x=>need?[...z.sites].map(s=>crit(x,s)).join('+'):crit(x)).join('+'),fn=R2.map(x=>need?[...z.sites].map(s=>critN(x,s)).join('+'):critN(x)).join('+');
-      grp.rows.push(['     '+(it||'من دون بند'),F(fs,z.v),F(fn,z.n),F('IF($B$TOT=0,0,ROUND(B'+r+'/$B$TOT*100,1))',TOT?Math.round(z.v/TOT*1000)/10:0)])}
-    grp.rows.push([])}
-  const tr=grp.rows.length+1;grp.rows.push(['الإجمالي',F(heads.map(h=>'B'+h).join('+')||'0',TOT,3),F(heads.map(h=>'C'+h).join('+')||'0',el.length,3),'']);grp.styles[grp.rows.length-1]=3;
-  grp.rows.push(['مراجعة: إجمالي شيت «المصروفات»',F('SUM('+EA+')',TOT),'','']);grp.rows.push(['الفرق (لازم يكون صفر)',F('B'+tr+'-B'+(tr+1),0),'','']);
-  for(const r of grp.rows)for(const c of r)if(c&&c.f)c.f=c.f.replace(/\$B\$TOT/g,'$B$'+tr);
-  /* 4) ملخص بالمعادلات */
-  const sm={name:'ملخص بالمعادلات',rows:[],styles:{},widths:[26,16,16,16,16],freeze:0};
-  const TD=dl.reduce((s,d)=>s+amt(d),0);
-  sm.rows.push(['ADC CONSTRUCTION'+(siteId?' · '+siteNameOf(siteId):' · كل المواقع')]);sm.styles[0]=3;sm.rows.push([]);
-  sm.rows.push(['إجمالي الإيداعات',F('SUM('+DA+')',TD)]);sm.rows.push(['إجمالي المصروفات',F('SUM('+EA+')',TOT)]);sm.rows.push(['الرصيد الدفتري',F('B3-B4',TD-TOT,3)]);sm.styles[4]=3;
-  sm.rows.push(['(الرصيد هنا من الإيداعات والمصروفات المسجّلة، من غير الشيكات اللي لسه ما اتحصّلتش ومن غير باقي العُهد — الرصيد الرسمي في شيت «الملخص».)']);
-  sm.rows.push([]);sm.rows.push(['الشهر','الإيداعات','المصروفات','صافي الشهر','الرصيد التراكمي']);sm.styles[sm.rows.length-1]=1;
-  const ks=[...new Set([...el.map(e=>(e.date||'').slice(0,7)),...dl.map(d=>(d.date||'').slice(0,7))].filter(Boolean))].sort();let run=0;const m0=sm.rows.length+1;
-  for(const k of ks){const r=sm.rows.length+1,dv=r2(dl.filter(d=>(d.date||'').startsWith(k)).reduce((s,d)=>s+amt(d),0)),ev=r2(el.filter(e=>(e.date||'').startsWith(k)).reduce((s,e)=>s+amt(e),0));run=r2(run+dv-ev);
-    sm.rows.push([xlMonName(k),F('SUMPRODUCT(('+DA+')*(LEFT('+DC+',7)='+str(k)+'))',dv),F('SUMPRODUCT(('+EA+')*(LEFT('+EC+',7)='+str(k)+'))',ev),F('B'+r+'-C'+r,dv-ev),F(r===m0?'D'+r:'E'+(r-1)+'+D'+r,run)])}
-  if(ks.length){const a=m0,b=sm.rows.length;sm.rows.push(['الإجمالي',F('SUM(B'+a+':B'+b+')',TD,3),F('SUM(C'+a+':C'+b+')',TOT,3),F('SUM(D'+a+':D'+b+')',TD-TOT,3),'']);sm.styles[sm.rows.length-1]=3}
-  sm.rows.push([]);sm.rows.push(['شيتات بالمعادلات: «المصروفات حسب الشهر»، «المقاولين والموردين»، «البنود العامة». كلها بتحسب من شيتي «المصروفات» و«الإيداعات» — لو عدّلت مبلغ هناك الإجماليات تتغير لوحدها.']);
-  return [sm,mon,cs,grp];
-}
 async function exportExcel(siteId,auto){
   const pick=l=>siteId?l.filter(x=>x.siteId===siteId):l;
   const byDate=(a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created||0)-(b.created||0);
@@ -7037,8 +6991,7 @@ async function exportExcel(siteId,auto){
      jr.rows.push([r.no,r.date,siteNameOf(r.siteId),r.k==='dep'?'إيداع':'مصروف',r.k==='dep'?v:'',r.k==='exp'?v:'',r.notes||(r.k==='dep'?'إيداع من المالك':''),r.item||'',r.contractor||'',r.remarks||'',r.virt?'عهدة':mlabel(r),run,(r.virt?userName(r.own):r.by)||'',dt(r.created)])}
    T(jr,['','','','الإجمالي',ti,to,'','','','','',run])}
   if(auto==='sheets')return [sum1,jr,ex,dp,ct,lg];
-  let xt=[];try{xt=xlExtraSheets(siteId,el,dl)}catch(e){console.warn('xlExtraSheets',e)}
-  const blob=XLSX_W.build([sum1,...xt,jr,ex,dp,ct,lg]);
+  const blob=XLSX_W.build([sum1,jr,ex,dp,ct,lg]);
   const lm=Math.max(0,...pick(S.log).map(l=>+l.at||0),...[...pick(S.exp),...pick(S.dep),...pick(S.cnt)].map(x=>Math.max(+x.updated||0,+x.created||0)))||now;
   const d=new Date(lm),fn='ADC-كشف-'+(siteId?siteNameOf(siteId).replace(/[\\/:*?"<>|]/g,'-'):'كامل')+'-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'.xlsx';
   try{await saveFile(fn,blob);if(!siteId){lsSet(LS_XLSX,now);S.xlsxMsg=(auto?'تم حفظ ملف Excel تلقائيًا: ':'تم الحفظ: ')+fn}render()}catch(e){}
@@ -9420,6 +9373,7 @@ function render(){
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   if(APP&&typeof entBar==='function'){const cur=S.sites.some(x=>x.id===S.sel)?S.sel:((S.sel==='__store'||appIsEngineer())&&typeof SO!=='undefined'?SO.site:'');const eb=entBar(cur);if(eb)$('#pane').insertAdjacentHTML('afterbegin',eb)}
+  if(APP&&!appIsEngineer()&&typeof newAccCard==='function'){const c=newAccCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&S.sel==='__all'&&typeof recNote==='function'){const c=recNote();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof rejCard==='function'&&(S.sel==='__all'||S.sites.some(x=>x.id===S.sel))){const c=rejCard(S.sel==='__all'?'':S.sel);if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof custFailCard==='function'&&(appIsEngineer()||S.sel==='__custody'||S.sites.some(x=>x.id===S.sel))){const c=custFailCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
