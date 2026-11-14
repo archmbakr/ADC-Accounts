@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ADC CONSTRUCTION — ملف الاختبارات الثابت (الدفعة 4، 14 نوفمبر 2026)
+"""ADC CONSTRUCTION — ملف الاختبارات الثابت (الدفعة 4، 14 نوفمبر 2026؛ + الدفعة 5)
 
 بيفتح التطبيق (index.html) في Chromium ببيانات وهمية (tests/sbmock.js بدل Supabase)
 ويجرّب كل الصفحات بأدوار مختلفة. أي خطأ JavaScript أو صفحة فاضية = فشل.
@@ -241,8 +241,90 @@ def t_limits_quiet(b, port):
     finally:
         a.close()
 
+def t_journal(b, port):
+    """اليومية (موبايل): الفورم ورا «+ قيد جديد»، و50 قيد في الشهر + «عرض المزيد»."""
+    seed = base_seed()
+    m = TODAY.replace(day=1)
+    for i in range(120):
+        dd = (m + timedelta(days=i % 27)).isoformat() if (m + timedelta(days=i % 27)) <= TODAY else m.isoformat()
+        seed['docs'].append(doc(f'expenses/j{i}', {'siteId': 's1', 'amount': 100 + i, 'date': dd, 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': f'قيد {i}', 'created': 9000 + i, 'by': 'المدير', 'byId': 'u-owner'}))
+    a = App(b, port, seed, OWNER, width=390)
+    try:
+        a.go('__journal')
+        expect(a.ev("!document.getElementById('jForm')") and '+ قيد جديد' in a.text(), 'الفورم مش متقفل على الموبايل')
+        a.p.click('[data-jform="open"]'); a.p.wait_for_timeout(250)
+        expect(a.ev("!!document.getElementById('jForm')"), 'زرار «+ قيد جديد» ما فتحش الفورم')
+        a.p.click('[data-jform="close"]'); a.p.wait_for_timeout(250)
+        expect(a.ev("!document.getElementById('jForm')"), 'زرار «إغلاق» ما قفلش الفورم')
+        n0 = a.ev("document.querySelectorAll('.j-cards .j-cd').length")
+        expect(n0 == 50, f'المفروض 50 قيد في الشهر المفتوح، ظهر {n0}')
+        expect(a.ev("!!document.querySelector('[data-jmore]')"), 'زرار «عرض المزيد» مش ظاهر')
+        a.p.click('[data-jmore] >> nth=0'); a.p.wait_for_timeout(250)
+        n1 = a.ev("document.querySelectorAll('.j-cards .j-cd').length")
+        expect(n1 == 100, f'«عرض المزيد» المفروض يوصل 100، ظهر {n1}')
+        a.check('اليومية')
+    finally:
+        a.close()
+    a = App(b, port, seed, OWNER, width=1280)
+    try:
+        a.go('__journal')
+        expect(a.ev("!!document.getElementById('jForm')"), 'على الكمبيوتر الفورم المفروض مفتوح')
+        a.check('اليومية (كمبيوتر)')
+    finally:
+        a.close()
+
+def t_reports(b, port):
+    """التقارير: 4 أساسية + «تقارير أخرى»، وبتتفتح لوحدها لو المختار منهم."""
+    a = App(b, port, base_seed(), OWNER)
+    try:
+        a.go('__stmts')
+        vis = a.ev("[...document.querySelectorAll('.sp-s')].map(x=>x.dataset.v)")
+        expect(vis == ['site', 'con', 'sup', 'pay'] or sorted(vis) == sorted(['site', 'con', 'sup', 'pay']), f'المربعات الظاهرة: {vis}')
+        a.p.click('[data-spmore="1"]'); a.p.wait_for_timeout(250)
+        n = a.ev("document.querySelectorAll('.sp-s').length")
+        expect(n > 4, '«تقارير أخرى» ما فتحتش')
+        a.p.click('.sp-s[data-v="journal"]'); a.p.wait_for_timeout(300)
+        a.ev("SP.more=undefined;render()"); a.p.wait_for_timeout(200)
+        expect(a.ev("!!document.querySelector('.sp-s[data-v=\"journal\"]')"), 'التقرير المختار من «الأخرى» اختفى')
+        a.p.click('[data-spmore="0"]'); a.p.wait_for_timeout(200)
+        expect(a.ev("document.querySelectorAll('.sp-s').length") == 4, '«إخفاء التقارير الأخرى» ما اشتغلش')
+        a.check('التقارير')
+    finally:
+        a.close()
+
+def t_mobile_ui(b, port):
+    """الموبايل: «خروج» مش في الهيدر، «القائمة» ظاهرة كاملة، التاب المفتوح متعلّم، والثيم الغامق أزراره بيضا."""
+    a = App(b, port, base_seed(), OWNER, width=390)
+    try:
+        a.go('s1')
+        expect(a.ev("getComputedStyle(document.getElementById('hdrLock')).display==='none'"), 'زرار «خروج» لسه في الهيدر')
+        full = a.ev("(()=>{const b=document.getElementById('menuBtn');const t=b.querySelector('.ml')||b;return t.scrollWidth<=t.clientWidth+1})()")
+        expect(full, '«القائمة» لسه مقطوعة')
+        expect(a.ev("!!document.querySelector('.bnav button[aria-current=\"true\"]')"), 'مفيش تاب متعلّم تحت')
+        a.ev("document.documentElement.setAttribute('data-theme','dark')"); a.p.wait_for_timeout(100)
+        col = a.ev("getComputedStyle(document.getElementById('addBtn')).color")
+        expect(col.replace(' ', '') in ('rgb(255,255,255)',), f'لون كتابة الزرار في الغامق: {col}')
+        a.check('واجهة الموبايل')
+    finally:
+        a.close()
+
+def t_errors(b, port):
+    """رسايل الخطأ بالعربي بالسبب."""
+    a = App(b, port, base_seed(), OWNER)
+    try:
+        cases = {'new row violates row-level security policy for table "custody"': 'صلاحية', 'quota exceeded': 'حد التعديلات',
+                 'locked period': 'فترة مقفولة', 'duplicate key value violates unique constraint': 'مكررة', 'JWT expired': 'جلسة الدخول',
+                 'canceling statement due to statement timeout': 'لم يرد', 'TypeError: Failed to fetch': 'اتصال', 'something new xyz': 'something new xyz'}
+        for m, want in cases.items():
+            got = a.ev(f"errMsg({{message:{json.dumps(m)}}},120)")
+            expect(want in got, f'«{m}» ← «{got}»')
+        a.check('رسايل الخطأ')
+    finally:
+        a.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
-         ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet)]
+         ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
+         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors)]
 
 def main():
     from playwright.sync_api import sync_playwright
