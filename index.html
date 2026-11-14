@@ -270,6 +270,8 @@ button.in-btn{background:var(--ok);border-color:var(--ok);color:var(--on-accent)
 select.auto-flash{animation:autoFlash 1.2s ease-out}
 
 .due-card{border-color:#e5c07b}.due-card .sec-h{color:#8a5a00}
+.pg-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:10px 0 2px}.pg-bar span{color:var(--muted,#666);font-size:13px;padding:0 6px}.pg-bar button{min-width:44px}
+.pg-filt{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pg-filt select{width:auto;max-width:200px}
 
 body.eng-mode .rail{display:none}
 /* navigation: header actions, pop menus, add dialog */
@@ -810,7 +812,7 @@ function newAccWatch(){if(NEWACC_CH||!SB||!APPU.owner)return;
     APPU.members=null;appLoadMembers()}).subscribe()}catch(e){}}
 setInterval(()=>{if(APPU.owner&&SB&&navigator.onLine&&!document.hidden)appLoadMembers()},10*60*1000);
 /* سجل تحديثات قاعدة البيانات */
-const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql'],['2026-11-14-devices-read','موافقة الأجهزة وتضييق القراءة','ADC-الدفعة-3-الأجهزة-وتضييق-القراءة.sql']];
+const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql'],['2026-11-14-devices-read','موافقة الأجهزة وتضييق القراءة','ADC-الدفعة-3-الأجهزة-وتضييق-القراءة.sql'],['2026-11-14-limits','تنبيه حدود Supabase','ADC-الدفعة-4-حدود-Supabase.sql']];
 const MIG={rows:null,busy:false,missing:false};
 async function migLoad(){if(MIG.busy||!SB||!APPU.owner)return;MIG.busy=true;try{const {data,error}=await SB.from('adc_migrations').select('*').order('name');if(error){MIG.missing=/adc_migrations|does not exist|schema cache/i.test(error.message||'');MIG.rows=[]}else{MIG.rows=data||[];MIG.missing=false}}catch(e){}MIG.busy=false;try{render()}catch(e){}}
 function migCard(){if(!APPU.owner)return '';if(MIG.rows===null){setTimeout(migLoad,0);return ''}
@@ -1353,7 +1355,7 @@ function custMerged(){
 function custLoad(){if(CU._ld)return CU._ld;CU._ld=custLoad0().finally(()=>{CU._ld=null});return CU._ld}
 async function custLoad0(){
   if(!SB||!navigator.onLine||!(await appHasSes())){const c=appLs(LS_CUST);if(c)CU.rows=c;CU.noData=!c;CU.netFail=true;CU.loaded=true;return}
-  let ok=false;try{const {data,error}=await netTO(SB.from('custody').select('*').order('updated_at',{ascending:true}).limit(5000));
+  let ok=false;try{const {data,error}=await sbAll('custody');if(data)data.sort((a,b)=>String(a.updated_at||'').localeCompare(String(b.updated_at||''))||String(a.id).localeCompare(String(b.id)));
     if(!error){CU.rows=data||[];appLs(LS_CUST,CU.rows);CU.missing=false;ok=true}else if(/custody|relation|does not exist|schema cache/i.test(error.message||'')){CU.missing=true;ok=true}}catch(e){}
   if(!ok){const c=appLs(LS_CUST);if(c&&!(CU.rows||[]).length)CU.rows=c;CU.noData=!c&&!(CU.rows||[]).length}else CU.noData=false;CU.netFail=!ok;
   CU.loaded=true;
@@ -1537,6 +1539,19 @@ function custFillEdit(p){
 function custNeedSql(){return CU.missing?`<div class="card"><p class="msg err">جدول العُهد غير موجود في قاعدة البيانات بعد. شغّل ملف «ADC-إعداد-العهد.sql» في Supabase.</p></div>`:''}
 
 /* ---------- صفحة العُهد للمدير وصاحب الموقع ---------- */
+/* ===== الدفعة 4: ترقيم الصفحات للقوائم الطويلة (العهد والمستخلصات) — 50 سطر في الصفحة ===== */
+const PG={};const PG_N=50;
+/* key: اسم القائمة (ولو فيها فلتر يتحط في الاسم) · hl: دالة بتحدد السطر المطلوب الوصول له (يفتح صفحته) */
+function pgCut(key,list,o){o=o||{};const n=o.n||PG_N,tot=list.length,pages=Math.max(1,Math.ceil(tot/n));let p=PG[key]||1;
+  if(o.hl){const i=list.findIndex(o.hl);if(i>=0)p=Math.floor(i/n)+1}
+  p=Math.min(Math.max(1,p),pages);PG[key]=p;
+  return {rows:list.slice((p-1)*n,p*n),bar:pgBar(key,p,pages,tot,n),top:`<span id="pg_${pgId(key)}"></span>`,page:p,pages}}
+const pgId=k=>String(k).replace(/[^\w-]/g,c=>c.charCodeAt(0).toString(36));
+function pgBar(key,p,pages,tot,n){if(pages<=1)return '';const k=esc(key),a=(p-1)*n+1,b=Math.min(p*n,tot);
+  const btn=(to,t,lbl)=>`<button type="button" class="ghost" data-pg="${k}" data-to="${to}" ${to<1||to>pages||to===p?'disabled':''} aria-label="${lbl}">${t}</button>`;
+  return `<div class="pg-bar" role="navigation" aria-label="الصفحات">${pages>2?btn(1,'«',' الصفحة الأولى'):''}${btn(p-1,'السابق','الصفحة السابقة')}<span>صفحة <b>${p}</b> من ${pages} · من ${a} إلى ${b} من ${tot}</span>${btn(p+1,'التالي','الصفحة التالية')}${pages>2?btn(pages,'»','الصفحة الأخيرة'):''}</div>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-pg]');if(!b||b.disabled)return;const k=b.dataset.pg;PG[k]=+b.dataset.to||1;
+  if(typeof navClear==='function')navClear();render();const t=document.getElementById('pg_'+pgId(k));if(t){const c=t.closest('.card')||t;c.scrollIntoView({block:'start'})}});
 function appRenderCustody(){
   if(isAcct())return appRenderCustAcct();
   if(!CU.loaded){custLoad().then(()=>render());$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
@@ -1546,6 +1561,12 @@ function appRenderCustody(){
   const mySites=S.sites.filter(s=>APPU.owner||(s._p||'')===S.pfx);
   const engs=CU.engs||[];
   const m=CU.msg;CU.msg=null;
+  const pgP=pgCut('cu_pend',pend,{hl:CU.hl?(r=>r.id===CU.hl):null});
+  const fEngs=[...new Map(rows.map(r=>[r.engineer,(r.data||{}).engName||''])).entries()].sort((a,b)=>a[1].localeCompare(b[1],'ar'));
+  const fSites=[...new Map(rows.map(r=>[r.site_id,(r.data||{}).siteName||siteNameOf(r.site_id)])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'ar'));
+  if(CU.fEng&&!fEngs.some(x=>x[0]===CU.fEng))CU.fEng='';if(CU.fSite&&!fSites.some(x=>x[0]===CU.fSite))CU.fSite='';
+  const allF=rows.filter(r=>(!CU.fEng||r.engineer===CU.fEng)&&(!CU.fSite||r.site_id===CU.fSite)).sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||'')));
+  const pgA=pgCut('cu_all:'+(CU.fEng||'')+':'+(CU.fSite||''),allF,{hl:CU.hl?(r=>r.id===CU.hl):null});
   $('#pane').innerHTML=`<div class="pane-h"><h2>العُهد</h2></div>${custNeedSql()}
   <div class="card"><div class="sec-h">صرف عهدة لمهندس</div>
   ${engs.length?`<form id="cuIssue" class="entry" novalidate>
@@ -1557,20 +1578,22 @@ function appRenderCustody(){
     <div class="form-foot"><button class="primary" type="submit">صرف العهدة</button>${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div></form>`
   :`<p class="note">لا يوجد مهندسون بعد. اطلب من المهندس إنشاء حساب من رابط التطبيق، ثم ${APPU.owner?'اجعل نوعه «مهندس موقع» من «الإعدادات» ← «المستخدمون» ووافق عليه.':'اطلب من المدير اعتماده كمهندس موقع.'}</p>`}</div>
   ${[...bts.entries()].map(([b,L])=>custBatchCard(b,L)).join('')}
-  ${pend.length?`<div class="card due-card"><div class="sec-h">مصروفات عهدة قيد المراجعة (${pend.length})</div><div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th>البند</th><th>المقاول</th><th>دُفع</th><th></th></tr></thead><tbody>
-    ${pend.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${esc(d.engName||'')}${d.byAcct?`<span class="note"> · سجّلها ${esc(d.byAcct)}</span>`:''}</td><td>${esc(d.siteName||siteNameOf(r.site_id))}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.remarks?`<span class="note"> · ${esc(d.remarks)}</span>`:''}</td><td>${esc(d.item||'')}</td><td>${esc(d.contractor||'')}</td><td>${esc(METHOD[d.method]||'نقدي')}</td>
+  ${pend.length?`<div class="card due-card"><div class="sec-h">مصروفات عهدة قيد المراجعة (${pend.length})</div>${pgP.top}<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th>البند</th><th>المقاول</th><th>دُفع</th><th></th></tr></thead><tbody>
+    ${pgP.rows.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${esc(d.engName||'')}${d.byAcct?`<span class="note"> · سجّلها ${esc(d.byAcct)}</span>`:''}</td><td>${esc(d.siteName||siteNameOf(r.site_id))}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.remarks?`<span class="note"> · ${esc(d.remarks)}</span>`:''}</td><td>${esc(d.item||'')}</td><td>${esc(d.contractor||'')}</td><td>${esc(METHOD[d.method]||'نقدي')}</td>
       <td class="acts">${custReceiptBtn(d)}${CU.rejecting===r.id?`<input id="cu_rej" placeholder="سبب الرفض" maxlength="120"><button class="danger" data-cu="rejyes" data-id="${esc(r.id)}">رفض</button><button data-cu="rejno">إلغاء</button>`:`<button class="primary" data-cu="approve" data-id="${esc(r.id)}">اعتماد</button><button class="ghost" data-cu="reject" data-id="${esc(r.id)}">رفض</button>`}</td></tr>`}).join('')}
-    </tbody></table></div><p class="note">عند الاعتماد يُسجَّل المبلغ مصروفًا على الموقع بطريقة الدفع التي اختارها المهندس، مع الإشارة إلى أنه من عهدته، وينقص رصيد عهدته.</p></div>`:''}
+    </tbody></table></div>${pgP.bar}<p class="note">عند الاعتماد يُسجَّل المبلغ مصروفًا على الموقع بطريقة الدفع التي اختارها المهندس، مع الإشارة إلى أنه من عهدته، وينقص رصيد عهدته.</p></div>`:''}
   <div class="card"><div class="sec-h">أرصدة العُهد</div>
   ${sum.length?`<div class="tbl-wrap"><table><thead><tr><th>المهندس</th><th class="num">المصروف له</th><th class="num">المعتمد</th><th class="num">قيد المراجعة</th><th class="num">المردود</th><th class="num">المتبقي معه</th><th></th></tr></thead><tbody>
     ${sum.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="num">${fmt(s.issued)}</td><td class="num">${fmt(s.approved)}</td><td class="num">${fmt(s.pending)}</td><td class="num">${fmt(s.returned)}</td><td class="num strong${s.left<0?' neg':''}">${fmt(s.left)}</td>
       <td class="acts">${CU.returning===s.eng?`<input id="cu_ret" type="number" inputmode="decimal" min="0" step="0.01" placeholder="المبلغ المردود" style="width:130px"><button class="primary" data-cu="retyes" data-eng="${esc(s.eng)}">حفظ</button><button data-cu="retno">إلغاء</button>`:`<button class="ghost" data-cu="ret" data-eng="${esc(s.eng)}">تسجيل رد مبلغ</button>`}<button class="ghost" data-chist="open" data-eng="${esc(s.eng)}">سجل العُهد</button></td></tr>`).join('')}
     </tbody></table></div>`:'<p class="note">لم تُصرف عُهد بعد.</p>'}</div>
   ${CU.histEng&&sum.some(x=>x.eng===CU.histEng)?custHistCard(CU.histEng,(sum.find(x=>x.eng===CU.histEng)||{}).name||'',rows):''}
-  <div class="card"><div class="sec-h">آخر حركات العُهد</div>
-  ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
-    ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,60).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.engName||'')}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${r.status==='rejected'&&d.reason?`<span class="note"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}</td></tr>`}).join('')}
-    </tbody></table></div>`:'<p class="note">لا توجد حركات.</p>'}</div>`;
+  <div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">حركات العُهد${allF.length?' ('+allF.length+')':''}</div>
+  ${rows.length?`<div class="pg-filt"><select id="cu_feng" aria-label="المهندس"><option value="">كل المهندسين</option>${fEngs.map(([id,n])=>`<option value="${esc(id)}" ${CU.fEng===id?'selected':''}>${esc(n)}</option>`).join('')}</select><select id="cu_fsite" aria-label="الموقع"><option value="">كل المواقع</option>${fSites.map(([id,n])=>`<option value="${esc(id)}" ${CU.fSite===id?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}</div>
+  ${pgA.top}${allF.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المهندس</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
+    ${pgA.rows.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.engName||'')}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${r.status==='rejected'&&d.reason?`<span class="note"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}</td></tr>`}).join('')}
+    </tbody></table></div>${pgA.bar}`:'<p class="note">لا توجد حركات.</p>'}</div>`;
+  {const fe=$('#cu_feng'),fs=$('#cu_fsite');if(fe)fe.onchange=()=>{CU.fEng=fe.value;render()};if(fs)fs.onchange=()=>{CU.fSite=fs.value;render()}}
   const f=$('#cuIssue');if(f)f.onsubmit=ev=>{ev.preventDefault();
     const eng=$('#cu_eng').value,site=$('#cu_site').value,amount=parseFloat($('#cu_amount').value),date=$('#cu_date').value,notes=$('#cu_notes').value.trim();
     if(!eng||!site||!(amount>0)||!date){CU.msg={t:'اختر المهندس والموقع واكتب المبلغ والتاريخ.'};return render()}
@@ -1698,6 +1721,7 @@ function appRenderCustAcct(){
   const cur=sites.get(F.site),engs=cur?[...cur.engs.values()]:[];if(!engs.some(e=>e.id===F.eng))F.eng=engs[0]?engs[0].id:'';
   const mine=rows.filter(r=>r.kind==='claim'&&(r.created_by===me.id||(r.data||{}).byAcctId===me.id));
   const m=CU.claimMsg,its=F.site&&typeof siteItems==='function'?siteItems(F.site).map(name=>({name})):regNames('items'),cons=regNames('contractors');
+  const pgM=pgCut('cu_acct',mine.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')),{hl:CU.hl?(r=>r.id===CU.hl):null});
   $('#pane').innerHTML=`<div class="pane-h"><h2>تصفية العهد</h2></div>${custNeedSql()}
   ${[...sites.values()].map(st=>{const L=custOpen(st.id);return L.length?`<div class="card"><div class="sec-h">${esc(st.name)}</div><div class="tbl-wrap"><table><thead><tr><th>المهندس</th><th class="num">صُرف له</th><th class="num">صُفّي</th><th class="num">قيد المراجعة</th><th class="num">المتبقي معه</th></tr></thead><tbody>${L.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="num">${fmt(s.issued)}</td><td class="num">${fmt(s.approved)}</td><td class="num">${s.pending?fmt(s.pending):'—'}</td><td class="num strong">${fmt(s.left)}</td></tr>`).join('')}</tbody></table></div></div>`:''}).join('')}
   ${custDraftCard(rows.filter(r=>r.kind==='claim'&&r.status==='draft'&&custIsMine(r)),true)}
@@ -1716,10 +1740,10 @@ function appRenderCustAcct(){
     <div class="form-foot"><button class="primary" type="submit" id="caSave">حفظ في المسودة</button>${CU.edit?'<button type="button" class="ghost" data-cu="dcancel">إلغاء التعديل</button>':''}${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
   </form><p class="note">تُجمع المصروفات في «مسودة التصفية». عند الانتهاء اضغط «إرسال التصفية» لتصل إلى صاحب الموقع فيراجعها مرة واحدة. وعند اعتمادها تدخل في مصروفات الموقع وتنقص من عهدة المهندس.</p></div>`
   :'<div class="card blank"><h3>لا توجد عُهد مصروفة في المواقع المحددة لك</h3><p>عندما يصرف صاحب الموقع أو المدير عهدة لمهندس في أحد مواقعك ستظهر هنا.</p></div>'}
-  <div class="card"><div class="sec-h">ما سجّلته</div>
+  <div class="card"><div class="sec-h">ما سجّلته${mine.length?' ('+mine.length+')':''}</div>${pgM.top}
   ${mine.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحالة</th><th>الموقع</th><th>المهندس</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
-  ${mine.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td>${esc(d.engName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.status==='pending'?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
-  </tbody></table></div>`:'<p class="note">لم تسجّل مصروفات بعد.</p>'}</div>`;
+  ${pgM.rows.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td>${esc(d.engName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.status==='pending'?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
+  </tbody></table></div>${pgM.bar}`:'<p class="note">لم تسجّل مصروفات بعد.</p>'}</div>`;
   custFillEdit('ca');custConBind('ca');
   const ss=$('#ca_site');if(ss)ss.onchange=()=>{F.site=ss.value;F.eng='';render()};
   const se=$('#ca_eng');if(se)se.onchange=()=>{F.eng=se.value};
@@ -1764,6 +1788,7 @@ function appRenderCustEng(){
   const me=APPU.me||{},rows=custMerged().filter(r=>r.engineer===me.id),s=custSummary(rows)[0]||{issued:0,returned:0,approved:0,pending:0,left:0,avail:0};
   const sites=new Map();for(const r of rows.filter(r=>r.kind==='issue'))sites.set(r.site_id,{id:r.site_id,name:(r.data||{}).siteName||'',manager:r.manager});
   const m=CU.claimMsg;
+  const pgE=pgCut('cu_eng',rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))),{hl:CU.hl?(r=>r.id===CU.hl):null});
   const enS=CU.enSite&&sites.has(CU.enSite)?CU.enSite:([...sites.keys()][0]||''),its=enS&&typeof siteItems==='function'?siteItems(enS).map(name=>({name})):regNames('items'),cons=regNames('contractors');
   $('#pane').innerHTML=`<div class="pane-h"><h2>عهدتي</h2><div class="actions"><button class="ghost" data-cu="eng-settings">${CU.engSettings?'إخفاء الإعدادات':'الإعدادات'}</button></div></div>${custNeedSql()}
   ${CU.engSettings?appSecurityCard():''}
@@ -1788,10 +1813,10 @@ function appRenderCustEng(){
     <div class="form-foot"><button class="primary" type="submit" id="enSave">حفظ في المسودة</button>${CU.edit?'<button type="button" class="ghost" data-cu="dcancel">إلغاء التعديل</button>':''}${m?`<span class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</span>`:''}</div>
   </form></div>`:'<div class="card blank"><h3>لا توجد عهدة مصروفة لك بعد</h3><p>عندما يصرف لك المدير أو صاحب الموقع عهدة ستظهر هنا، ويمكنك بعدها تسجيل مصروفاتك منها.</p></div>'}
   ${sites.size?custHistCard(me.id):''}
-  <div class="card"><div class="sec-h">حركات عهدتي</div>
+  <div class="card"><div class="sec-h">حركات عهدتي${rows.length?' ('+rows.length+')':''}</div>${pgE.top}
   ${rows.length?`<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الموقع</th><th class="num">المبلغ</th><th>البيان</th><th></th></tr></thead><tbody>
-  ${rows.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||String(b.updated_at||'').localeCompare(String(a.updated_at||''))).map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.kind==='claim'&&r.status==='pending'&&!isLocked(d.date)?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
-  </tbody></table></div>`:'<p class="note">لا توجد حركات بعد.</p>'}</div>`;
+  ${pgE.rows.map(r=>{const d=r.data||{};return `<tr><td class="date">${esc(d.date||'')}</td><td>${stTag(r)}${r._local?'<span class="pend">محلي</span>':''}</td><td>${esc(d.siteName||'')}</td><td class="num">${fmt(d.amount)}</td><td>${esc(d.notes||'')}${d.item?`<span class="note"> · ${esc(d.item)}</span>`:''}${r.status==='rejected'&&d.reason?`<span class="note neg"> · سبب الرفض: ${esc(d.reason)}</span>`:''}</td><td class="acts">${custReceiptBtn(d)}${r.kind==='claim'&&r.status==='pending'&&!isLocked(d.date)?`<button class="ghost" data-cu="del" data-id="${esc(r.id)}">حذف</button>`:''}</td></tr>`}).join('')}
+  </tbody></table></div>${pgE.bar}`:'<p class="note">لا توجد حركات بعد.</p>'}</div>`;
   custFillEdit('en');custConBind('en');{const es=$('#en_site');if(es)es.onchange=()=>{CU.enSite=es.value;render()}}
   const ph=$('#en_photo');if(ph)ph.onchange=e=>{CU.pick=e.target.files&&e.target.files[0]||null;render()};
   const f=$('#enForm');if(f)f.onsubmit=async ev=>{ev.preventDefault();
@@ -1850,7 +1875,7 @@ async function ctLoad0(){
   let ok=false;
   if(SB&&navigator.onLine){
     try{
-      const [a,b,c,d]=await netTO(Promise.all([SB.from('certs').select('*').limit(5000),SB.from('site_access').select('*').limit(5000),SB.from('cert_ret').select('*').limit(5000),SB.from('cert_boq').select('*').limit(5000)]));
+      const [a,b,c,d]=await Promise.all(['certs','site_access','cert_ret','cert_boq'].map(t=>sbAll(t)));
       if(a.error&&/certs|relation|does not exist|schema cache/i.test(a.error.message||'')){CT.missing=true;ok=true}
       else if(!a.error){CT.missing=false;CT.srv=a.data||[];CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[];ok=true;
         if(appIsEngineer()&&isTechR(myRole())){try{const p=await netTO(SB.rpc('cert_paid_rows'));CT.paid=p.error?null:(p.data||[])}catch(e){CT.paid=CT.paid||null}}
@@ -2138,9 +2163,10 @@ async function ctBoqSave(){
   await ctLoad();CT.boqEdit=null;CT.boqMsg={ok:1,t:'تم حفظ بنود التعاقد.'};render();
 }
 /* ---------- lists ---------- */
-function ctListHTML(rows){
-  if(!rows.length)return '<p class="note">لا توجد مستخلصات بعد.</p>';
-  return `<div class="tbl-wrap"><table><thead><tr><th>رقم</th><th>الموقع</th><th>المقاول</th><th>البند</th><th>التاريخ</th><th class="num">الأعمال حتى تاريخه</th><th class="num">صافي المستخلص</th><th>الحالة</th><th></th></tr></thead><tbody>
+function ctListHTML(all,key){
+  if(!all.length)return '<p class="note">لا توجد مستخلصات بعد.</p>';
+  const pg=pgCut(key||'ct',all,{hl:CT.hl?(c=>c.id===CT.hl):null}),rows=pg.rows;
+  return `${pg.top}<div class="tbl-wrap"><table><thead><tr><th>رقم</th><th>الموقع</th><th>المقاول</th><th>البند</th><th>التاريخ</th><th class="num">الأعمال حتى تاريخه</th><th class="num">صافي المستخلص</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${rows.map(c=>{const k=ctCalc(c),d=c.data||{},ap=ctCanApprove(c),mine=appIsEngineer();
     const acts=[`<button class="ghost" data-ct="print" data-id="${esc(c.id)}">طباعة</button>`];
     if(c.status!=='approved'&&(ap||(mine&&!isLocked((c.data||{}).date))))acts.push(`<button class="ghost" data-ct="edit" data-id="${esc(c.id)}">تعديل</button>`);
@@ -2155,7 +2181,7 @@ function ctListHTML(rows){
     if(ap&&c.edit_req)acts.push(`<button class="ghost" data-ct="noreq" data-id="${esc(c.id)}">رفض طلب التعديل</button>`);
     if(mine&&!ap&&c.status==='approved'&&!c.edit_req)acts.push(`<button class="ghost" data-ct="req" data-id="${esc(c.id)}">طلب تعديل</button>`);
     return `<tr id="ctr_${esc(c.id)}"${CT.hl===c.id?' class="hl"':''}><td><b>${c.no}</b>${d.final?'<span class="pend">ختامي</span>':''}</td><td>${esc(d.siteName||siteNameOf(c.site_id))}</td><td>${esc(c.contractor)}</td><td>${esc(d.item||'')||'—'}</td><td class="date">${esc(d.date||'')}</td><td class="num plain">${fmt(k.works)}</td><td class="num">${k.net==null?'—':fmt(k.net)}</td><td>${ST_L[c.status]||''}${c.status==='draft'&&d.overReq&&k.overBlocked?'<span class="pill pill-neg">زيادة فوق '+CT_OVER+'% — يحتاج إلى موافقة صاحب الموقع</span>':''}${c.status==='draft'&&d.overRej?'<span class="note"> · المدير رجّعه يراجع الكميات</span>':''}${c.edit_req?'<span class="pend">مطلوب تعديله</span>':''}${c._local?'<span class="pend">على الجهاز</span>':''}</td><td class="acts">${acts.join('')}</td></tr>`}).join('')}
-  </tbody></table></div>`;
+  </tbody></table></div>${pg.bar}`;
 }
 const ctSort=l=>l.slice().sort((a,b)=>(b.data.date||'').localeCompare(a.data.date||'')||b.no-a.no);
 /* شاشة المهندس الفني */
@@ -2169,7 +2195,7 @@ function ctRenderEngineer(){
   ${sites.length?'':`<div class="card blank"><h3>لا توجد مواقع متاحة لك بعد</h3><p>اطلب من المدير أو صاحب الموقع أن يعطيك صلاحية المستخلصات على الموقع.</p></div>`}
   ${ctFormHTML()}
   ${ctBoqMe()&&sites.length?ctBoqHTML(sites):''}
-  <div class="card"><div class="sec-h">مستخلصات مواقعي</div>${ctListHTML(rows)}</div>`;
+  <div class="card"><div class="sec-h">مستخلصات مواقعي${rows.length?' ('+rows.length+')':''}</div>${ctListHTML(rows,'ct_eng')}</div>`;
   if(!CT.form)CT.msg=null;
   ctBindForm();if(ctBoqMe())ctBindBoq(sites);
 }
@@ -2190,12 +2216,12 @@ function ctRenderPage(){
   ${ovWait.length?`<div class="card due-card"><b>${ovWait.length===1?'مستخلص يحتاج إلى':ovWait.length+' مستخلصات تحتاج إلى'} موافقتك:</b> توجد بنود زادت كميتها على التعاقد بأكثر من ${CT_OVER}%. ستجد «موافق على الزيادة» و«إرجاع للمهندس» بجانبه في الجدول أدناه.</div>`:''}
   ${!CT.form&&CT.msg?`<p class="msg ${CT.msg.ok?'ok':'err'}">${esc(CT.msg.t)}</p>`:''}
   ${ctFormHTML()}
-  ${pend.length?`<div class="card due-card"><div class="sec-h">بانتظار الاعتماد أو مطلوب تعديلها (${pend.length})</div>${ctListHTML(ctSort(pend))}<p class="note">عند الاعتماد يُثبَّت «إجمالي السابق صرفه» من المصروفات المسجّلة على نفس المقاول ونفس البند في نفس الموقع حتى تاريخ المستخلص.</p></div>`:''}
+  ${pend.length?`<div class="card due-card"><div class="sec-h">بانتظار الاعتماد أو مطلوب تعديلها (${pend.length})</div>${ctListHTML(ctSort(pend),'ct_pend:'+(CT.site||''))}<p class="note">عند الاعتماد يُثبَّت «إجمالي السابق صرفه» من المصروفات المسجّلة على نفس المقاول ونفس البند في نفس الموقع حتى تاريخ المستخلص.</p></div>`:''}
   <div class="card"><div class="sec-h">أرصدة المقاولين حسب آخر مستخلص معتمد</div>
   ${bal.length?`<div class="tbl-wrap"><table><thead><tr><th>المقاول</th><th>البند</th><th>الموقع</th><th>آخر مستخلص</th><th class="num">الأعمال حتى تاريخه</th><th class="num">بعد الخصومات</th><th class="num">المصروف له حتى الآن</th><th class="num">المتبقي له</th></tr></thead><tbody>
     ${bal.map(b=>`<tr><td><b>${esc(b.c.contractor)}</b></td><td>${esc(ctItem(b.c))||'—'}</td><td>${esc(siteNameOf(b.c.site_id))}</td><td>رقم ${b.c.no}${b.k.fin?' (ختامي)':''}</td><td class="num plain">${fmt(b.k.works)}</td><td class="num">${fmt(b.k.after)}</td><td class="num">${fmt(b.paid)}</td><td class="num strong${b.left<0?' neg':''}">${fmt(b.left)}</td></tr>`).join('')}
   </tbody></table></div><p class="note">المصروف له = كل المصروفات المسجّلة على نفس المقاول ونفس البند في نفس الموقع.</p>`:'<p class="note">لا توجد مستخلصات معتمدة بعد.</p>'}</div>
-  <div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">كل المستخلصات</div><select id="ct_fsite" aria-label="الموقع" style="width:auto"><option value="">كل المواقع</option>${mySites.map(s=>`<option value="${esc(s.id)}" ${CT.site===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>${ctListHTML(ctSort(rows))}</div>
+  <div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="sec-h" style="margin:0">كل المستخلصات${rows.length?' ('+rows.length+')':''}</div><select id="ct_fsite" aria-label="الموقع" style="width:auto"><option value="">كل المواقع</option>${mySites.map(s=>`<option value="${esc(s.id)}" ${CT.site===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>${ctListHTML(ctSort(rows),'ct_all:'+(CT.site||''))}</div>
   ${ctBoqHTML(mySites)}
   <details class="card"${CT.openRet?' open':''} id="ctRetBox"><summary class="sec-h" style="cursor:pointer">نسبة تأمين الأعمال (الافتراضي ٥٪)</summary>
     <p class="note">التأمين يُحجز من إجمالي الأعمال ويُرد مع المستخلص الختامي. يمكنك تغيير النسبة أو إلغاؤها لمقاول معيّن في مواقعك.</p>
@@ -2319,13 +2345,21 @@ const soQ=()=>appLs(LS_SOQ)||[];
 const soEmpty=()=>({moves:[],items:[],sites:[],access:[]});
 function soOverlay(list,t){const m=new Map(list.map(r=>[r.id,r]));for(const op of soQ()){if(op.t!==t)continue;if(op.op==='del')m.delete(op.id);else m.set(op.id,{...(m.get(op.id)||{}),...op.row,_local:true})}return [...m.values()]}
 function soData(){const s=SO.srv||soEmpty();return {moves:soOverlay(s.moves||[],'store_moves'),items:soOverlay(s.items||[],'store_items'),sites:s.sites||[],access:s.access||[]}}
-async function soAll(t){const out=[];for(let off=0;;off+=1000){const r=await SB.from(t).select('*').range(off,off+999);if(r.error)return r;out.push(...(r.data||[]));if(!r.data||r.data.length<1000)break}return {data:out,error:null}}
+/* ===== الدفعة 4: تحميل الجداول على صفحات (Supabase بيرجّع 1000 صف بالكتير في الطلب الواحد) — بترتيب ثابت علشان ما يتكررش ولا يقع صف ===== */
+const SB_KEYS={custody:['id'],certs:['id'],cert_boq:['id'],site_access:['engineer','site_id'],cert_ret:['owner_key','contractor'],store_moves:['id'],store_items:['id'],store_sites:['site_id'],store_access:['person','site_id']};
+const SB_PAGE=1000;
+async function sbAll(t,ord){ord=ord||SB_KEYS[t]||['id'];const out=[];
+  for(let off=0;;off+=SB_PAGE){let q=SB.from(t).select('*');for(const c of ord)q=q.order(c,{ascending:true});
+    const r=await netTO(q.range(off,off+SB_PAGE-1));if(r.error)return r;out.push(...(r.data||[]));if(!r.data||r.data.length<SB_PAGE)break;
+    if(off>200000)break}
+  return {data:out,error:null}}
+async function soAll(t){return sbAll(t)}
 function soLoad(){if(SO._ld)return SO._ld;SO._ld=soLoad0().finally(()=>{SO._ld=null});return SO._ld}
 async function soLoad0(){
   let ok=false;
   if(SB&&navigator.onLine){
     try{
-      const [m,i,s,a]=await netTO(Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll)));
+      const [m,i,s,a]=await Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll));
       try{const r=await netTO(SB.from('app_settings').select('*'),5000);if(!r.error){const x=(r.data||[]).find(z=>z.key==='lock_until');SO.lock=x?x.value:'';appLs('adc_lock_v1',SO.lock);const xa=(r.data||[]).find(z=>z.key==='lock_acct');SO.lockAcct=!!(xa&&xa.value==='1');appLs('adc_lock_acct_v1',SO.lockAcct);soLimFrom(r.data);if(typeof rsFromSettings==='function')rsFromSettings(r.data);if(typeof jlFrom==='function')jlFrom(r.data);if(typeof spAliasFrom==='function')spAliasFrom(r.data)}}catch(e){}
       if(m.error&&/store_moves|relation|does not exist|schema cache/i.test(m.error.message||'')){SO.missing=true;SO.srv=SO.srv||soEmpty();ok=true}
       else if(!m.error){SO.missing=false;SO.srv={moves:m.data||[],items:i.data||[],sites:s.data||[],access:a.data||[]};ok=true;appLs(LS_SO,{...SO.srv,at:Date.now()})}
@@ -3781,7 +3815,8 @@ async function admLoad(force){
   if(!APPU.owner||!SB||ADM.busy||(!force&&Date.now()-ADM.at<60000))return;
   ADM.busy=true;
   try{
-    const [o,u,d]=await Promise.all([SB.rpc('owners_list'),SB.rpc('storage_usage'),SB.from('docs').select('path,data').in('path',['sys/backup','sys/backup_req'])]);
+    const [o,u,d,x]=await Promise.all([SB.rpc('owners_list'),SB.rpc('storage_usage'),SB.from('docs').select('path,data').in('path',['sys/backup','sys/backup_req']),SB.rpc('usage_detail').then(r=>r,e=>({error:e}))]);
+    ADM.det=x&&!x.error&&x.data?x.data:null;ADM.detMissing=!!(x&&x.error&&admFnMissing(x.error));
     ADM.missing=admFnMissing(o.error)||admFnMissing(u.error);
     ADM.owners=o.error?null:(o.data||[]).map(x=>typeof x==='string'?x:(x.owners_list||x.email||''));
     ADM.usage=u.error?null:u.data;
@@ -3820,16 +3855,58 @@ function admCards(){
   ${U?admBar('قاعدة البيانات (الحسابات)',+U.db||0,ADM_LIM.db)+admBar('الملفات (الصور ونسخ التقارير)',+U.files||0,ADM_LIM.files,(U.buckets&&U.buckets.receipts?'الصور '+admMB(+U.buckets.receipts):''))
     :(ADM.missing?'':'<p class="note">جاري الحساب…</p>')}
   ${D&&D.quota?admBar('على هذا الجهاز',D.usage,D.quota):''}
-  <p class="note">هذه الأرقام هي حدود الباقة المجانية في Supabase. عندما تصل أي خانة إلى 80٪ سيظهر لك تنبيه.</p>
+  <p class="note">هذه الأرقام هي حدود الباقة المجانية في Supabase. عندما تصل أي خانة إلى 80٪ أو يُتوقَّع أن تصل إليها خلال شهرين سيظهر لك تنبيه أعلى الصفحات.</p>
+  ${limDetail()}
   <details class="adm-rest"><summary class="sec-h" style="cursor:pointer">استرجاع كامل (للطوارئ فقط)</summary>
   <p class="note">إذا حدثت مشكلة كبيرة وحُذفت بيانات: اختر ملف «قاعدة البيانات كاملة» من أي بريد نسخة احتياطية (‎.json أو ‎.json.gz). سيُنشئ التطبيق ملف SQL تشغّله في Supabase ← SQL Editor، فتعود البيانات كلها كما كانت وقت هذه النسخة تمامًا. اختيار الملف هنا لا يغيّر شيئًا بمفرده.</p>
   <span class="filebtn"><button type="button">اختر ملف النسخة…</button><input type="file" id="adm_restore" accept=".json,.gz,application/json,application/gzip" aria-label="ملف قاعدة البيانات كاملة"></span>
   ${rm?`<p class="msg ${rm.ok?'ok':'err'}">${esc(rm.t)}</p>`:''}</details>`;
 }
+/* ===== الدفعة 4: تنبيه حدود Supabase — سرعة الزيادة والتوقع وأكبر الجداول ===== */
+const LIM_DAYS=60,LIM_TBL={docs:'الحسابات (المواقع والمصروفات والإيداعات والجرد)',custody:'العُهد',certs:'مستخلصات المقاولين',cert_boq:'بنود المستخلصات',cert_ret:'نسب التأمين',store_moves:'حركات المخزن',store_items:'خامات المخزن',store_sites:'مخازن المواقع',audit_log:'سجل التعديلات',owner_docs:'مستخلصات المالك',owner_locks:'أقفال مستخلص المالك',members:'المستخدمون',member_devices:'الأجهزة',app_settings:'الإعدادات',adc_codes:'الأكواد',edit_quota:'الحد اليومي',notice_ignores:'التنبيهات المتجاهلة',private_items:'البنود الخاصة',acct_sites:'مواقع المحاسب',site_access:'صلاحيات المواقع',adc_usage_log:'سجل المساحة',adc_migrations:'سجل التحديثات',item_types:'أنواع البنود',entry_sites:'وضع التسجيل'};
+function limCalc(){
+  const X=ADM.det,U=X||ADM.usage;if(!U)return null;
+  const db=+U.db||0,files=+U.files||0,o={db,files,dbPct:admPct(db,ADM_LIM.db),filesPct:admPct(files,ADM_LIM.files),days:0};
+  const L=(X&&X.log||[]).filter(r=>r&&r.day).sort((a,b)=>String(a.day).localeCompare(String(b.day)));
+  if(L.length>=2){const a=L.length>31?L[L.length-31]:L[0],b=L[L.length-1],n=Math.round((Date.parse(b.day)-Date.parse(a.day))/864e5);
+    if(n>=7){o.days=n;for(const k of ['db','files']){const per=((+b[k]||0)-(+a[k]||0))/n;o[k+'Day']=per;const lim=ADM_LIM[k]*0.8,cur=o[k];
+      o[k+'To80']=cur>=lim?0:per>0?Math.ceil((lim-cur)/per):null}}}
+  o.hot=o.dbPct>=80||o.filesPct>=80;
+  o.soon=!o.hot&&[o.dbTo80,o.filesTo80].some(d=>d!=null&&d<=LIM_DAYS);
+  return o}
+const limDays=d=>d===1?'يوم واحد':d===2?'يومين':d<=10?d+' أيام':d+' يومًا';
+const limWhen=d=>{const t=new Date(Date.now()+d*864e5);return d<45?'بعد حوالي '+limDays(d)+' ('+t.toLocaleDateString('en-CA')+')':'بعد حوالي '+Math.round(d/30)+' شهور ('+t.toLocaleDateString('en-CA').slice(0,7)+')'};
+function limDetail(){
+  if(!APPU.owner)return '';
+  if(ADM.detMissing)return '<p class="msg err">شغّل ملف «ADC-الدفعة-4-حدود-Supabase.sql» في Supabase لتظهر سرعة الزيادة وأكبر الجداول.</p>';
+  const c=limCalc(),X=ADM.det;if(!c||!X)return '';
+  const rate=c.days?`<p>سرعة الزيادة (آخر ${c.days} يوم): قاعدة البيانات <b dir="ltr">${c.dbDay>=0?'+':''}${admMB(Math.abs(c.dbDay*30))}</b> في الشهر · الملفات <b dir="ltr">${c.filesDay>=0?'+':''}${admMB(Math.abs(c.filesDay*30))}</b> في الشهر.</p>
+    <p>${['db','files'].map(k=>{const d=c[k+'To80'],nm=k==='db'?'قاعدة البيانات':'الملفات';return d===0?`<b class="neg">${nm} وصلت 80٪.</b>`:d==null?`${nm}: لا تزيد حاليًا.`:`${nm} تصل إلى 80٪ <b class="${d<=LIM_DAYS?'neg':''}">${limWhen(d)}</b> بالسرعة الحالية.`}).join('<br>')}</p>`
+    :'<p class="note">سرعة الزيادة والتاريخ المتوقع للامتلاء يظهران بعد أسبوع من تشغيل التحديث (يُسجَّل الحجم مرة كل يوم من التطبيق ومن النسخة الاحتياطية الليلية).</p>';
+  const T=(X.tables||[]).slice(0,8);
+  return `${rate}${T.length?`<details class="adm-tbls"><summary class="sec-h" style="cursor:pointer">أكبر الجداول</summary><div class="tbl-wrap"><table class="tbl"><thead><tr><th>الجدول</th><th class="num">عدد الصفوف</th><th class="num">الحجم</th></tr></thead><tbody>${T.map(t=>`<tr><td>${esc(LIM_TBL[t.name]||t.name)}</td><td class="num plain">${(+t.rows||0).toLocaleString('en-US')}</td><td class="num plain" dir="ltr">${admMB(+t.bytes||0)}</td></tr>`).join('')}</tbody></table></div></details>`:''}
+  <p class="note">حدود أخرى في الباقة المجانية لا يمكن قياسها من هنا: نقل البيانات (5 GB في الشهر)، وتوقّف المشروع إذا لم يُستخدم أسبوعًا (النسخة الاحتياطية الليلية تمنع ذلك). تابعها من صفحة Usage في Supabase: <a href="https://supabase.com/dashboard/project/ifsupnuwtkyfyughcudi/usage" target="_blank" rel="noopener">فتح صفحة الاستهلاك</a>.</p>`}
+/* كارت أعلى صفحات المدير: لما خانة توصل 80٪ أو متوقع توصلها خلال شهرين */
+function sbLimCard(){
+  if(!APPU.owner||S.sel==='__settings')return '';
+  const c=limCalc();if(!c||!(c.hot||c.soon))return '';
+  const top=Math.max(c.dbPct,c.filesPct);
+  if(top<90){try{if(+localStorage.getItem('adc_lim_hide')>Date.now())return ''}catch(e){}}
+  const parts=[];
+  if(c.dbPct>=80)parts.push('قاعدة البيانات وصلت '+c.dbPct+'٪');else if(c.dbTo80!=null&&c.dbTo80<=LIM_DAYS)parts.push('قاعدة البيانات ('+c.dbPct+'٪) متوقع تصل 80٪ '+limWhen(c.dbTo80));
+  if(c.filesPct>=80)parts.push('الملفات (الصور) وصلت '+c.filesPct+'٪');else if(c.filesTo80!=null&&c.filesTo80<=LIM_DAYS)parts.push('الملفات (الصور) ('+c.filesPct+'٪) متوقع تصل 80٪ '+limWhen(c.filesTo80));
+  return `<div class="card due-card" id="limCard"><div class="sec-h">⚠️ مساحة Supabase</div><p style="margin:0 0 8px">${parts.map(esc).join('<br>')}</p>
+  <p class="note" style="margin:0 0 8px">${c.filesPct>=c.dbPct?'الحل الأسهل: نقل الصور القديمة إلى Google Drive، أو الترقية للباقة المدفوعة.':'الحل: حذف سجل التعديلات القديم، أو الترقية للباقة المدفوعة.'} كلّمني قبل ما توصل 100٪ لأن التطبيق بيقف عن الحفظ ساعتها.</p>
+  <div class="row"><button type="button" class="primary" data-lim="go">التفاصيل في الإعدادات</button>${top<90?'<button type="button" class="ghost" data-lim="hide">إخفاء لمدة أسبوع</button>':''}</div></div>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-lim]');if(!b)return;
+  if(b.dataset.lim==='go'){S.sel='__settings';render();const h=document.getElementById('admSpace'),el=h&&h.closest('[data-ck]');
+    if(el&&!ckOpen(el)){CK[el.dataset.ck]=true;try{localStorage.setItem('adc_cards_v1',JSON.stringify(CK))}catch(e){}ckApply()}
+    const det=h&&h.closest('details');if(det&&!det.open)det.open=true;if(h)h.scrollIntoView({block:'start'});return}
+  try{localStorage.setItem('adc_lim_hide',String(Date.now()+7*864e5))}catch(e){}render()});
 async function admUsageWarn(){
   if(!APPU.owner)return;
-  const day=today();try{if(localStorage.getItem('adc_adm_warn')===day)return}catch(e){}
-  await admLoad(true);const U=ADM.usage;if(!U)return;
+  const day=today();try{if(localStorage.getItem('adc_adm_warn')===day){await admLoad(true);try{render()}catch(e){}return}}catch(e){}
+  await admLoad(true);try{render()}catch(e){}const U=ADM.usage;if(!U)return;
   const hot=[];if(admPct(+U.db||0,ADM_LIM.db)>=80)hot.push('قاعدة البيانات '+admPct(+U.db,ADM_LIM.db)+'٪');if(admPct(+U.files||0,ADM_LIM.files)>=80)hot.push('الملفات '+admPct(+U.files,ADM_LIM.files)+'٪');
   try{localStorage.setItem('adc_adm_warn',day)}catch(e){}
   if(hot.length)showBanner('تنبيه المساحة: '+hot.join(' و')+'. افتح «الإعدادات» ← «المساحة».');
@@ -9413,7 +9490,7 @@ function render(){
   if(APP&&typeof waitCard==='function'&&S.sites.some(x=>x.id===S.sel)){const w=waitCard(S.sel);if(w)$('#pane').insertAdjacentHTML('afterbegin',w)}
   if(APP&&typeof quNote==='function'){const q=quNote();if(q)$('#pane').insertAdjacentHTML('afterbegin',q)}
   if(APP&&typeof entBar==='function'){const cur=S.sites.some(x=>x.id===S.sel)?S.sel:((S.sel==='__store'||appIsEngineer())&&typeof SO!=='undefined'?SO.site:'');const eb=entBar(cur);if(eb)$('#pane').insertAdjacentHTML('afterbegin',eb)}
-  if(APP&&!appIsEngineer()&&typeof newAccCard==='function'){const c=newAccCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c);const d=S.sel==='__settings'?'':devPendCard();if(d)$('#pane').insertAdjacentHTML('afterbegin',d)}
+  if(APP&&!appIsEngineer()&&typeof newAccCard==='function'){const c=newAccCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c);const d=S.sel==='__settings'?'':devPendCard();if(d)$('#pane').insertAdjacentHTML('afterbegin',d);const lc=typeof sbLimCard==='function'?sbLimCard():'';if(lc)$('#pane').insertAdjacentHTML('afterbegin',lc)}
   if(APP&&S.sel==='__all'&&typeof recNote==='function'){const c=recNote();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof rejCard==='function'&&(S.sel==='__all'||S.sites.some(x=>x.id===S.sel))){const c=rejCard(S.sel==='__all'?'':S.sel);if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
   if(APP&&typeof custFailCard==='function'&&(appIsEngineer()||S.sel==='__custody'||S.sites.some(x=>x.id===S.sel))){const c=custFailCard();if(c)$('#pane').insertAdjacentHTML('afterbegin',c)}
