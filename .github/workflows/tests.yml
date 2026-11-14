@@ -1,0 +1,26 @@
+name: tests
+# اختبارات التطبيق: بتشتغل لوحدها كل ما index.html أو ملفات الاختبارات تترفع.
+# لو فيه اختبار فشل GitHub بيبعتلك إيميل، والتفاصيل في تبويب Actions.
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+concurrency: tests
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chromium
+        run: |
+          pip install --quiet playwright
+          python -m playwright install --with-deps chromium > /dev/null
+      - name: Run tests
+        run: python tests/run.py
