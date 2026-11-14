@@ -269,6 +269,33 @@ async function keepAlive() {                      // GitHub بيوقف المو�
     log(r.ok ? 'تم تنشيط المستودع.' : 'تعذّر تنشيط المستودع: ' + r.status);
   } catch { }
 }
+/* ---------- الدفعة 4: مساحة Supabase في إيميل النسخة الليلية (وبتسجّل قراءة النهارده) ---------- */
+const LIM = { db: 500 * 1048576, files: 1024 * 1048576 };   // الباقة المجانية
+async function usageInfo() {
+  if (MOCK || DRY || !SB_URL) return null;
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/rpc/usage_detail', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: '{}' });
+    if (!r.ok) { log('مساحة Supabase: الدالة usage_detail مش متاحة (' + r.status + ')'); return null; }
+    return await r.json();
+  } catch { return null; }
+}
+function usageHtml(U) {
+  if (!U) return { html: '', warn: false };
+  const mb = b => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB', pct = (u, l) => Math.round(u / l * 100);
+  const L = (U.log || []).slice().sort((a, b) => String(a.day).localeCompare(String(b.day)));
+  const out = [];let warn = false;
+  for (const [k, nm] of [['db', 'قاعدة البيانات'], ['files', 'الملفات (الصور)']]) {
+    const cur = +U[k] || 0, p = pct(cur, LIM[k]);let eta = '';
+    if (L.length >= 2) {
+      const a = L.length > 31 ? L[L.length - 31] : L[0], b = L[L.length - 1], n = Math.round((Date.parse(b.day) - Date.parse(a.day)) / 864e5);
+      const per = n >= 7 ? ((+b[k] || 0) - (+a[k] || 0)) / n : 0, lim = LIM[k] * 0.8;
+      if (per > 0 && cur < lim) { const d = Math.ceil((lim - cur) / per); eta = ` · تصل 80٪ بعد حوالي ${d < 45 ? (d === 1 ? 'يوم واحد' : d === 2 ? 'يومين' : d <= 10 ? d + ' أيام' : d + ' يومًا') : Math.round(d / 30) + ' شهور'}`; if (d <= 60) warn = true; }
+    }
+    if (p >= 70) warn = true;
+    out.push(`${nm}: <b dir="ltr">${mb(cur)}</b> من <span dir="ltr">${mb(LIM[k])}</span> (${p}٪)${eta}`);
+  }
+  return { warn, html: `<p style="margin:10px 0;padding:8px 10px;border-radius:6px;${warn ? 'background:#fff4e5;border:1px solid #e5c07b;color:#7a4b00' : 'color:#555'}">${warn ? '<b>⚠️ تنبيه مساحة Supabase:</b><br>' : 'مساحة Supabase: '}${out.join('<br>')}${warn ? '<br>افتح التطبيق ← الإعدادات ← المساحة للتفاصيل.' : ''}</p>` };
+}
 async function backup(now, c) {
   const sys = MOCK ? (JSON.parse(fs.readFileSync(MOCK, 'utf8')).docs || []).filter(d => /^sys\/backup/.test(d.path))
     : await sbGet('docs?select=path,data&path=in.(sys/backup,sys/backup_req)');
@@ -288,14 +315,16 @@ async function backup(now, c) {
     { filename: 'ADC-نسخة-احتياطية-' + stamp + '.json', content: makeBak(G, '', at, 'daily-backup') }];
   const repo = await toRepo(stamp + '.json.gz', gz);
   const why = asked && !nightly ? 'نسخة احتياطية (طلبتها من التطبيق)' : 'النسخة الاحتياطية اليومية';
+  const US = usageHtml(await usageInfo());
   const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;color:#111;line-height:1.7">
   <h2 style="margin:0 0 6px">${esc(why)}</h2><p style="margin:0 0 10px;color:#444">بتاريخ <b dir="ltr">${esc(c.day + ' ' + c.hm)}</b> بتوقيت القاهرة</p>
   <table style="border-collapse:collapse;margin:6px 0 12px">${rows.map(r => `<tr><td style="border:1px solid #ccc;padding:4px 10px">${esc(r[0])}</td><td style="border:1px solid #ccc;padding:4px 10px;text-align:left" dir="ltr"><b>${fmt(r[1])}</b></td><td style="border:1px solid #ccc;padding:4px 10px;text-align:left" dir="ltr">${r[2] == null ? '' : fmt(r[2]) + ' ' + CUR}</td></tr>`).join('')}</table>
   <p>المرفقات:<br>• <b>قاعدة البيانات كاملة</b>: كل الجداول (الحسابات والعهد والمستخلصات والمخزن والمستخدمين)، وده اللي بيترجّع منه كل حاجة لو حصلت مشكلة كبيرة.<br>• <b>نسخة احتياطية</b>: حسابات مواقعك، ينفع ترجّعها من التطبيق: «الإعدادات» ← «استرجاع من ملف».</p>
   ${repo ? '<p>واتحفظت كمان نسخة في مستودع GitHub الخاص.</p>' : ''}
+  ${US.html}
   <p style="color:#777;font-size:12px">الصور (الإيصالات والخامات) مش جوه النسخة؛ دي محفوظة على Supabase. رسالة آلية من تطبيق ADC حسابات المواقع.</p></div>`;
   let sent = 0;
-  for (const o of A.owners || []) if (o.email) { await send(o.email, why + ' — ' + c.day, html, files); sent++; }
+  for (const o of A.owners || []) if (o.email) { await send(o.email, (US.warn ? '⚠️ ' : '') + why + ' — ' + c.day, html, files); sent++; }
   if (!MOCK && !DRY) await sbPut('sys/backup', { day: nightly ? c.day : (state.day || ''), at, reqDone: asked ? req.at : (state.reqDone || 0), size: dump.length, repo, sent });
   await keepAlive();
   log('تم. نسخ اتبعتت: ' + sent + (repo ? ' + مستودع GitHub' : ''));
