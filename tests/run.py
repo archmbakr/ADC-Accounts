@@ -322,9 +322,32 @@ def t_errors(b, port):
     finally:
         a.close()
 
+def t_resync(b, port):
+    """تغيير من جهاز تاني (من غير ما يوصل لحظيًا): بيظهر لما التطبيق يرجع من الخلفية، ومن زرار «تحديث»."""
+    seed = base_seed(n_cust=10)
+    for r in seed['custody']:
+        if r['kind'] == 'claim':
+            r['status'] = 'pending'
+    a = App(b, port, seed, OWNER)
+    try:
+        pend = "custMine().filter(r=>r.kind==='claim'&&r.status==='pending').length"
+        n0 = a.ev(pend)
+        expect(n0 > 0, 'مفيش مصروفات قيد المراجعة في البداية')
+        a.ev("for(const r of window.__DB.custody)if(r.kind==='claim')r.status='approved'")
+        a.ev("Object.defineProperty(document,'visibilityState',{value:'visible',configurable:true});appSideAt=0;document.dispatchEvent(new Event('visibilitychange'))")
+        a.p.wait_for_timeout(800)
+        expect(a.ev(pend) == 0, 'الرجوع من الخلفية ما حدّثش العهد')
+        a.ev("for(const r of window.__DB.custody)if(r.kind==='claim')r.status='pending'")
+        a.p.click('#hdrSync')
+        a.p.wait_for_function("!document.getElementById('hdrSync').disabled", timeout=15000)
+        expect(a.ev(pend) == n0, 'زرار «تحديث» ما جابش آخر بيانات العهد')
+        a.check('التحديث')
+    finally:
+        a.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
-         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors)]
+         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync)]
 
 def main():
     from playwright.sync_api import sync_playwright
