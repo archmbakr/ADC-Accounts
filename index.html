@@ -1001,7 +1001,21 @@ function appChannel(){
   }).subscribe(st=>{if(st==='SUBSCRIBED')appRefreshAll(true)});
 }
 window.addEventListener('online',()=>{appRefreshAll(true);setTimeout(()=>{const L=[];if(CU.netFail)L.push(custLoad());if(CT.netFail)L.push(ctLoad());if(typeof SO!=='undefined'&&SO.netFail)L.push(soLoad());if(L.length)Promise.all(L.map(p=>p.catch(()=>{}))).then(()=>{try{render()}catch(e){}})},1500)});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')appRefreshAll(false)});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){appRefreshAll(false);appSideReload(false)}});
+/* ===== 15 نوفمبر: العهد والمستخلصات والمخزن بيتحدّثوا لما التطبيق يرجع من الخلفية، ولما الاتصال يرجع، وكل 5 دقايق، ومن زرار «تحديث» =====
+   (على الموبايل الاتصال المباشر بيقف في الخلفية، والتغييرات اللي حصلت وقتها مش بتوصل لوحدها) */
+let appSideAt=0,appSideP=null;
+function appSideReload(force){
+  if(!SB||!navigator.onLine||typeof CU==='undefined')return Promise.resolve();
+  if(appSideP)return appSideP;if(!force&&Date.now()-appSideAt<20000)return Promise.resolve();appSideAt=Date.now();
+  const L=[];
+  if(CU.loaded||CU.rows)L.push(custLoad().then(()=>custFlush()));
+  if(typeof CT!=='undefined'&&CT.loaded)L.push(ctLoad());
+  if(typeof SO!=='undefined'&&SO.loaded)L.push(soLoad());
+  appSideP=Promise.all(L.map(p=>Promise.resolve(p).catch(()=>{}))).then(()=>{try{render()}catch(e){}}).finally(()=>{appSideP=null});
+  return appSideP;
+}
+setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine&&S.roleKnown){appRefreshAll(true);appSideReload(true)}},5*60000);
 const APPDB={
   collection(col){
     const q={col,log:false,lim:0};
@@ -1393,7 +1407,7 @@ let custT=null;
 function custRefresh(){clearTimeout(custT);custT=setTimeout(async()=>{await custLoad();await custFlush();try{render()}catch(e){}},300)}
 function custChannel(){
   if(CU.ch||!SB)return;
-  CU.ch=SB.channel('adc-cust').on('postgres_changes',{event:'*',schema:'public',table:'custody'},()=>custRefresh()).subscribe();
+  CU.ch=SB.channel('adc-cust').on('postgres_changes',{event:'*',schema:'public',table:'custody'},()=>custRefresh()).subscribe(st=>{if(st!=='SUBSCRIBED')return;if(CU.chUp)custRefresh();CU.chUp=true});
 }
 /* حفظ صف: تعديل للموجود وإضافة للجديد بدل upsert (upsert بيطبّق قاعدة الإضافة حتى على الموجود) — 12 نوفمبر */
 async function sbPutRow(t,row,known){
@@ -1959,7 +1973,7 @@ setInterval(()=>{if(ctQ().length&&navigator.onLine)ctFlush().then(()=>{try{rende
 function ctQueue(op){const q=ctQ().filter(x=>x.id!==op.id);q.push({qid:newId(),...op});appLs(LS_CTQ,q);CT.rows=ctMerged()}
 let ctT=null;
 function ctRefresh(){clearTimeout(ctT);ctT=setTimeout(async()=>{await ctLoad();try{if(!document.activeElement||!/^(ct|bq)_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
-function ctChannel(){if(CT.ch||!SB)return;CT.ch=SB.channel('adc-certs').on('postgres_changes',{event:'*',schema:'public',table:'certs'},()=>ctRefresh()).on('postgres_changes',{event:'*',schema:'public',table:'site_access'},()=>ctRefresh()).on('postgres_changes',{event:'*',schema:'public',table:'cert_boq'},()=>ctRefresh()).subscribe()}
+function ctChannel(){if(CT.ch||!SB)return;CT.ch=SB.channel('adc-certs').on('postgres_changes',{event:'*',schema:'public',table:'certs'},()=>ctRefresh()).on('postgres_changes',{event:'*',schema:'public',table:'site_access'},()=>ctRefresh()).on('postgres_changes',{event:'*',schema:'public',table:'cert_boq'},()=>ctRefresh()).subscribe(st=>{if(st!=='SUBSCRIBED')return;if(CT.chUp)ctRefresh();CT.chUp=true})}
 function ctNeedSql(){return CT.missing||CT.boqMissing?`<div class="card"><p class="msg err">جداول المستخلصات ${CT.missing?'غير موجودة':'تحتاج تحديثًا'} في قاعدة البيانات. شغّل ملف «ADC-إعداد-المستخلصات.sql» (آخر نسخة) في Supabase.</p></div>`:''}
 const ctOwnerOf=site=>site&&site._p?site._p.split('/')[1]:null;
 const ctItem=c=>((c.data||{}).item||'').trim();
@@ -2532,7 +2546,7 @@ function soQueue(t,op,id,row){if(t==='store_moves'&&op==='put'&&row&&isFut(row.d
 async function soPut(t,row){soQueue(t,'put',row.id,row);await soFlush();return !soQ().some(x=>x.t===t&&x.id===row.id)}
 let soT=null;
 function soRefresh(){clearTimeout(soT);soT=setTimeout(async()=>{await soLoad();try{if(!document.activeElement||!/^so_/.test(document.activeElement.id||''))render()}catch(e){}},300)}
-function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access','site_access','app_settings'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe()}
+function soChannel(){if(SO.ch||!SB)return;let c=SB.channel('adc-store');for(const t of ['store_moves','store_items','store_sites','store_access','site_access','app_settings'])c=c.on('postgres_changes',{event:'*',schema:'public',table:t},()=>soRefresh());SO.ch=c.subscribe(st=>{if(st!=='SUBSCRIBED')return;if(SO.chUp)soRefresh();SO.chUp=true})}
 function soStart(){soLoad().then(()=>{try{render()}catch(e){}});if(SB)soChannel()}
 function soNeedSql(){return SO.missing?'<div class="card"><p class="msg err">جداول المخزن غير موجودة في قاعدة البيانات. شغّل ملف «ADC-إعداد-المخزن.sql» في Supabase.</p></div>':''}
 
@@ -6045,7 +6059,7 @@ async function syncNow(){
     for(let i=0;i<60&&S.flushing;i++)await new Promise(r=>setTimeout(r,250));
     await flush();
     for(let i=0;i<60&&S.flushing;i++)await new Promise(r=>setTimeout(r,250));
-    if(APP){try{appRefreshAll(true)}catch(e){}try{if(typeof custLoad==='function')custLoad()}catch(e){}}
+    if(APP){try{await Promise.all([custFlush(),ctFlush(),soFlush()].map(p=>Promise.resolve(p).catch(()=>{})))}catch(e){}try{appRefreshAll(true)}catch(e){}try{await appSideReload(true)}catch(e){}}
     await new Promise(r=>setTimeout(r,900));
     const n=left();
     flash(n?'لم يُرفع '+n+' تعديل بعد. تأكد من الاتصال بالإنترنت واضغط «تحديث» مرة أخرى.':'تم التحديث ✓ كل ما سجّلته محفوظ على السيرفر، والبيانات المعروضة هي الأحدث.',!!n);
