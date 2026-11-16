@@ -345,9 +345,41 @@ def t_resync(b, port):
     finally:
         a.close()
 
+def t_stuck_queue(b, port):
+    """طابور العهد: الخانات الداخلية ما تتبعتش، خطأ السيرفر (400) يظهر في كارت ومايوقفش اللي وراه، والنسخة اللي زي السيرفر تتشال."""
+    seed = base_seed(n_cust=10)
+    for r in seed['custody']:
+        if r['kind'] == 'claim':
+            r['status'] = 'pending'
+    a = App(b, port, seed, OWNER)
+    try:
+        ids = a.ev("custMerged().filter(r=>r.kind==='claim').map(r=>r.id).slice(0,3)")
+        # (1) حركة فيها خانة داخلية (_err) زي اللي حصلت 16 نوفمبر — لازم تتبعت عادي
+        a.ev(f"""(()=>{{const r=CU.rows.find(x=>x.id==={json.dumps(ids[0])});appLs(LS_CUSTQ,[{{qid:'q1',op:'put',id:r.id,row:{{...r,status:'approved',_err:'قديم',_local:true}}}}]);}})()""")
+        a.ev("custFlush()"); a.p.wait_for_timeout(800)
+        st = a.ev(f"window.__DB.custody.find(x=>x.id==={json.dumps(ids[0])}).status")
+        expect(st == 'approved', f'الحركة اللي فيها خانة داخلية ما اتبعتتش (الحالة {st})')
+        expect(a.ev('custQ().length') == 0, 'الطابور ما فضيش بعد الإرسال')
+        # (2) خطأ 400 على أول حركة: يظهر في الكارت، والتانية تتبعت
+        a.ev(f"""window.__FAIL={{custody:(op,p,f)=>f.some(x=>x[2]==={json.dumps(ids[1])})?{{message:'new value violates something odd',code:'XX000'}}:null}}""")
+        a.ev(f"""(()=>{{const g=id=>CU.rows.find(x=>x.id===id);appLs(LS_CUSTQ,[{{qid:'q2',op:'put',id:{json.dumps(ids[1])},row:{{...g({json.dumps(ids[1])}),status:'approved'}}}},{{qid:'q3',op:'put',id:{json.dumps(ids[2])},row:{{...g({json.dumps(ids[2])}),status:'approved'}}}}])}})()""")
+        a.ev("custFlush()"); a.p.wait_for_timeout(800)
+        expect(a.ev(f"window.__DB.custody.find(x=>x.id==={json.dumps(ids[2])}).status") == 'approved', 'الحركة اللي ورا الحركة الفاشلة اتوقفت')
+        expect(a.ev("custQ().length===1&&!!custQ()[0].err"), 'الحركة الفاشلة ما اتعلّمش عليها خطأ')
+        a.go('__custody')
+        expect('لم تُحفظ على السيرفر' in a.text(), 'كارت «لم تُحفظ» ما ظهرش')
+        # (3) نسخة محلية زي السيرفر بالظبط تتشال لوحدها بعد التحميل
+        a.ev("window.__FAIL=null;appLs(LS_CUSTQ,[]);const r=CU.rows[0];appLs(LS_CUSTQ,[{qid:'q4',op:'put',id:r.id,row:JSON.parse(JSON.stringify(r)),err:'قديم'}])")
+        a.ev("custLoad().then(()=>render())"); a.p.wait_for_timeout(600)
+        expect(a.ev('custQ().length') == 0, 'النسخة المحلية اللي زي السيرفر ما اتشالتش')
+        a.errs = [e for e in a.errs if '400' not in e]
+        a.check('طابور العهد')
+    finally:
+        a.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
-         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync)]
+         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue)]
 
 def main():
     from playwright.sync_api import sync_playwright
