@@ -5,6 +5,8 @@
      window.__USER   = { id, email, name, owner }  المستخدم الداخل (owner = مدير)
      window.__RPC    = { name: (args, db) => data } دوال إضافية أو بديلة
      window.__MISSING= ['table', ...]               جداول تتعامل كأنها مش موجودة
+     window.__FAIL   = { table: (op,payload,filters) => error|null }  رفض كتابة (زي 400 من السيرفر)
+   وأي خانة بتبدأ بـ _ في الكتابة = 400 PGRST204 زي السيرفر الحقيقي.
    زي Supabase الحقيقي: أي طلب قراءة بيرجّع 1000 صف بالكتير (MAX_ROWS). */
 (function () {
   'use strict';
@@ -65,6 +67,8 @@
       const t = this.t; LOG.push({ t, op: this.op, f: this.f.map(x => x.slice(0, 3)), rg: this.rg, lim: this.lim });
       if ((window.__MISSING || []).includes(t)) return err('relation "public.' + t + '" does not exist', '42P01');
       const T = tbl(t);
+      if (this.op !== 'select' && window.__FAIL && window.__FAIL[t]) { const fe = window.__FAIL[t](this.op, this.p, this.f); if (fe) return { data: null, error: fe, status: 400 }; }
+      if (this.op !== 'select' && this.p && !Array.isArray(this.p)) { const bad = Object.keys(this.p).find(k => k[0] === '_'); if (bad) return err("Could not find the '" + bad + "' column of '" + t + "' in the schema cache", 'PGRST204'); }
       if (this.op === 'select') {
         let L = T.filter(r => this._match(r));
         for (const [c, asc] of this.o.slice().reverse()) L = L.slice().sort((a, b) => (asc ? 1 : -1) * cmp(get(a, c), get(b, c)));
