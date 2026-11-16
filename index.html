@@ -1395,7 +1395,7 @@ function custLoad(){if(CU._ld)return CU._ld;CU._ld=custLoad0().finally(()=>{CU._
 async function custLoad0(){
   if(!SB||!navigator.onLine||!(await appHasSes())){const c=appLs(LS_CUST);if(c)CU.rows=c;CU.noData=!c;CU.netFail=true;CU.loaded=true;return}
   let ok=false;try{const {data,error}=await sbAll('custody');if(data)data.sort((a,b)=>String(a.updated_at||'').localeCompare(String(b.updated_at||''))||String(a.id).localeCompare(String(b.id)));
-    if(!error){CU.rows=data||[];appLs(LS_CUST,CU.rows);CU.missing=false;ok=true}else if(/custody|relation|does not exist|schema cache/i.test(error.message||'')){CU.missing=true;ok=true}}catch(e){}
+    if(!error){CU.rows=data||[];appLs(LS_CUST,CU.rows);CU.missing=false;ok=true;custPrune()}else if(/custody|relation|does not exist|schema cache/i.test(error.message||'')){CU.missing=true;ok=true}}catch(e){}
   if(!ok){const c=appLs(LS_CUST);if(c&&!(CU.rows||[]).length)CU.rows=c;CU.noData=!c&&!(CU.rows||[]).length}else CU.noData=false;CU.netFail=!ok;
   CU.loaded=true;
 }
@@ -1416,6 +1416,13 @@ async function sbPutRow(t,row,known){
   const dup=e=>!!e&&(e.code==='23505'||/duplicate key/i.test(e.message||''));
   if(known){const r=await upd();if(!r.error||!/0 rows/.test(r.error.message||''))return r;const r2=await ins();return dup(r2.error)?r:r2}
   const r=await ins();if(dup(r.error))return upd();return r}
+/* 16 نوفمبر: نسخة محلية (مستنية أو فاشلة) السيرفر عنده نفسها بالظبط ← تتشال لوحدها */
+function qPrune(key,srv,t,keys){try{const sv=new Map((srv||[]).map(r=>[r.id,r])),q=appLs(key)||[];
+  const keep=q.filter(o=>!((o.op==='put'||o.op==='upsert'||!o.op||o.op==='ins')&&o.op!=='del'&&o.row&&(!t||o.t===t)&&sameRow(o.row,sv.get(o.id),keys)));
+  if(keep.length!==q.length)appLs(key,keep)}catch(e){}}
+function custPrune(){const sv=new Map((CU.rows||[]).map(r=>[r.id,r])),q=custQ();
+  const keep=q.filter(o=>!(o.op==='put'&&o.row&&sameRow(o.row,sv.get(o.id),['status','kind','engineer','site_id','data'])));
+  if(keep.length!==q.length)appLs(LS_CUSTQ,keep);return q.length-keep.length}
 async function custFlush(){
   if(CU.busy||!SB||!navigator.onLine||!(await appHasSes()))return;
   let q=custQ();if(!q.length)return;CU.busy=true;
@@ -1425,12 +1432,12 @@ async function custFlush(){
       try{
         if(op.op==='del'){const {error}=await SB.from('custody').delete().eq('id',op.id);if(error)throw error}
         else{
-          const row={...op.row};delete row._local;delete row.updated_at;
+          const row=sbStrip(op.row);delete row.updated_at;
           if(row.data&&String(row.data.receipt||'').startsWith('Q')){const raw=await rcGetRaw(row.data.receipt);if(raw&&raw.blob){const up=await APPASSETS.upload(raw.blob,{type:raw.type});await rcDelRaw(row.data.receipt);row.data={...row.data,receipt:up.id}}}
           const {error}=await sbPutRow('custody',row,(CU.rows||[]).some(x=>x.id===row.id));if(error)throw error;
         }
         q=custQ().filter(x=>x.qid!==op.qid);appLs(LS_CUSTQ,q);
-      }catch(e){const m=String(e&&e.message||'');if(/row-level|permission|violates|locked period|quota|invoice required|future|check constraint|foreign key/i.test(m)){const why=custErrText(m);q=custQ().map(x=>x.qid===op.qid?{...x,err:why,errRaw:m.slice(0,300),errAt:Date.now()}:x);appLs(LS_CUSTQ,q);showBanner('تعذّر حفظ حركة عهدة: '+why+' الحركة محفوظة على هذا الجهاز في «حركات عهدة لم تُحفظ».');continue}break}
+      }catch(e){const m=String(e&&e.message||'');if(!ctNetErr(e)||/row-level|permission|violates|locked period|quota|invoice required|future|check constraint|foreign key/i.test(m)){const why=/row-level|permission|violates|locked period|quota|invoice required|future|check constraint|foreign key/i.test(m)?custErrText(m):'رفض الخادم: '+errMsg(e,140);q=custQ().map(x=>x.qid===op.qid?{...x,err:why,errRaw:m.slice(0,300),errAt:Date.now()}:x);appLs(LS_CUSTQ,q);showBanner('تعذّر حفظ حركة عهدة: '+why+' الحركة محفوظة على هذا الجهاز في «حركات عهدة لم تُحفظ».');continue}break}
     }
   }finally{CU.busy=false}
   await custLoad();if(typeof quSoon==='function'&&quApplies())quSoon();try{render()}catch(e){}
@@ -1598,6 +1605,7 @@ function errWhy(e){
   if(/invalid input|22P02|check constraint|23514|not-null|23502/i.test(mc))return 'قيمة ناقصة أو غير صحيحة في إحدى الخانات.';
   if(/payload too large|413|entity too large/i.test(mc))return 'الملف كبير جدًا.';
   if(/locked/i.test(m))return 'مقفول. اطلب من صاحب الموقع فتحه للتعديل.';
+  if(/could not find the .* column|PGRST204/i.test(mc))return 'الحركة فيها خانة السيرفر مش عارفها (نسخة قديمة من التطبيق). حدّث التطبيق وجرّب تاني.';
   if(/function .* does not exist|PGRST202|schema cache|relation .* does not exist|42P01|42883/i.test(mc))return 'قاعدة البيانات تحتاج إلى تحديث. أبلغ المدير (ملف SQL ناقص).';
   return '';
 }
@@ -1941,7 +1949,7 @@ async function ctLoad0(){
     try{
       const [a,b,c,d]=await Promise.all(['certs','site_access','cert_ret','cert_boq'].map(t=>sbAll(t)));
       if(a.error&&/certs|relation|does not exist|schema cache/i.test(a.error.message||'')){CT.missing=true;ok=true}
-      else if(!a.error){CT.missing=false;CT.srv=a.data||[];CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[];ok=true;
+      else if(!a.error){CT.missing=false;CT.srv=a.data||[];qPrune(LS_CTQ,CT.srv,null,['status','site_id','contractor','no','data']);CT.access=b.data||[];CT.ret=c.data||[];CT.boqMissing=!!(d.error&&/cert_boq|relation|does not exist|schema cache/i.test(d.error.message||''));CT.boq=d.data||[];ok=true;
         if(appIsEngineer()&&isTechR(myRole())){try{const p=await netTO(SB.rpc('cert_paid_rows'));CT.paid=p.error?null:(p.data||[])}catch(e){CT.paid=CT.paid||null}}
         appLs(LS_CT,{rows:CT.srv,access:CT.access,ret:CT.ret,boq:CT.boq,paid:CT.paid||null,at:Date.now()});
         if(appIsEngineer()){try{const st=await netTO(SB.from('app_settings').select('key,value').in('key',['inv_del_roles','boq_users']),5000);if(!st.error)soPermFrom(st.data||[])}catch(e){}}}
@@ -1951,14 +1959,20 @@ async function ctLoad0(){
   CT.netFail=!ok;CT.noData=!ok&&!appLs(LS_CT)&&!(CT.srv||[]).length;
   try{CT.rows=ctMerged()}catch(e){CT.rows=CT.rows||[]}CT.loaded=true;
 }
-const ctNetErr=e=>!navigator.onLine||/fetch|network|timeout|load failed|offline/i.test(String(e&&(e.message||e)||''));
+/* 16 نوفمبر: خطأ جاي من السيرفر (ليه كود زي PGRST204 أو 22P02) مش انقطاع نت — كان بيتعامل كأنه نت فالحركة تفضل «محلي» وتوقّف اللي وراها */
+const ctNetErr=e=>{if(!navigator.onLine)return true;const c=String(e&&e.code||'');if(c&&c!=='57014')return false;return /fetch|network|timeout|load failed|offline|ERR_/i.test(String(e&&(e.message||e)||''))};
+/* الخانات اللي بتبدأ بـ _ داخلية للتطبيق (محلي، خطأ…) وما تتبعتش للسيرفر */
+const sbStrip=r=>{const x={};for(const k in r)if(k[0]!=='_')x[k]=r[k];return x};
+/* مقارنة صف محلي بصف السيرفر من غير ترتيب الخانات */
+const canonJ=v=>v&&typeof v==='object'?(Array.isArray(v)?'['+v.map(canonJ).join(',')+']':'{'+Object.keys(v).filter(k=>k[0]!=='_'&&v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canonJ(v[k])).join(',')+'}'):JSON.stringify(v===undefined?null:v);
+const sameRow=(a,b,keys)=>!!a&&!!b&&keys.every(k=>canonJ(a[k])===canonJ(b[k]));
 let ctBusy=false;
 async function ctFlush(){
   const fail={};if(ctBusy||!SB||!navigator.onLine||!ctQ().length)return fail;ctBusy=true;let done=0;
   try{
     for(const op of ctQ()){
       let err=null;
-      try{const r=op.op==='del'?await SB.from('certs').delete().eq('id',op.id):await sbPutRow('certs',(()=>{const x={...op.row};delete x._local;delete x.updated_at;return x})(),(CT.rows||[]).some(x=>x.id===op.id&&!x._local));err=r&&r.error}catch(e){err=e}
+      try{const r=op.op==='del'?await SB.from('certs').delete().eq('id',op.id):await sbPutRow('certs',(()=>{const x=sbStrip(op.row);delete x.updated_at;return x})(),(CT.rows||[]).some(x=>x.id===op.id&&!x._local));err=r&&r.error}catch(e){err=e}
       if(err&&ctNetErr(err))break;
       appLs(LS_CTQ,ctQ().filter(x=>x.qid!==op.qid));done++;
       if(err){const m=String(err.message||'');fail[op.id]=/quota/.test(m)?quHit():/locked period/.test(m)?lockMsg():/locked/.test(m)?'هذا المستخلص معتمد. اطلب من صاحب الموقع فتحه للتعديل.':/access/.test(m)?'ليس لديك صلاحية على هذا الموقع.':'تعذّر الحفظ: '+errMsg({message:m},120);showBanner('مستخلص لم يُحفظ: '+fail[op.id])}
@@ -2426,7 +2440,7 @@ async function soLoad0(){
       const [m,i,s,a]=await Promise.all(['store_moves','store_items','store_sites','store_access'].map(soAll));
       try{const r=await netTO(SB.from('app_settings').select('*'),5000);if(!r.error){const x=(r.data||[]).find(z=>z.key==='lock_until');SO.lock=x?x.value:'';appLs('adc_lock_v1',SO.lock);const xa=(r.data||[]).find(z=>z.key==='lock_acct');SO.lockAcct=!!(xa&&xa.value==='1');appLs('adc_lock_acct_v1',SO.lockAcct);soLimFrom(r.data);if(typeof rsFromSettings==='function')rsFromSettings(r.data);if(typeof jlFrom==='function')jlFrom(r.data);if(typeof spAliasFrom==='function')spAliasFrom(r.data)}}catch(e){}
       if(m.error&&/store_moves|relation|does not exist|schema cache/i.test(m.error.message||'')){SO.missing=true;SO.srv=SO.srv||soEmpty();ok=true}
-      else if(!m.error){SO.missing=false;SO.srv={moves:m.data||[],items:i.data||[],sites:s.data||[],access:a.data||[]};ok=true;appLs(LS_SO,{...SO.srv,at:Date.now()})}
+      else if(!m.error){SO.missing=false;SO.srv={moves:m.data||[],items:i.data||[],sites:s.data||[],access:a.data||[]};ok=true;qPrune(LS_SOQ,SO.srv.moves,'store_moves',['kind','date','site_id','deleted','data']);qPrune(LS_SOQ,SO.srv.items,'store_items',['site_id','data','name']);appLs(LS_SO,{...SO.srv,at:Date.now()})}
     }catch(e){}
   }
   const cc=ok?null:appLs(LS_SO);
@@ -2523,7 +2537,7 @@ async function lockSet(v){
 }
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-lock]');if(!b)return;const a=b.dataset.lock;
   if(a==='set'){const d=$('#lk_date');if(d&&d.value)lockSet(d.value)}else if(a==='last')lockSet(lastMonthEnd());else if(a==='clear'){if(confirm('إلغاء القفل؟ سيتمكن المهندسون من التعديل في الفترات القديمة.'))lockSet('')}});
-const soClean=r=>{const x={...r};delete x._local;delete x.updated_at;delete x.created_at;return x};
+const soClean=r=>{const x=sbStrip(r);delete x.updated_at;delete x.created_at;return x};
 let soBusy=false;
 async function soFlush(){
   if(soBusy||!SB||!navigator.onLine||!soQ().length)return;soBusy=true;let done=0;
