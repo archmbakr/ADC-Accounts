@@ -59,7 +59,7 @@ def base_seed(n_cust=0, n_certs=0, eng='u-eng', tech='u-tech'):
 OWNER = {'id': 'u-owner', 'email': 'owner@test.local', 'name': 'المدير', 'owner': True}
 ENG = {'id': 'u-eng', 'email': 'eng@test.local', 'name': 'م. محمود', 'owner': False}
 TECH = {'id': 'u-tech', 'email': 'tech@test.local', 'name': 'م. سارة', 'owner': False}
-PAGES = ['__all', 's1', '__journal', '__contractors', '__items', '__custody', '__certs', '__store', '__stmts', '__codes', '__trash', '__ocert', '__search', '__settings']
+PAGES = ['__all', 's1', '__journal', '__contractors', '__items', '__custody', '__certs', '__store', '__stmts', '__codes', '__trash', '__ocert', '__cost', '__search', '__settings']
 
 # ---------------- التشغيل ----------------
 class Fail(Exception):
@@ -377,9 +377,87 @@ def t_stuck_queue(b, port):
     finally:
         a.close()
 
+def t_cert_retention(b, port):
+    """تأمين الأعمال جوه المستخلص: المقترح من آخر مستخلص للمقاول، ويتشال أو يتغير لكل مستخلص."""
+    seed = base_seed(n_certs=0)
+    seed['cert_boq'] = [{'id': 'bq1', 'site_id': 's1', 'contractor': 'مقاول أحمد', 'item': 'بند 1', 'data': {'lines': [{'id': 'l1', 'kind': 'line', 'desc': 'نجارة', 'unit': 'م2', 'qty': 100, 'rate': 200}]}}]
+    seed['certs'] = [{'id': 'old1', 'site_id': 's1', 'contractor': 'مقاول أحمد', 'no': 1, 'status': 'approved', 'updated_at': '2026-11-01T00:00:00Z',
+                      'data': {'date': d(20), 'item': 'بند 1', 'ret_pct': 0, 'lines': {'l1': {'tot': 10}}}}]
+    a = App(b, port, seed, OWNER)
+    try:
+        a.go('__certs')
+        a.ev("CT.form={site:'s1',con:'مقاول أحمد',item:'بند 1',date:today(),lines:{},deds:[]};render()")
+        a.p.wait_for_timeout(300)
+        expect(a.ev("!!document.getElementById('ct_reton')"), 'خانة «تأمين أعمال» مش ظاهرة في فورم المستخلص')
+        expect(a.ev("!document.getElementById('ct_reton').checked"), 'المقترح المفروض «بدون تأمين» زي آخر مستخلص للمقاول')
+        a.p.click('#ct_reton'); a.p.fill('#ct_retp', '7'); a.p.wait_for_timeout(200)
+        expect(a.ev("ctReadForm(),ctFormCert(CT.form).data.ret_pct") == 7, 'النسبة 7٪ ما اتسجلتش في المستخلص')
+        expect(a.ev("ctRetDef('s2','مقاول أحمد',null,'')") == 0, 'المقترح من موقع تاني المفروض ياخد آخر مستخلص للمقاول')
+        expect(a.ev("ctRetDef('s1','مقاول جديد',null,'')") == 5, 'مقاول جديد المفروض 5٪')
+        expect(a.ev("!document.getElementById('ctRetBox')"), 'كارت نسبة التأمين على مستوى الصفحة لسه موجود')
+        a.check('تأمين الأعمال')
+    finally:
+        a.close()
+
+def t_site_groups(b, port):
+    """البنود العامة لكل موقع: تقسيم خاص بيبدأ بنسخة من المشترك، والتعديل مايأثرش على موقع تاني، و«بدون»."""
+    seed = base_seed()
+    seed['docs'].append(doc('items/g1', {'name': 'الأعمال الصحية', 'kind': 'group', 'items': ['أعمال السباكة'], 'created': 5}))
+    a = App(b, port, seed, OWNER)
+    try:
+        a.ev("S.siteTab='sum';CK.igsite=true"); a.go('s1')
+        expect('البنود العامة لهذا الموقع' in a.text(), 'كارت البنود العامة مش ظاهر في ملخص الموقع')
+        a.p.click('[data-igs="mode"][data-v="own"]'); a.p.wait_for_timeout(500)
+        expect(a.ev("S.sites.find(x=>x.id==='s1').igMode") == 'own', 'الموقع ما اتحولش لتقسيم خاص')
+        expect(a.ev("igOf('أعمال السباكة',igPfOfSite('s1'))") == 'الأعمال الصحية', 'التقسيم الخاص ما اتنسخش من المشترك')
+        a.p.click('[data-igs="rmitem"] >> nth=0'); a.p.wait_for_timeout(400)
+        expect(a.ev("igOf('أعمال السباكة',igPfOfSite('s1'))") == '', 'شيل البند من التقسيم الخاص ما اشتغلش')
+        expect(a.ev("igOf('أعمال السباكة',igPfOfSite('s2'))") == 'الأعمال الصحية', 'التعديل في موقع أثّر على موقع تاني')
+        a.p.click('[data-igs="mode"][data-v="off"]'); a.p.wait_for_timeout(400)
+        expect(a.ev("igGroups(igPfOfSite('s1')).length") == 0, '«بدون بنود عامة» ما اشتغلش')
+        a.check('البنود العامة لكل موقع')
+    finally:
+        a.close()
+
+def t_cost_review(b, port):
+    """مراجعة التكاليف: بند بخصم وربط بند مصروفات ومبلغ يدوي في تحليل السعر، والحفظ والحساب صح."""
+    a = App(b, port, base_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(400)
+        if a.ev("CR.site") != 's1':
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="new"]'); a.p.wait_for_timeout(200)
+        a.p.fill('#cr_name', 'أعمال السباكة'); a.p.fill('#cr_unit', 'مقطوعية'); a.p.fill('#cr_qty', '1'); a.p.fill('#cr_rate', '100000')
+        a.p.fill('[data-crd="0"][data-k="v"]', '10')
+        a.p.click('[data-cr="pick"][data-w="i"]'); a.p.wait_for_timeout(200)
+        a.p.select_option('#cr_pv', 'أعمال السباكة'); a.p.click('[data-cr="link"][data-w="i"]'); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="partadd"]'); a.p.wait_for_timeout(200)
+        a.p.fill('[data-crp="0"][data-k="name"]', 'حدادة')
+        a.p.click('[data-cr="pick"][data-w="p0"]'); a.p.wait_for_timeout(200)
+        a.p.select_option('#cr_pt', 'man'); a.p.wait_for_timeout(200)
+        a.p.fill('#cr_ma', '5000'); a.p.fill('#cr_mx', 'دفعات حداد'); a.p.click('[data-cr="link"][data-w="p0"]'); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="save"]'); a.p.wait_for_timeout(600)
+        rows = a.ev("window.__DB.cost_items||[]")
+        expect(len(rows) == 1 and rows[0]['site_id'] == 's1', f'البند ما اتحفظش ({len(rows)})')
+        k = a.ev("crCalc('s1',window.__DB.cost_items[0].data)")
+        exp = a.ev("r2(S.exp.filter(e=>e.siteId==='s1'&&e.item==='أعمال السباكة').reduce((a,e)=>a+amt(e),0))")
+        expect(k['contract'] == 100000 and k['dedT'] == 10000 and k['allowed'] == 90000, f'الحساب غلط: {k}')
+        expect(abs(k['act'] - (exp + 5000)) < 0.01, f'المصروف فعلًا {k["act"]} والمتوقع {exp + 5000}')
+        txt = a.text()
+        expect('بنود المقايسة (1)' in txt and 'غير داخلة في أي بند' in txt, 'الجدول أو تنبيه غير المربوط مش ظاهر')
+        a.check('مراجعة التكاليف')
+    finally:
+        a.close()
+    e = App(b, port, base_seed(), ENG)
+    try:
+        expect(not e.ev("crCanAny()"), 'المهندس شايف مراجعة التكاليف')
+    finally:
+        e.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
-         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue)]
+         ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review)]
 
 def main():
     from playwright.sync_api import sync_playwright
