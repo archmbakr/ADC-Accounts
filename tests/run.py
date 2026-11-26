@@ -419,15 +419,27 @@ def t_site_groups(b, port):
     finally:
         a.close()
 
+def cost_seed():
+    seed = base_seed()
+    seed['owner_docs'] = [
+        {'id': 'pj1', 'kind': 'proj', 'site_id': 's1', 'data': {'secs': [{'id': 'sc1', 'title': 'الأعمال الصحية', 'g': ''}],
+            'boq': [{'id': 'b1', 's': 'sc1', 'desc': 'أعمال السباكة', 'unit': 'مقطوعية', 'cq': 1, 'rate': 100000},
+                    {'id': 'b2', 's': 'sc1', 'desc': 'توريدات حديد', 'unit': 'طن', 'cq': 20, 'rate': 40000}]}},
+        {'id': 'oc1', 'kind': 'cert', 'site_id': 's1', 'data': {'no': 1, 'date': d(30), 'status': 'approved', 'lines': [{'id': 'l1', 's': 'sc1', 'boq': 'b1', 'desc': 'أعمال السباكة', 'unit': 'مقطوعية', 'cq': 1, 'rate': 100000, 'totQ': 0.5, 'pct': 100}]}},
+        {'id': 'oc2', 'kind': 'cert', 'site_id': 's1', 'data': {'no': 2, 'date': d(5), 'status': 'approved', 'lines': [{'id': 'l1', 's': 'sc1', 'boq': 'b1', 'desc': 'أعمال السباكة', 'unit': 'مقطوعية', 'cq': 1, 'rate': 100000, 'totQ': 1, 'pct': 80},
+                                                                                                         {'id': 'l2', 's': 'sc1', 'boq': 'b2', 'desc': 'توريدات حديد', 'unit': 'طن', 'cq': 20, 'rate': 40000, 'totQ': 10, 'pct': 50}]}}]
+    return seed
+
 def t_cost_review(b, port):
-    """مراجعة التكاليف: بند بخصم وربط بند مصروفات ومبلغ يدوي في تحليل السعر، والحفظ والحساب صح."""
-    a = App(b, port, base_seed(), OWNER)
+    """مراجعة التكاليف: البند من ملف المشروع، المنفذ من مستخلص المالك (× نسبة التنفيذ) واختيار المستخلص، وسعر الوحدة + الإجمالي."""
+    a = App(b, port, cost_seed(), OWNER)
     try:
-        a.go('__cost'); a.p.wait_for_timeout(400)
+        a.go('__cost'); a.p.wait_for_timeout(600)
         if a.ev("CR.site") != 's1':
-            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(200)
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(300)
+        expect(a.ev("CR.oc.s1||crCert('s1').id") == 'oc2', 'الافتراضي المفروض آخر مستخلص معتمد (رقم 2)')
         a.p.click('[data-cr="new"]'); a.p.wait_for_timeout(200)
-        a.p.fill('#cr_name', 'أعمال السباكة'); a.p.fill('#cr_unit', 'مقطوعية'); a.p.fill('#cr_qty', '1'); a.p.fill('#cr_rate', '100000')
+        a.p.select_option('#cr_boq', 'b1'); a.p.wait_for_timeout(300)
         a.p.fill('[data-crd="0"][data-k="v"]', '10')
         a.p.click('[data-cr="pick"][data-w="i"]'); a.p.wait_for_timeout(200)
         a.p.select_option('#cr_pv', 'أعمال السباكة'); a.p.click('[data-cr="link"][data-w="i"]'); a.p.wait_for_timeout(200)
@@ -435,16 +447,23 @@ def t_cost_review(b, port):
         a.p.fill('[data-crp="0"][data-k="name"]', 'حدادة')
         a.p.click('[data-cr="pick"][data-w="p0"]'); a.p.wait_for_timeout(200)
         a.p.select_option('#cr_pt', 'man'); a.p.wait_for_timeout(200)
-        a.p.fill('#cr_ma', '5000'); a.p.fill('#cr_mx', 'دفعات حداد'); a.p.click('[data-cr="link"][data-w="p0"]'); a.p.wait_for_timeout(200)
-        a.p.click('[data-cr="save"]'); a.p.wait_for_timeout(600)
+        a.p.fill('#cr_ma', '5000'); a.p.click('[data-cr="link"][data-w="p0"]'); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="save"]'); a.p.wait_for_timeout(700)
         rows = a.ev("window.__DB.cost_items||[]")
-        expect(len(rows) == 1 and rows[0]['site_id'] == 's1', f'البند ما اتحفظش ({len(rows)})')
+        expect(len(rows) == 1 and rows[0]['data'].get('boq') == 'b1', f'البند ما اتحفظش مربوط بملف المشروع ({rows})')
         k = a.ev("crCalc('s1',window.__DB.cost_items[0].data)")
         exp = a.ev("r2(S.exp.filter(e=>e.siteId==='s1'&&e.item==='أعمال السباكة').reduce((a,e)=>a+amt(e),0))")
-        expect(k['contract'] == 100000 and k['dedT'] == 10000 and k['allowed'] == 90000, f'الحساب غلط: {k}')
-        expect(abs(k['act'] - (exp + 5000)) < 0.01, f'المصروف فعلًا {k["act"]} والمتوقع {exp + 5000}')
+        expect(k['contract'] == 100000 and k['allowed'] == 90000 and abs(k['allowU'] - 90000) < 0.01, f'الحساب غلط: {k}')
+        expect(abs(k['exe'] - 0.8) < 1e-9, f'المنفذ المفروض 1 × 80٪ = 0.8 ولقيته {k["exe"]}')
+        act = exp + 5000
+        expect(abs(k['act'] - act) < 0.01 and abs(k['actU'] - act / 0.8) < 0.01, f'الفعلي للوحدة غلط {k["actU"]}')
+        expect(abs(k['save'] - (90000 * 0.8 - act)) < 0.01, f'الوفر غلط {k["save"]}')
+        a.p.select_option('#cr_oc', 'oc1'); a.p.wait_for_timeout(300)
+        expect(abs(a.ev("crCalc('s1',window.__DB.cost_items[0].data).exe") - 0.5) < 1e-9, 'اختيار مستخلص رقم 1 ما غيّرش الكمية المنفذة')
         txt = a.text()
-        expect('بنود المقايسة (1)' in txt and 'غير داخلة في أي بند' in txt, 'الجدول أو تنبيه غير المربوط مش ظاهر')
+        expect('للوحدة' in txt and 'الإجمالي' in txt and 'بنود المراجعة (1)' in txt, 'الجدول بسعر الوحدة والإجمالي مش ظاهر')
+        a.p.click('[data-cr="impoc"]'); a.p.wait_for_timeout(700)
+        expect(len(a.ev("window.__DB.cost_items")) == 2, '«إضافة كل بنود ملف المشروع» ما ضافش البند الناقص')
         a.check('مراجعة التكاليف')
     finally:
         a.close()
