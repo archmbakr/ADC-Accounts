@@ -473,10 +473,66 @@ def t_cost_review(b, port):
     finally:
         e.close()
 
+def t_owner_boq(b, port):
+    """مستخلص المالك بالمقايسة: النموذج الافتراضي، سطور المشروع (ضريبة/تأمين/دفعة مقدمة) والملاحظة، بند جديد يتضاف لملف المشروع، وتسجيل البنود كبنود عامة."""
+    a = App(b, port, base_seed(), OWNER)
+    try:
+        a.go('__ocert'); a.p.wait_for_timeout(500)
+        a.ev("OC.site='s1';OC.tab='proj';render()"); a.p.wait_for_timeout(300)
+        a.p.click('[data-oc="pnew"]'); a.p.wait_for_timeout(800)
+        D = a.ev("window.__DB.owner_docs||[]")
+        tpl = [r for r in D if r['kind'] == 'tpl']; pj = [r for r in D if r['kind'] == 'proj']
+        expect(len(tpl) == 1 and tpl[0]['data'].get('type') == 'boq' and len(pj) == 1, f'النموذج الافتراضي مش «بالمقايسة» ({[r["kind"] for r in D]})')
+        a.ev("OC.tab='proj';OC.pe=null;render()"); a.p.wait_for_timeout(300)
+        expect('سطور الإجمالي والضرائب في هذا المشروع' in a.text(), 'كارت سطور الإجمالي مش ظاهر في ملف المشروع')
+        a.ev("OC.pe.secs=[{id:'sc1',title:'الأعمال الصحية',g:'',parts:{}}];OC.pe.boq=[{id:'b1',s:'sc1',desc:'أعمال السباكة',unit:'م',cq:100,rate:1000}];render()"); a.p.wait_for_timeout(200)
+        expect('1.1' in a.text(), 'ترقيم البنود (1.1) مش ظاهر في ملف المشروع')
+        i_adv = a.ev("OC.pe.rows.findIndex(r=>r.k==='adv')")
+        a.p.check(f'[data-pe="rows.{i_adv}.on"]'); a.p.wait_for_timeout(300)
+        a.p.fill('[data-pe="adv.amt"]', '20000'); a.p.fill('[data-pe="adv.pct"]', '10')
+        a.p.click('[data-oc="radd"][data-v="tax"]'); a.p.wait_for_timeout(300)
+        i_tax = a.ev("OC.pe.rows.findIndex(r=>r.label==='ضريبة أخرى')")
+        expect(i_tax > 0, '«+ ضريبة» ما ضافش «ضريبة أخرى»')
+        a.p.fill(f'[data-pe="rows.{i_tax}.def"]', '1')
+        a.p.fill('#oc_note', 'الأسعار شاملة النقل')
+        a.p.click('[data-oc="psave"]'); a.p.wait_for_timeout(800)
+        P = [r for r in a.ev("window.__DB.owner_docs") if r['kind'] == 'proj'][0]['data']
+        expect(P.get('note') == 'الأسعار شاملة النقل' and P.get('adv', {}).get('amt') == 20000 and isinstance(P.get('rows'), list), f'إعدادات المشروع ما اتحفظتش ({P.get("adv")}, {P.get("note")})')
+        a.ev("OC.tab='certs';render()"); a.p.wait_for_timeout(300)
+        a.p.click('[data-oc="cnew"]'); a.p.wait_for_timeout(900)
+        expect(a.ev("!!OC.ce"), 'المستخلص الجديد ما اتفتحش')
+        txt = a.text()
+        expect('المصنعيات' not in txt and 'بند عام' in txt, 'نموذج المقايسة لسه فيه أجزاء مصنعيات/توريدات أو مفيهوش عمود البند العام')
+        a.ev("const l=OC.ce.data.lines.find(x=>x.boq==='b1');l.totQ=50;OC.dirty=true;render()"); a.p.wait_for_timeout(200)
+        K = a.ev("(()=>{const P=ocProj('s1'),T=ocTplOf(P),K=ocCalc(OC.ce,P,T);return Object.fromEntries(K.rows.map(r=>[r.id,r.v]))})()")
+        expect(abs(K['w'] - 50000) < .01 and abs(K['vat'] - 7000) < .01 and abs(K['ret'] + 2500) < .01 and abs(K['adv'] + 5000) < .01, f'حساب سطور الإجمالي غلط {K}')
+        expect('sv' not in K and 'stp' not in K, f'سطور غير متعلمة اتحسبت {K}')
+        expect(any(abs(v - 500) < .01 for k, v in K.items() if k.startswith('r')), f'«ضريبة أخرى» 1٪ ما اتحسبتش {K}')
+        expect('الأسعار شاملة النقل' in a.text(), 'الملاحظة العامة مش ظاهرة في المستخلص')
+        a.p.click('[data-oc="nbopen"] >> nth=0'); a.p.wait_for_timeout(200)
+        a.p.fill('#ocnb_desc', 'أعمال الصرف'); a.p.fill('#ocnb_unit', 'م.ط'); a.p.fill('#ocnb_cq', '30'); a.p.fill('#ocnb_rate', '200')
+        a.p.click('[data-oc="nbsave"]'); a.p.wait_for_timeout(800)
+        P = [r for r in a.ev("window.__DB.owner_docs") if r['kind'] == 'proj'][0]['data']
+        expect(any(x['desc'] == 'أعمال الصرف' for x in P['boq']), '«+ بند جديد» ما اتضافش لملف المشروع')
+        expect(a.ev("OC.ce.data.lines.some(l=>l.desc==='أعمال الصرف'&&l.boq)"), '«+ بند جديد» ما اتضافش للمستخلص')
+        a.p.click('[data-oc="lreg"] >> nth=0'); a.p.wait_for_timeout(500)
+        expect(a.ev("S.sites.find(x=>x.id==='s1').igMode") == 'own', 'تسجيل بند عام ما حوّلش الموقع لتقسيم خاص')
+        a.p.click('[data-oc="lregall"]'); a.p.wait_for_timeout(500)
+        names = a.ev("igSiteGroups(S.sites.find(x=>x.id==='s1')).map(g=>g.name)")
+        expect('أعمال السباكة' in names and 'أعمال الصرف' in names, f'تسجيل كل البنود كبنود عامة ما اشتغلش ({names})')
+        expect(a.ev("igGroups(igPfOfSite('s2')).every(g=>g.name!=='أعمال الصرف')"), 'التسجيل أثّر على موقع تاني')
+        a.p.click('[data-oc="csave"]'); a.p.wait_for_timeout(800)
+        body = a.ev("ocDocBody(ocCerts('s1')[0]).body")
+        expect('الأسعار شاملة النقل' in body and 'oc-pgnote' in body and 'المصنعيات' not in body, 'الطباعة: الملاحظة أو أجزاء المصنعيات')
+        expect(a.ev("crBoqList('s1')[0].code") == '1.1', 'ترقيم البنود في مراجعة التكاليف')
+        a.check('مستخلص المالك بالمقايسة')
+    finally:
+        a.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq)]
 
 def main():
     from playwright.sync_api import sync_playwright
