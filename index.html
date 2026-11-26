@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#7a1416"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ADC حسابات"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>.sp-prev tr.ok-row td{color:var(--muted)}.chk-ed select{min-width:160px}@media print{.no-print{display:none!important}}.ent-bar{border:1px solid #c27a1a;background:rgba(217,130,43,.14)}.ni-li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ni-li>.linkish{flex:1;text-align:start}.ni-x{font-size:12px;padding:2px 10px;min-height:0}.ni-gx{display:flex;justify-content:flex-end;margin:-4px 0 8px}input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}.oc-band{background:var(--accent);color:var(--on-accent);font-weight:700;padding:6px 10px;border-radius:6px;margin:10px 0 4px}
-.oc-sec{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}.oc-sh{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.oc-src{font-size:.92em;margin-bottom:6px}
+.oc-sec{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}.oc-sno{min-width:1.6em;text-align:center}.oc-rows tr.oc-off td{opacity:.55}#pane .oc-rows select,#pane .oc-rows input:not([type=checkbox]){width:auto;min-width:0;padding:4px 6px}#pane .oc-rows input.w-d{width:170px}#pane .oc-rows input.w-n{width:80px}#pane .oc-rows input.w-p{width:50px}.oc-rows td{padding:4px}.oc-adv{white-space:nowrap}.oc-nb td{background:var(--accent-soft,#eef5ff)}.oc-sh{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.oc-src{font-size:.92em;margin-bottom:6px}
 table.oc-t input{padding:3px 5px;font-size:.92em}table.oc-t input{width:auto;min-width:0}table.oc-t .w-n{width:78px}table.oc-t .w-p{width:54px}table.oc-t .w-s{width:56px}table.oc-t .w-d{width:min(300px,48vw)}table.oc-t .w-m{width:120px}
 #pane .oc-pg select[data-octype],#pane .oc-pg .row select,#pane .oc-pg .row input:not([type=checkbox]),#pane .oc-pg .oc-sh select,#pane .oc-pg .oc-src select,#pane .oc-inl input,#pane .oc-inl select,#ocSum input{width:auto;display:inline-block;min-width:0}#ocSum input{width:90px}table.oc-t td{padding:4px 5px}
 tr.oc-part td{background:var(--sunk);font-weight:700}table.oc-t tr.tot td,#ocSum tr.tot td{font-weight:700;background:var(--sunk)}
@@ -1596,7 +1596,7 @@ const CR={rows:null,loaded:false,missing:false,busy:false,site:'',edit:null,msg:
    والكمية المنفذة من مستخلص مالك تختاره (الافتراضي آخر معتمد) = totQ × نسبة التنفيذ؛ والعرض بسعر الوحدة + الإجمالي. */
 const crProj=site=>typeof ocProj==='function'&&typeof OC!=='undefined'&&OC.loaded?ocProj(site):null;
 function crBoqList(site){const P=crProj(site);if(!P)return [];const secs=new Map((P.data.secs||[]).map((x,i)=>[x.id,{t:x.title||x.g||'',i}]));
-  return (P.data.boq||[]).map((b,k)=>({...b,sec:(secs.get(b.s)||{}).t||'',si:(secs.get(b.s)||{}).i??999,k})).sort((a,b)=>a.si-b.si||a.k-b.k)}
+  return (P.data.boq||[]).map((b,k)=>({...b,sec:(secs.get(b.s)||{}).t||'',si:(secs.get(b.s)||{}).i??999,k})).sort((a,b)=>a.si-b.si||a.k-b.k).map((b,_,A)=>({...b,code:b.si<999?(b.si+1)+'.'+(A.filter(x=>x.si===b.si).indexOf(b)+1):''}))}
 function crInfo(site,d){const b=d.boq?crBoqList(site).find(x=>x.id===d.boq):null;
   if(b)return {linked:true,name:String(b.desc||'').trim(),unit:b.unit||'',qty:crN(b.cq),rate:crN(b.rate),sec:b.sec,code:b.code||''};
   return {linked:false,name:d.name||'',unit:d.unit||'',qty:crN(d.qty),rate:crN(d.rate),sec:d.sec||'',code:''}}
@@ -9091,6 +9091,20 @@ function ocDefTpl(){return {name:'نموذج نسبة إشراف',head:['الم�
   rows:[{id:'w',k:'works',label:'إجمالي قيمة الأعمال',sign:1},{id:'sv',k:'pct',label:'نسبة الإشراف على الأعمال',sign:1,def:10},{id:'b',k:'sub',label:'إجمالي قيمة الأعمال مضافًا إليها نسبة الإشراف',sign:1},
     {id:'pp',k:'prev',label:'خصم السابق صرفه حتى تاريخ المستخلص',sign:-1},{id:'n',k:'net',label:'قيمة المستحق بعد الخصومات',sign:1}],
   sigs:['المهندس','مدير المشروع','الاستشاري','المالك']}}
+/* 26 نوفمبر: نموذج «بالمقايسة (بنود فقط)» + سطور الإجمالي على مستوى المشروع (P.data.rows):
+   كل سطر: on (يتحسب ويظهر)، sign (+/−)، mode (pct نسبة / amt مبلغ)، def (القيمة)، base (works إجمالي الأعمال حتى تاريخه / run الإجمالي حتى السطر ده).
+   adv = استرداد الدفعة المقدمة (P.data.adv = {amt, pct}) تراكمي لحد ما يخلص، والسابق صرفه بيطرح منه الدفعة المقدمة. */
+function ocBoqTpl(){return {name:'نموذج بالمقايسة (بنود فقط)',type:'boq',head:['المالك','الاستشاري','اسم المشروع','رقم العقد وتاريخه'],cols:Object.fromEntries(OC_COLS.map(([k])=>[k,true])),
+  parts:{lab:'own',sup:'none',srv:'none'},
+  rows:[{id:'w',k:'works',label:'إجمالي الأعمال حتى تاريخه',sign:1,on:true},{id:'vat',k:'pct',label:'ضريبة القيمة المضافة',sign:1,mode:'pct',def:14,base:'works',on:true},
+    {id:'adv',k:'adv',label:'استرداد الدفعة المقدمة',sign:-1,on:false},{id:'ret',k:'pct',label:'تأمين أعمال',sign:-1,mode:'pct',def:5,base:'works',on:true},
+    {id:'sv',k:'pct',label:'نسبة إشراف',sign:1,mode:'pct',def:10,base:'works',on:false},{id:'stp',k:'pct',label:'دمغات',sign:-1,mode:'amt',def:'',base:'works',on:false},
+    {id:'pp',k:'prev',label:'السابق صرفه (دفعات المالك)',sign:-1,on:true},{id:'n',k:'net',label:'المستحق',sign:1,on:true}],
+  sigs:['المهندس','مدير المشروع','الاستشاري','المالك']}}
+const ocIsBoq=T=>!!(T&&T.data&&T.data.type==='boq');
+/* سطور الإجمالي للمشروع: من ملف المشروع لو اتحددت، وإلا من النموذج (بقيم ملف المشروع القديمة vals) */
+function ocRowsOf(P,T){if(P&&Array.isArray(P.data.rows))return P.data.rows;const pv=(P&&P.data.vals)||{};
+  return ((T&&T.data.rows)||ocDefTpl().rows).map(r=>({...r,on:r.on!==false,def:r.k==='pct'&&pv[r.id]!=null&&pv[r.id]!==''?pv[r.id]:r.def}))}
 const ocSrc=(T,sec,part)=>{const v=(sec&&sec.parts&&sec.parts[part])||(T&&T.data.parts&&T.data.parts[part])||ocDefTpl().parts[part];return OC_SRCOK[part].includes(v)?v:'none'};
 /* ---------- الحركات (فواتير المخزن، المرتجعات، المصروفات) ---------- */
 function ocTypeOf(it){const t=(typeof itType==='function'&&itType(it))||(typeof itGuess==='function'&&itGuess(it))||'';return t==='sup'||t==='lab'||t==='srv'?t:(/توريد/.test(it||'')?'sup':'srv')}
@@ -9155,14 +9169,17 @@ function ocCalc(c,P,T,depth){
   const S2=secs.map((s,i)=>{const ls=L.filter(l=>s.id==='__none'?orphan.includes(l):l.s===s.id);const tot=r2(ls.reduce((a,l)=>a+ocV(l),0));
     const sp=c.data.secPrev||{},pv=pc?(pc.bySec[s.id]||0):sp[s.id]!=null?ocNum(sp[s.id]):r2(ls.reduce((a,l)=>a+ocVPrev(l),0));bySec[s.id]=tot;works=r2(works+tot);const pv2=Math.abs(tot-pv)<0.05?tot:pv;return {s,i:i+1,ls,tot,prev:pv2,cur:r2(tot-pv2)}});
   const prevW=pc?pc.works:r2(S2.reduce((a,x)=>a+x.prev,0));
-  const vals=c.data.vals||{},pv=(P&&P.data.vals)||{},rows=[];let run=works;
-  for(const r of (T&&T.data.rows)||ocDefTpl().rows){
+  const proj=!!(P&&Array.isArray(P.data.rows)),vals=c.data.vals||{},pv=(P&&P.data.vals)||{},rows=[];let run=works;
+  const RS=ocRowsOf(P,T),adv=(P&&P.data.adv)||{},advOn=RS.some(r=>r.k==='adv'&&r.on!==false)&&ocNum(adv.amt)>0;
+  for(const r of RS){if(r.on===false)continue;const sg=r.sign<0?-1:1;
     if(r.k==='works'){run=works;rows.push({...r,v:works,prev:prevW,cur:r2(works-prevW)});continue}
-    if(r.k==='pct'){const p=vals[r.id]!=null&&vals[r.id]!==''?ocNum(vals[r.id]):pv[r.id]!=null&&pv[r.id]!==''?ocNum(pv[r.id]):ocNum(r.def);const v=r2(works*p/100*(r.sign<0?-1:1));run=r2(run+v);rows.push({...r,p,v});continue}
-    if(r.k==='amt'){const v=r2(ocNum(vals[r.id])*(r.sign<0?-1:1));run=r2(run+v);rows.push({...r,v,a:vals[r.id]??''});continue}
-    if(r.k==='prev'){const ov=vals[r.id];const pp=ov!=null&&ov!==''?ocNum(ov):ocDeps(c.site_id,c.data.date);run=r2(run-pp);rows.push({...r,v:-pp,ov:ov!=null&&ov!==''});continue}
+    if(r.k==='pct'){const hv=(!proj||c.data.status==='approved')&&vals[r.id]!=null&&vals[r.id]!=='';if(r.mode==='amt'){const a=ocNum(hv?vals[r.id]:r.def);const v=r2(a*sg);run=r2(run+v);rows.push({...r,v,a});continue}
+      const p=hv?ocNum(vals[r.id]):proj?ocNum(r.def):pv[r.id]!=null&&pv[r.id]!==''?ocNum(pv[r.id]):ocNum(r.def);const v=r2((r.base==='run'?run:works)*p/100*sg);run=r2(run+v);rows.push({...r,p,v});continue}
+    if(r.k==='adv'){const A=ocNum(adv.amt),p=ocNum(adv.pct),cum=r2(Math.min(A,works*p/100)),pcum=pc?r2(Math.min(A,pc.works*p/100)):0;const v=-cum;run=r2(run+v);rows.push({...r,v,p,A,cum,left:r2(A-cum),cur:r2(cum-pcum)});continue}
+    if(r.k==='amt'){const v=r2(ocNum(vals[r.id])*sg);run=r2(run+v);rows.push({...r,v,a:vals[r.id]??''});continue}
+    if(r.k==='prev'){const ov=vals[r.id];let pp=ov!=null&&ov!==''?ocNum(ov):ocDeps(c.site_id,c.data.date);if(advOn&&!(ov!=null&&ov!==''))pp=Math.max(0,r2(pp-ocNum(adv.amt)));run=r2(run-pp);rows.push({...r,v:-pp,ov:ov!=null&&ov!=='',advOut:advOn});continue}
     rows.push({...r,v:run})}
-  return {secs:S2,works,prevW,rows,bySec,net:run};
+  return {secs:S2,works,prevW,rows,bySec,net:run,proj,note:String((P&&P.data.note)||'').trim()};
 }
 /* ترقيم السطور: رقم القسم . مسلسل (المصنعيات ثم التوريدات ثم النقل) */
 function ocCodes(sec){const m={};let n=0;for(const [p] of OC_PARTS)for(const l of sec.ls.filter(l=>(l.part||'lab')===p)){n++;m[l.id]=sec.i+'.'+n}return m}
@@ -9222,13 +9239,13 @@ function ocTplTab(){
   const L=ocTpls(),used=id=>OC.rows.filter(r=>r.kind==='proj'&&r.data.tpl===id).map(r=>siteNameOf(r.site_id)||'').filter(Boolean);
   return `<div class="card"><div class="sec-h">نماذج المستخلصات <span class="note">— قالب تعمله مرة وتستخدمه في أي مشروع. تعديل النموذج لا يغيّر المستخلصات المعتمدة.</span></div>
    ${L.length?`<div class="tbl-wrap"><table><thead><tr><th>النموذج</th><th>مستخدم في</th><th></th></tr></thead><tbody>${L.map(t=>`<tr><td class="tl"><b>${esc(t.data.name||'')}</b></td><td class="tl">${esc(used(t.id).join('، ')||'—')}</td><td>${ocTplCanEdit(t)?`<button type="button" class="ghost" data-oc="tedit" data-id="${esc(t.id)}">تعديل</button> `:''}<button type="button" class="ghost" data-oc="tcopy" data-id="${esc(t.id)}">نسخ</button>${ocTplCanEdit(t)&&!used(t.id).length?` <button type="button" class="ghost" data-oc="tdel" data-id="${esc(t.id)}">حذف</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">لا توجد نماذج بعد.</p>'}
-   <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="primary" data-oc="tnew" data-v="def">+ نموذج نسبة إشراف</button><button type="button" class="ghost" data-oc="tnew" data-v="blank">+ نموذج فارغ</button></div></div>`}
+   <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="primary" data-oc="tnew" data-v="boq">+ نموذج بالمقايسة (بنود فقط)</button><button type="button" class="ghost" data-oc="tnew" data-v="def">+ نموذج نسبة إشراف</button><button type="button" class="ghost" data-oc="tnew" data-v="blank">+ نموذج فارغ</button></div></div>`}
 function ocTplEdit(){const t=OC.te.data,sel=(p,v)=>`<select data-te="parts.${p}">${OC_SRCOK[p].map(k=>`<option value="${k}" ${v===k?'selected':''}>${OC_SRC[k]}</option>`).join('')}</select>`;
   return `<div class="card"><div class="sec-h">${OC.te.isNew?'نموذج جديد':'تعديل النموذج'}</div>
    <div class="fw"><label>اسم النموذج<input data-te="name" value="${esc(t.name||'')}"></label></div>
    <h4>1. بيانات الرأس</h4><div class="row" style="gap:6px;flex-wrap:wrap">${(t.head||[]).map((h,i)=>`<span class="chip">${esc(h)} <button type="button" class="linkish" data-oc="thdel" data-i="${i}" aria-label="حذف ${esc(h)}">✕</button></span>`).join('')}<input id="ocHeadNew" placeholder="خانة جديدة" style="width:140px"><button type="button" class="ghost" data-oc="thadd">+ خانة</button></div>
    <h4>2. أعمدة الجدول في الطباعة</h4><div class="row" style="gap:10px;flex-wrap:wrap">${OC_COLS.map(([k,l])=>`<label><input type="checkbox" data-te="cols.${k}" ${(t.cols||{})[k]!==false?'checked':''}> ${l}</label>`).join('')}</div>
-   <h4>3. تقسيم كل قسم (بند عام) والمصدر الافتراضي</h4><div class="tbl-wrap"><table><tbody>${OC_PARTS.map(([p,l])=>`<tr><td class="tl"><b>${l}</b></td><td>${sel(p,(t.parts||{})[p]||ocDefTpl().parts[p])}</td></tr>`).join('')}</tbody></table></div><p class="note">ولكل مشروع تقدر تغيّر مصدر قسم معيّن من ملف المشروع. وفي أي جزء تقدر تضيف سطرًا يدويًا.</p>
+   ${ocIsBoq({data:t})?'<h4>3. نوع النموذج</h4><p class="note">بالمقايسة: بنود ملف المشروع بس (من غير مصنعيات/توريدات/فواتير). سطور الإجمالي هنا افتراضية، وكل مشروع يعدّلها من «ملف المشروع».</p>':''}${ocIsBoq({data:t})?'<!--':''}<h4>3. تقسيم كل قسم (بند عام) والمصدر الافتراضي</h4><div class="tbl-wrap"><table><tbody>${OC_PARTS.map(([p,l])=>`<tr><td class="tl"><b>${l}</b></td><td>${sel(p,(t.parts||{})[p]||ocDefTpl().parts[p])}</td></tr>`).join('')}</tbody></table></div><p class="note">ولكل مشروع تقدر تغيّر مصدر قسم معيّن من ملف المشروع. وفي أي جزء تقدر تضيف سطرًا يدويًا.</p>${ocIsBoq({data:t})?'-->':''}
    <h4>4. سطور الإجمالي (بالترتيب)</h4><div class="tbl-wrap"><table><thead><tr><th>السطر</th><th>النوع</th><th>جمع/طرح</th><th>القيمة الافتراضية</th><th></th></tr></thead><tbody>${(t.rows||[]).map((r,i)=>`<tr><td><input data-te="rows.${i}.label" value="${esc(r.label||'')}"></td><td><select data-te="rows.${i}.k">${Object.entries(OC_RK).map(([k,l])=>`<option value="${k}" ${r.k===k?'selected':''}>${l}</option>`).join('')}</select></td><td>${r.k==='pct'||r.k==='amt'?`<select data-te="rows.${i}.sign"><option value="1" ${r.sign>=0?'selected':''}>+ يُضاف</option><option value="-1" ${r.sign<0?'selected':''}>− يُخصم</option></select>`:r.k==='prev'?'− يُخصم':''}</td><td>${r.k==='pct'?`<input data-te="rows.${i}.def" value="${esc(r.def??'')}" inputmode="decimal" style="width:70px"> %`:''}</td><td>${i?`<button type="button" class="linkish" data-oc="trup" data-i="${i}" aria-label="لأعلى">↑</button> `:''}<button type="button" class="linkish" data-oc="trdel" data-i="${i}" aria-label="حذف السطر">✕</button></td></tr>`).join('')}</tbody></table></div>
    <button type="button" class="ghost" data-oc="tradd">+ سطر إجمالي</button><p class="note">أمثلة: نسبة الإشراف (نسبة تُضاف)، تأمين أعمال أو ضرائب (نسبة تُخصم)، دمغات (مبلغ يُخصم).</p>
    <h4>5. أماكن اللوجوهات في رأس الطباعة و Excel</h4><div class="row" style="gap:10px;flex-wrap:wrap">${[['r','يمين'],['m','النص'],['l','شمال']].map(([k,l])=>`<label>${l} <select data-te="logos.${k}">${OC_LOGOS.map(([v,t])=>`<option value="${v}" ${ocLogoPos(OC.te)[k]===v?'selected':''}>${t}</option>`).join('')}</select></label>`).join('')}</div>
@@ -9241,28 +9258,47 @@ function ocNewProjData(site,tplId){const T=OC.rows.find(r=>r.id===tplId),pf=site
   return {tpl:tplId,head,vals:{},secs:gs.map(g=>({id:'s'+newId(),g,title:g,parts:{}})),boq:[],rev:{},oldTo:''}}
 function ocProjTab(site){
   const P=ocProj(site.id),tpls=ocTpls();
-  if(!P&&!OC.pe){return `<div class="card"><div class="sec-h">إنشاء ملف مستخلص المشروع — ${esc(site.name)}</div>${tpls.length?`<div class="row" style="gap:8px;align-items:center"><label for="ocNewTpl">النموذج</label><select id="ocNewTpl">${tpls.map(t=>`<option value="${esc(t.id)}">${esc(t.data.name)}</option>`).join('')}</select><button type="button" class="primary" data-oc="pnew">إنشاء ملف المشروع</button></div>`:`<p class="note">لا يوجد نموذج بعد.</p><button type="button" class="primary" data-oc="pnewdef">إنشاء «نموذج نسبة إشراف» وملف المشروع</button>`}
+  if(!P&&!OC.pe){return `<div class="card"><div class="sec-h">إنشاء ملف مستخلص المشروع — ${esc(site.name)}</div><div class="row" style="gap:8px;align-items:center"><label for="ocNewTpl">النموذج</label><select id="ocNewTpl">${tpls.some(t=>ocIsBoq(t))?'':'<option value="__boq" selected>نموذج بالمقايسة (بنود فقط) — جديد</option>'}${tpls.slice().sort((a,b)=>ocIsBoq(b)-ocIsBoq(a)).map((t,i)=>`<option value="${esc(t.id)}" ${i===0&&ocIsBoq(t)?'selected':''}>${esc(t.data.name)}</option>`).join('')}</select><button type="button" class="primary" data-oc="pnew">إنشاء ملف المشروع</button></div>
     <p class="note" style="margin-top:10px">أو استورد آخر مستخلص للمشروع من Excel (مثل مستخلص رقم 3)، وسيتكوّن ملف المشروع منه: الأقسام وبنود تعاقد المالك، والمستخلص الجديد يكمّل منه.</p>${ocImpBtn()}${ocImpCard(site)}</div>`}
-  const d=ocPeOf(site);if(!d)return '';const T=OC.rows.find(r=>r.id===d.tpl),pf=site._p||'',gs=igNames(pf);
+  const d=ocPeOf(site);if(!d)return '';const T=OC.rows.find(r=>r.id===d.tpl),pf=site._p||'',gs=igNames(igPfOfSite(site.id));
+  if(!Array.isArray(d.rows))d.rows=ocClone(ocRowsOf({data:d},T));d.adv=d.adv||{amt:'',pct:''};
   const used=id=>ocCerts(site.id).some(c=>(c.data.lines||[]).some(l=>l.s===id));
   const pctRows=((T&&T.data.rows)||[]).filter(r=>r.k==='pct');
   const secRow=(s,i)=>{const boq=(d.boq||[]).map((b,j)=>({b,j})).filter(x=>x.b.s===s.id);
-    return `<div class="oc-sec" data-ocdrop="${i}"><div class="oc-sh"><span class="oc-hdl" draggable="true" data-ocdrag="${i}" title="اسحب لتغيير الترتيب" aria-hidden="true">⠿</span><input type="number" class="oc-ord" min="1" max="${(d.secs||[]).length}" value="${i+1}" data-ocsord="${i}" aria-label="ترتيب القسم — اكتب الرقم" title="اكتب الرقم والقسم يتنقل لمكانه"><b style="flex:1;min-width:140px">${esc(s.g||s.title||'')}</b><select data-pe="secs.${i}.g" aria-label="البند العام"><option value="">— من غير بند عام —</option>${gs.map(g=>`<option ${regNormK(g)===regNormK(s.g)?'selected':''}>${esc(g)}</option>`).join('')}</select>
+    const sn=i+1;let bn=0;
+    return `<div class="oc-sec" data-ocdrop="${i}"><div class="oc-sh"><span class="oc-hdl" draggable="true" data-ocdrag="${i}" title="اسحب لتغيير الترتيب" aria-hidden="true">⠿</span><b class="oc-sno">${sn}</b><input type="number" class="oc-ord" min="1" max="${(d.secs||[]).length}" value="${i+1}" data-ocsord="${i}" aria-label="ترتيب القسم — اكتب الرقم" title="اكتب الرقم والقسم يتنقل لمكانه"><b style="flex:1;min-width:140px">${esc(s.g||s.title||'')}</b><select data-pe="secs.${i}.g" aria-label="البند العام"><option value="">— من غير بند عام —</option>${gs.map(g=>`<option ${regNormK(g)===regNormK(s.g)?'selected':''}>${esc(g)}</option>`).join('')}</select>
       ${i?`<button type="button" class="linkish" data-oc="sup" data-i="${i}" aria-label="لأعلى">↑</button>`:''}</div>
-     <div class="row oc-src" style="gap:10px;flex-wrap:wrap">${OC_PARTS.map(([p,l])=>`<label>${l}: <select data-pe="secs.${i}.parts.${p}"><option value="">النموذج (${OC_SRC[ocSrc(T,null,p)]})</option>${OC_SRCOK[p].map(k=>`<option value="${k}" ${(s.parts||{})[p]===k?'selected':''}>${OC_SRC[k]}</option>`).join('')}</select></label>`).join('')}</div>
-     ${ocSrc(T,s,'lab')==='own'||boq.length?`<div class="tbl-wrap"><table class="oc-t"><thead><tr><th>البيان (توصيف المالك)</th><th>الوحدة</th><th>كمية التعاقد</th><th>الفئة</th><th></th></tr></thead><tbody>${boq.map(({b,j})=>`<tr><td><input data-pe="boq.${j}.desc" value="${esc(b.desc||'')}" class="w-d"></td><td><input data-pe="boq.${j}.unit" value="${esc(b.unit||'')}" class="w-s"></td><td><input data-pe="boq.${j}.cq" value="${esc(b.cq??'')}" inputmode="decimal" class="w-n"></td><td><input data-pe="boq.${j}.rate" value="${esc(b.rate??'')}" inputmode="decimal" class="w-n"></td><td><button type="button" class="linkish" data-oc="bdel" data-i="${j}" aria-label="حذف البند">✕</button></td></tr>`).join('')||'<tr><td colspan="5" class="note">لا توجد بنود تعاقد للمالك في هذا القسم.</td></tr>'}</tbody></table></div>
+     ${ocIsBoq(T)?'':`<div class="row oc-src" style="gap:10px;flex-wrap:wrap">`}${ocIsBoq(T)?'':OC_PARTS.map(([p,l])=>`<label>${l}: <select data-pe="secs.${i}.parts.${p}"><option value="">النموذج (${OC_SRC[ocSrc(T,null,p)]})</option>${OC_SRCOK[p].map(k=>`<option value="${k}" ${(s.parts||{})[p]===k?'selected':''}>${OC_SRC[k]}</option>`).join('')}</select></label>`).join('')+'</div>'}
+     ${ocSrc(T,s,'lab')==='own'||boq.length?`<div class="tbl-wrap"><table class="oc-t"><thead><tr><th>م</th><th>البيان (توصيف المالك)</th><th>الوحدة</th><th>كمية التعاقد</th><th>الفئة</th><th></th></tr></thead><tbody>${boq.map(({b,j})=>`<tr><td class="n">${sn}.${++bn}</td><td><input data-pe="boq.${j}.desc" value="${esc(b.desc||'')}" class="w-d"></td><td><input data-pe="boq.${j}.unit" value="${esc(b.unit||'')}" class="w-s"></td><td><input data-pe="boq.${j}.cq" value="${esc(b.cq??'')}" inputmode="decimal" class="w-n"></td><td><input data-pe="boq.${j}.rate" value="${esc(b.rate??'')}" inputmode="decimal" class="w-n"></td><td><button type="button" class="linkish" data-oc="bdel" data-i="${j}" aria-label="حذف البند">✕</button></td></tr>`).join('')||'<tr><td colspan="6" class="note">لا توجد بنود تعاقد للمالك في هذا القسم.</td></tr>'}</tbody></table></div>
      <div class="row" style="gap:8px"><button type="button" class="ghost" data-oc="badd" data-s="${esc(s.id)}">+ بند تعاقد</button><span class="filebtn"><button type="button" class="ghost">استيراد بنود من Excel</button><input type="file" data-ocboq="${esc(s.id)}" accept=".xlsx" aria-label="استيراد بنود تعاقد من Excel"></span></div>`:''}</div>`};
   const miss=gs.filter(g=>!(d.secs||[]).some(s=>regNormK(s.g)===regNormK(g)));
   return `<div class="card"><div class="sec-h">ملف مستخلص المشروع — ${esc(site.name)} ${OC.dirty?'<span class="chip wait">تعديلات غير محفوظة</span>':''}</div>
    <div class="row" style="gap:8px;flex-wrap:wrap"><label>النموذج <select data-pe="tpl">${tpls.map(t=>`<option value="${esc(t.id)}" ${t.id===d.tpl?'selected':''}>${esc(t.data.name)}</option>`).join('')}</select></label>
    ${Object.keys(d.head||{}).concat(((T&&T.data.head)||[]).filter(h=>!(h in (d.head||{})))).map(h=>`<label>${esc(h)} <input data-pe="head.${esc(h)}" value="${esc((d.head||{})[h]||'')}"></label>`).join('')}
-   ${pctRows.map(r=>`<label>${esc(r.label)} % <input data-pe="vals.${esc(r.id)}" value="${esc((d.vals||{})[r.id]??r.def??'')}" inputmode="decimal" style="width:70px"></label>`).join('')}</div>
+</div>
    <div class="row" style="gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px">${[['owner','لوجو المالك'],['cons','لوجو الاستشاري']].map(([k,l])=>`<span class="oc-logo"><b>${l}</b> ${(d.logos||{})[k]?`<img src="${esc(d.logos[k])}" alt="${l}" style="max-height:34px;max-width:110px;vertical-align:middle"> <button type="button" class="linkish" data-oc="lgdel" data-k="${k}">شيل</button> `:''}<span class="filebtn"><button type="button" class="ghost">${(d.logos||{})[k]?'تغيير':'+ رفع صورة'}</button><input type="file" accept="image/png,image/jpeg" data-oclogo="${k}" aria-label="${l}"></span></span>`).join('')}<span class="note">لوجو الشركة من «الإعدادات ← شكل التقارير». الأماكن من النموذج.</span></div>
    <div class="row" style="gap:8px;align-items:center;margin-top:8px"><label>الحركات حتى تاريخ <input type="date" data-pe="oldTo" value="${esc(d.oldTo||'')}"></label><span class="note">تُعتبر داخلة في مستخلصات سابقة (قبل استخدام التطبيق).</span></div></div>
+   ${ocRowsEditHTML(site,d,T)}
    <div class="card"><div class="sec-h">الأقسام بترتيب المستخلص وبنود تعاقد المالك</div><p class="note">القسم = بند عام، ويمكن تعديل اسمه في المطبوع. للترتيب: اكتب رقم القسم في الخانة المقابلة له، أو اسحبه من ⠿، أو استخدم ↑. المصدر لكل جزء من النموذج، ويمكنك تغييره لقسم معيّن هنا.</p>
    ${(d.secs||[]).map(secRow).join('')}
    <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="ghost" data-oc="sadd">+ قسم</button>${miss.length?`<span class="note">بنود عامة ليست أقسامًا: ${miss.map(esc).join('، ')}</span> <button type="button" class="ghost" data-oc="saddall">أضفها كلها</button>`:''}</div></div>
    <div class="row" style="gap:8px"><button type="button" class="primary" data-oc="psave">حفظ ملف المشروع</button>${OC.dirty?'<button type="button" class="ghost" data-oc="pundo">تجاهل التعديلات</button>':''}</div>`}
+/* ---------- سطور الإجمالي والضرائب لكل مشروع (26 نوفمبر) ---------- */
+function ocRowsEditHTML(site,d,T){const R=d.rows||[],fixed=k=>['works','net','prev','sub','adv'].includes(k),others=ocProjects().filter(x=>x.site_id!==site.id);
+  const row=(r,i)=>`<tr${r.on===false?' class="oc-off"':''}><td>${r.k==='works'||r.k==='net'?'':`<input type="checkbox" data-pe="rows.${i}.on" ${r.on!==false?'checked':''} aria-label="يتحسب">`}</td>
+   <td><input data-pe="rows.${i}.label" value="${esc(r.label||'')}" class="w-d" aria-label="اسم السطر"></td>
+   <td>${fixed(r.k)?`<span class="note">${{works:'إجمالي الأعمال',net:'النهائي',prev:'خصم تلقائي',sub:'إجمالي حتى هنا',adv:'خصم'}[r.k]}</span>`:`<select data-pe="rows.${i}.sign"><option value="1" ${+r.sign>0?'selected':''}>+ إضافة</option><option value="-1" ${+r.sign<0?'selected':''}>− خصم</option></select>`}</td>
+   <td>${r.k==='pct'?`<select data-pe="rows.${i}.mode"><option value="pct" ${r.mode!=='amt'?'selected':''}>نسبة ٪</option><option value="amt" ${r.mode==='amt'?'selected':''}>مبلغ</option></select>`:r.k==='amt'?'<span class="note">مبلغ في كل مستخلص</span>':''}</td>
+   <td>${r.k==='pct'?`<input data-pe="rows.${i}.def" value="${esc(r.def??'')}" inputmode="decimal" class="w-n" aria-label="القيمة">`:r.k==='adv'?`<span class="oc-adv">المبلغ <input data-pe="adv.amt" value="${esc(d.adv.amt??'')}" inputmode="decimal" class="w-n" aria-label="مبلغ الدفعة المقدمة"> يُسترد <input data-pe="adv.pct" value="${esc(d.adv.pct??'')}" inputmode="decimal" class="w-p" aria-label="نسبة الاسترداد"> ٪ من الأعمال</span>`:''}</td>
+   <td>${r.k==='pct'&&r.mode!=='amt'?`<select data-pe="rows.${i}.base"><option value="works" ${r.base!=='run'?'selected':''}>إجمالي الأعمال</option><option value="run" ${r.base==='run'?'selected':''}>الإجمالي حتى هنا</option></select>`:''}</td>
+   <td class="acts">${i>1?`<button type="button" class="linkish" data-oc="rup" data-i="${i}" aria-label="لأعلى">↑</button>`:''}${fixed(r.k)&&r.k!=='sub'&&r.k!=='adv'?'':`<button type="button" class="linkish" data-oc="rdel" data-i="${i}" aria-label="حذف">✕</button>`}</td></tr>`;
+  return `<div class="card"><div class="sec-h">سطور الإجمالي والضرائب في هذا المشروع</div>
+  <p class="note" style="margin-top:0">علّم اللي يتحسب ويظهر في المستخلص، وحدد النسبة أو المبلغ. كل الحسابات تراكمية على «إجمالي الأعمال حتى تاريخه». التغيير هنا لكل مستخلصات المشروع (المعتمد القديم يحتفظ بأي نسبة اتكتبت جواه).</p>
+  <div class="tbl-wrap"><table class="oc-t oc-rows"><thead><tr><th></th><th>السطر</th><th>إضافة/خصم</th><th>النوع</th><th>القيمة</th><th>محسوبة على</th><th></th></tr></thead><tbody>${R.map(row).join('')}</tbody></table></div>
+  <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="ghost" data-oc="radd" data-v="tax">+ ضريبة</button><button type="button" class="ghost" data-oc="radd" data-v="ded">+ خصم</button><button type="button" class="ghost" data-oc="radd" data-v="add">+ إضافة</button>${R.some(r=>r.k==='adv')?'':'<button type="button" class="ghost" data-oc="radd" data-v="adv">+ استرداد دفعة مقدمة</button>'}<button type="button" class="ghost" data-oc="radd" data-v="sub">+ إجمالي حتى هنا</button></div>
+  <div class="f" style="margin-top:10px"><label for="oc_note">ملاحظة عامة (تظهر في كل صفحات طباعة المستخلص)</label><input id="oc_note" data-pe="note" value="${esc(d.note||'')}" maxlength="300" placeholder="مثال: الأسعار شاملة ضريبة القيمة المضافة"></div>
+  ${others.length?`<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><span>استيراد الإعدادات من مشروع:</span><select id="oc_rimp" style="width:auto">${others.map(x=>`<option value="${esc(x.site_id)}">${esc(siteNameOf(x.site_id))}</option>`).join('')}</select><button type="button" class="ghost" data-oc="rimp">استيراد</button><span class="note">بينسخ سطور الإجمالي والنسب والملاحظة (من غير مبلغ الدفعة المقدمة).</span></div>`:''}</div>`}
+const ocProjects=()=>OC.rows.filter(r=>r.kind==='proj');
 /* ---------- مصاريف الشركة ---------- */
 function ocCoTab(site){
   const co=ocCoList(site.id),coS=ocCoSet(site.id),E=S.exp.filter(e=>e.siteId===site.id&&!e.deleted&&!e._priv);
@@ -9318,15 +9354,15 @@ function ocCertTab(site){
 function ocCeOf(c){if(!OC.ce||OC.ce.id!==c.id){OC.ce=ocClone(c);OC.ceBase=+(c.data.ver||0);OC.dirty=false}return OC.ce}
 function ocCertEdit(site,P,T,c0){
   const appr=c0.data.status==='approved',c=appr?c0:ocCeOf(c0);if(!appr&&!OC.dirty)ocRefresh(c,site,P,T);
-  const K=ocCalc(c,P,T),R=ocReview(site),num=(l,f,w)=>appr?esc(l[f]??''):`<input data-cl="${esc(l.id)}|${f}" value="${esc(l[f]??'')}" inputmode="decimal" class="${w||'w-n'}" aria-label="${f}">`;
+  const K=ocCalc(c,P,T),R=ocReview(site),BQ=ocIsBoq(T),boss=BQ&&!appr&&siteBoss(site),regd=new Set(BQ&&site.igMode!=='off'?igGroups(igPfOfSite(site.id)).map(g=>regNormK(g.name)):[]),num=(l,f,w)=>appr?esc(l[f]??''):`<input data-cl="${esc(l.id)}|${f}" value="${esc(l[f]??'')}" inputmode="decimal" class="${w||'w-n'}" aria-label="${f}">`;
   const line=(l,code)=>{const isInv=/^[ic]:/.test(l.src||'');const note=[l.note,l.numNote].filter(Boolean).join(' — ');
     return `<tr${l.gone?' class="bad"':''}><td class="n">${code}</td><td class="tl">${appr?esc(l.desc||''):`<input data-cl="${esc(l.id)}|desc" value="${esc(l.desc||'')}" class="w-d" aria-label="البيان">`}${l.gone?' <span class="neg">⚠ الحركة حُذفت</span>':''}</td><td>${appr?esc(l.unit||''):`<input data-cl="${esc(l.id)}|unit" value="${esc(l.unit||'')}" class="w-s" aria-label="الوحدة">`}</td>
      <td class="n">${num(l,'cq')}</td><td class="n">${isInv?fmt(ocNum(l.rate)):num(l,'rate')}</td><td class="n">${esc(fmt(ocNum(l.prevQ)))}</td><td class="n">${num(l,'totQ')}</td><td class="n" id="occ_${esc(l.id)}">${fmt(r2(ocNum(l.totQ)-ocNum(l.prevQ)))}</td><td class="n">${num(l,'pct','w-p')}</td><td class="n b" id="ocv_${esc(l.id)}">${fmt(ocV(l))}</td>
-     <td class="tl">${appr?esc(note):`<input data-cl="${esc(l.id)}|note" value="${esc(l.note||'')}" class="w-m" aria-label="ملاحظات">${l.numNote?`<div class="note">${esc(l.numNote)}</div>`:''}`}</td>${appr?'':`<td><button type="button" class="linkish" data-oc="ldel" data-id="${esc(l.id)}" aria-label="حذف السطر">✕</button></td>`}</tr>`};
-  const head=`<tr><th>م</th><th>البيان</th><th>الوحدة</th><th>كمية التعاقد</th><th>الفئة</th><th>سابق</th><th>إجمالي الحصر${appr?'':' ✎'}</th><th>حالي</th><th>نسبة التنفيذ %</th><th>الإجمالي</th><th>ملاحظات</th>${appr?'':'<th></th>'}</tr>`;
+     <td class="tl">${appr?esc(note):`<input data-cl="${esc(l.id)}|note" value="${esc(l.note||'')}" class="w-m" aria-label="ملاحظات">${l.numNote?`<div class="note">${esc(l.numNote)}</div>`:''}`}</td>${appr?'':`<td><button type="button" class="linkish" data-oc="ldel" data-id="${esc(l.id)}" aria-label="حذف السطر">✕</button></td>`}${BQ?`<td>${!(l.desc||'').trim()?'':regd.has(regNormK(l.desc))?'<span class="chip ok">✓ بند عام</span>':boss?`<button type="button" class="linkish" data-oc="lreg" data-id="${esc(l.id)}">سجّله</button>`:''}</td>`:''}</tr>`};
+  const head=`<tr><th>م</th><th>البيان</th><th>الوحدة</th><th>كمية التعاقد</th><th>الفئة</th><th>سابق</th><th>إجمالي الحصر${appr?'':' ✎'}</th><th>حالي</th><th>نسبة التنفيذ %</th><th>الإجمالي</th><th>ملاحظات</th>${appr?'':'<th></th>'}${BQ?'<th>بند عام</th>':''}</tr>`;
   const secHTML=x=>{const codes=ocCodes(x);if(!x.ls.length&&appr)return '';
-    return `<div class="oc-band">${x.i} — ${esc(x.s.g||x.s.title||'')}</div><div class="tbl-wrap"><table class="oc-t"><thead>${head}</thead><tbody>${OC_PARTS.map(([p,pl])=>{const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length&&appr)return '';return `<tr class="oc-part"><td colspan="${appr?11:12}">${pl}${appr?'':` <button type="button" class="linkish" data-oc="ladd" data-s="${esc(x.s.id)}" data-p="${p}">+ سطر</button>`}</td></tr>${ls.map(l=>line(l,codes[l.id])).join('')}`}).join('')}
-      <tr class="tot"><td colspan="9">إجمالي البند العام — ${esc(x.s.g||x.s.title||'')}</td><td class="n b" id="ocst_${esc(x.s.id)}">${fmt(x.tot)}</td><td colspan="${appr?1:2}"></td></tr></tbody></table></div>`};
+    return `<div class="oc-band">${x.i} — ${esc(x.s.g||x.s.title||'')}</div><div class="tbl-wrap"><table class="oc-t"><thead>${head}</thead><tbody>${BQ?x.ls.map(l=>line(l,codes[l.id])).join('')+(appr?'':ocNbRow(x.s.id,appr)):OC_PARTS.map(([p,pl])=>{const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length&&appr)return '';return `<tr class="oc-part"><td colspan="${appr?11:12}">${pl}${appr?'':` <button type="button" class="linkish" data-oc="ladd" data-s="${esc(x.s.id)}" data-p="${p}">+ سطر</button>`}</td></tr>${ls.map(l=>line(l,codes[l.id])).join('')}`}).join('')}
+      <tr class="tot"><td colspan="9">إجمالي البند العام — ${esc(x.s.g||x.s.title||'')}</td><td class="n b" id="ocst_${esc(x.s.id)}">${fmt(x.tot)}</td><td colspan="${(appr?1:2)+(BQ?1:0)}"></td></tr></tbody></table></div>`};
   const filled=K.secs.filter(x=>x.ls.length),empty=K.secs.filter(x=>!x.ls.length&&x.s.id!=='__none');
   const cf=OC.conf&&OC.conf.id===c.id?`<div class="card" style="background:var(--danger-soft)"><b>عُدِّلت المسودة من «${esc(OC.conf.theirs.editBy||'مستخدم آخر')}»${OC.conf.theirs.editAt?' الساعة '+esc(stamp(OC.conf.theirs.editAt).slice(11)):''} بعد أن فتحتها أنت.</b><p>لم يُحفظ تعديلك حتى لا يمحو تعديله.</p><div class="row" style="gap:8px"><button type="button" class="primary" data-oc="cfnew">افتح النسخة الجديدة</button><button type="button" class="ghost" data-oc="cfmine">احفظ تعديلي فوقه</button></div></div>`:'';
   return cf+`<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><button type="button" class="ghost" data-oc="close">← المستخلصات</button><h3 style="margin:0">مستخلص رقم (${esc(c.data.no)})</h3><span class="chip ${appr?'ok':'wait'}">${appr?'معتمد':'مسودة'}</span>${OC.dirty?'<span class="chip wait">تعديلات غير محفوظة</span>':''}
@@ -9335,13 +9371,23 @@ function ocCertEdit(site,P,T,c0){
     ${!appr?'<p class="note">تكتب «إجمالي الحصر» ويُحسب الحالي تلقائيًا (الإجمالي − السابق). يُكتب خصم الاستشاري في نسبة التنفيذ (مثل 92.6). كل خانة قابلة للتعديل حتى الاعتماد.</p>':''}</div>
    <div class="card" id="ocSum">${ocSumHTML(c,K,appr)}</div>
    ${filled.map(secHTML).join('')}
-   ${!appr&&empty.length?`<div class="card"><div class="sec-h">أقسام من غير سطور</div><div class="row" style="gap:6px;flex-wrap:wrap">${empty.map(x=>`<span class="chip">${x.i} — ${esc(x.s.g||x.s.title)} <button type="button" class="linkish" data-oc="ladd" data-s="${esc(x.s.id)}" data-p="lab">+ سطر</button></span>`).join('')}</div></div>`:''}
+   ${!appr&&empty.length?`<div class="card"><div class="sec-h">أقسام من غير سطور</div><div class="row" style="gap:6px;flex-wrap:wrap">${empty.map(x=>`<span class="chip">${x.i} — ${esc(x.s.g||x.s.title)} <button type="button" class="linkish" data-oc="${BQ?'nbopen':'ladd'}" data-s="${esc(x.s.id)}" data-p="lab">${BQ?'+ بند جديد':'+ سطر'}</button></span>`).join('')}</div>${BQ&&OC.nb&&empty.some(x=>x.s.id===OC.nb)?`<div class="tbl-wrap"><table class="oc-t"><tbody>${ocNbRow(OC.nb,false)}</tbody></table></div>`:''}</div>`:''}
+   ${boss?`<div class="card"><div class="sec-h">البنود العامة للموقع</div><p class="note" style="margin-top:0">«سجّله» يضيف بند المستخلص كبند عام للموقع (يتحول الموقع لتقسيم خاص بيه لو كان على المشترك، بنسخة منه).</p><div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="ghost" data-oc="lregall">تسجيل كل البنود كبنود عامة</button><button type="button" class="ghost" data-oc="lregnew">+ بند عام آخر للموقع</button></div></div>`:''}
    <div class="row" style="gap:8px;flex-wrap:wrap">${appr?'':`<button type="button" class="primary" data-oc="csave">حفظ المسودة</button>`}<button type="button" class="ghost" data-oc="cprint">طباعة / PDF</button><button type="button" class="ghost" data-oc="cxl">Excel</button>
     ${appr?(S.isManager?`<button type="button" class="ghost" data-oc="creopen">فتح الاعتماد (للمدير)</button>`:''):`<button type="button" class="primary" data-oc="cappr">اعتماد بعد مراجعة الاستشاري</button><button type="button" class="ghost" data-oc="cdel">حذف المسودة</button>`}</div>
    ${appr?'':'<p class="note">قبل الاعتماد: عدّل الأرقام بما اعتمده الاستشاري. بعد الاعتماد يُقفل المستخلص، ويُكمل المستخلص التالي منه.</p>'}`}
+function ocNbRow(sid,appr){if(appr)return '';
+  if(OC.nb!==sid)return `<tr class="oc-part"><td colspan="13"><button type="button" class="linkish" data-oc="nbopen" data-s="${esc(sid)}">+ بند جديد</button> <span class="note">(يتضاف لبنود ملف المشروع كمان)</span></td></tr>`;
+  return `<tr class="oc-nb"><td></td><td class="tl"><input id="ocnb_desc" class="w-d" placeholder="البيان" aria-label="البيان"></td><td><input id="ocnb_unit" class="w-s" placeholder="الوحدة" aria-label="الوحدة"></td><td><input id="ocnb_cq" class="w-n" inputmode="decimal" placeholder="كمية التعاقد" aria-label="كمية التعاقد"></td><td><input id="ocnb_rate" class="w-n" inputmode="decimal" placeholder="الفئة" aria-label="الفئة"></td><td colspan="8"><button type="button" class="primary" data-oc="nbsave" data-s="${esc(sid)}">إضافة البند</button> <button type="button" class="ghost" data-oc="nbcancel">إلغاء</button></td></tr>`}
+/* تسجيل بنود كبنود عامة للموقع: لو الموقع على التقسيم المشترك بيتحول لخاص بنسخة منه */
+function ocRegGen(site,names){names=[...new Set(names.map(x=>String(x||'').trim()).filter(Boolean))];if(!names.length)return 0;
+  if(site.igMode==='off'&&!confirm('البنود العامة مقفولة لهذا الموقع. تشغيل تقسيم خاص بالموقع؟'))return 0;
+  if(site.igMode!=='own'){if(site.igMode!=='off')igSiteCopy(site,igSplit(site._p||'').base??(site._p||''));igSiteMode(site,'own')}
+  const s2=S.sites.find(x=>x.id===site.id)||site,have=new Set(igSiteGroups(s2).map(g=>regNormK(g.name)));let n=0;
+  for(const nm of names)if(!have.has(regNormK(nm))){igSiteNew(s2,nm,[]);have.add(regNormK(nm));n++}return n}
 function ocSumHTML(c,K,appr){
   return `<div class="sec-h">ملخص الأعمال</div><div class="tbl-wrap"><table><thead><tr><th>م</th><th>البند العام</th><th>السابق</th><th>الحالي</th><th>الإجمالي</th></tr></thead><tbody>${K.secs.filter(x=>x.ls.length||x.prev).map(x=>`<tr><td class="n">${x.i}</td><td class="tl">${esc(x.s.g||x.s.title||'')}</td><td class="n">${fmt(x.prev)}</td><td class="n">${fmt(x.cur)}</td><td class="n b">${fmt(x.tot)}</td></tr>`).join('')}</tbody>
-   <tfoot>${K.rows.map(r=>`<tr${r.k==='works'||r.k==='sub'||r.k==='net'?' class="tot"':''}><td></td><td class="tl">${esc(r.label)}${r.k==='pct'?' — '+(appr?esc(fmt(r.p)):`<input data-cv="${esc(r.id)}" value="${esc((c.data.vals||{})[r.id]??r.p)}" inputmode="decimal" class="w-p" aria-label="النسبة">`)+' %':''}${r.k==='prev'&&!r.ov?' <span class="note">(دفعات المالك حتى تاريخ المستخلص)</span>':''}</td><td class="n">${r.k==='works'?fmt(r.prev):''}</td><td class="n">${r.k==='works'?fmt(r.cur):''}</td><td class="n b">${r.k==='amt'&&!appr?`<input data-cv="${esc(r.id)}" value="${esc(r.a)}" inputmode="decimal" class="w-n" aria-label="${esc(r.label)}">`:fmt(r.v)}</td></tr>`).join('')}</tfoot></table></div>`}
+   <tfoot>${K.rows.map(r=>{const ro=appr||K.proj;return `<tr${r.k==='works'||r.k==='sub'||r.k==='net'?' class="tot"':''}><td></td><td class="tl">${esc(r.label)}${r.k==='pct'&&r.mode!=='amt'?' — '+(ro?esc(fmt(r.p)):`<input data-cv="${esc(r.id)}" value="${esc((c.data.vals||{})[r.id]??r.p)}" inputmode="decimal" class="w-p" aria-label="النسبة">`)+' %':''}${r.k==='adv'?' — '+fmt(r.p)+' % <span class="note">(الدفعة '+fmt(r.A)+' · المسترد حتى تاريخه '+fmt(r.cum)+' · المتبقي '+fmt(r.left)+')</span>':''}${r.k==='prev'&&!r.ov?' <span class="note">(دفعات المالك حتى تاريخ المستخلص'+(r.advOut?' من غير الدفعة المقدمة':'')+')</span>':''}</td><td class="n">${r.k==='works'?fmt(r.prev):''}</td><td class="n">${r.k==='works'?fmt(r.cur):''}</td><td class="n b">${r.k==='amt'&&!appr?`<input data-cv="${esc(r.id)}" value="${esc(r.a)}" inputmode="decimal" class="w-n" aria-label="${esc(r.label)}">`:fmt(r.v)}</td></tr>`}).join('')}</tfoot></table></div>${K.note?`<p class="note"><b>ملاحظة:</b> ${esc(K.note)}</p>`:''}${K.proj?'<p class="note">سطور الإجمالي والضرائب من «ملف المشروع».</p>':''}`}
 /* تحديث الأرقام وإنت بتكتب من غير ما الصفحة تتعاد */
 function ocLive(){const site=S.sites.find(s=>s.id===OC.site),c=OC.ce;if(!site||!c)return;const P=ocProj(site.id),T=ocTplOf(P),K=ocCalc(c,P,T);
   for(const l of c.data.lines||[]){const a=document.getElementById('ocv_'+l.id),b=document.getElementById('occ_'+l.id);if(a)a.textContent=fmt(ocV(l));if(b)b.textContent=fmt(r2(ocNum(l.totQ)-ocNum(l.prevQ)))}
@@ -9354,14 +9400,15 @@ function ocDocBody(c){
   const info=Object.entries(head).filter(([k,v])=>v).map(([k,v])=>`<span><b>${esc(k)}:</b> ${esc(v)}</span>`).join(' · ');
   let body=`<p class="sub">${info}${info?' · ':''}<b>حتى:</b> ${esc(ocDmy(c.data.date))}${c.data.status!=='approved'?' · <b>مسودة</b>':''}</p>
    <table><thead><tr><th>م</th><th>البند العام</th><th>السابق</th><th>الحالي</th><th>الإجمالي</th></tr></thead><tbody>${K.secs.filter(x=>x.ls.length||x.prev).map(x=>`<tr><td class="n">${x.i}</td><td class="tl">${esc(x.s.g||x.s.title||'')}</td><td class="n">${m(x.prev)}</td><td class="n">${m(x.cur)}</td><td class="n b">${m(x.tot)}</td></tr>`).join('')}</tbody>
-   <tfoot>${K.rows.map(r=>`<tr><td></td><td class="tl b">${esc(r.label)}${r.k==='pct'?' — '+m(r.p)+' %':''}</td><td class="n">${r.k==='works'?m(r.prev):''}</td><td class="n">${r.k==='works'?m(r.cur):''}</td><td class="n b">${r.v<0?'('+m(-r.v)+')':m(r.v)}</td></tr>`).join('')}</tfoot></table>`;
+   <tfoot>${K.rows.map(r=>`<tr><td></td><td class="tl b">${esc(r.label)}${r.k==='pct'&&r.mode!=='amt'||r.k==='adv'?' — '+m(r.p)+' %':''}</td><td class="n">${r.k==='works'?m(r.prev):''}</td><td class="n">${r.k==='works'?m(r.cur):''}</td><td class="n b">${r.v<0?'('+m(-r.v)+')':m(r.v)}</td></tr>`).join('')}</tfoot></table>`;
   const C=OC_COLS.filter(([k])=>on(k)),qn=['prev','cur','tot'].filter(on).length;
   for(const x of K.secs){if(!x.ls.length)continue;const codes=ocCodes(x);
     body+=`<h3>${x.i} — ${esc(x.s.g||x.s.title||'')}</h3><table><thead><tr>${C.filter(([k])=>!['prev','cur','tot'].includes(k)||k===['prev','cur','tot'].find(on)).map(([k,l])=>['prev','cur','tot'].includes(k)?`<th colspan="${qn}">الكميات</th>`:`<th rowspan="2">${l==='الإجمالي'?'الإجمالي':l}</th>`).join('')}</tr><tr>${['prev','cur','tot'].filter(on).map(k=>`<th>${{prev:'سابق',cur:'حالي',tot:'الإجمالي'}[k]}</th>`).join('')}</tr></thead><tbody>`;
-    for(const [p,pl] of OC_PARTS){const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length)continue;body+=`<tr class="grp-h"><td colspan="${C.length}">${pl}</td></tr>`;
+    for(const [p,pl] of OC_PARTS){const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length)continue;if(!ocIsBoq(T))body+=`<tr class="grp-h"><td colspan="${C.length}">${pl}</td></tr>`;
       for(const l of ls){const v={no:codes[l.id],desc:esc(ocPrDesc(l)),unit:esc(l.unit||''),cq:l.cq===''||l.cq==null?'-':m(ocNum(l.cq)),rate:m(ocNum(l.rate)),prev:m(ocNum(l.prevQ)),cur:m(r2(ocNum(l.totQ)-ocNum(l.prevQ))),tot:m(ocNum(l.totQ)),pct:m(ocPct(l))+'%',val:m(ocV(l)),note:esc([l.note,l.numNote].filter(Boolean).join(' — '))};
         body+=`<tr>${C.map(([k])=>`<td class="${k==='desc'||k==='note'||k==='unit'?'tl':'n'}${k==='val'?' b':''}">${v[k]}</td>`).join('')}</tr>`}}
     body+=`<tr class="sub-t"><td colspan="${Math.max(1,C.findIndex(([k])=>k==='val'))}">إجمالي البند العام — ${esc(x.s.g||x.s.title||'')}</td>${on('val')?`<td class="n b">${m(x.tot)}</td>`:''}${C.slice(C.findIndex(([k])=>k==='val')+1).map(()=>'<td></td>').join('')}</tr></tbody></table>`}
+  if(K.note)body+=`<style>.oc-pgnote{margin-top:8px;font-size:11px;border-top:1px solid #999;padding-top:3px}@media print{.oc-pgnote{position:fixed;bottom:0;left:0;right:0;background:#fff;margin:0}.oc-pgsp{height:22px}}</style><div class="oc-pgsp"></div><div class="oc-pgnote"><b>ملاحظة:</b> ${esc(K.note)}</div>`;
   return {hd:ocHeadHTML(c,P,T,'مستخلص رقم ('+c.data.no+')'),title:'مستخلص رقم ('+c.data.no+')'+(site.name?' — '+site.name:''),sub:'',body,signs:(T&&T.data.sigs&&T.data.sigs.length)?T.data.sigs:['المهندس','مدير المشروع','الاستشاري','المالك'],land:true};
 }
 function ocCoDoc(siteId){const site=S.sites.find(s=>s.id===siteId)||{name:''},coS=ocCoSet(siteId),E=S.exp.filter(e=>e.siteId===siteId&&!e.deleted&&!e._priv&&e.item&&coS.has(regNormK(e.item))).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
@@ -9384,9 +9431,9 @@ async function ocExcel(c){
   const S1=r,sumRows=[];
   for(const x of K.secs){if(!x.ls.length&&!x.prev)continue;put(0,x.i,3);put(1,x.s.g||x.s.title||'',7);if(sc[2]>2)merges.push(L(1)+r+':'+L(sc[2]-1)+r);put(sc[2],x.prev,3);put(sc[3],x.cur,3,L(sc[4])+r+'-'+L(sc[2])+r);sumRows.push({x,r});r++}
   const S2=r-1,refs={};
-  for(const t of K.rows){put(0,'',4);put(1,t.label+(t.k==='pct'?' — '+t.p+' %':''),4);if(sc[2]>2)merges.push(L(1)+r+':'+L(sc[2]-1)+r);
+  for(const t of K.rows){put(0,'',4);put(1,t.label+(t.k==='pct'&&t.mode!=='amt'||t.k==='adv'?' — '+t.p+' %':''),4);if(sc[2]>2)merges.push(L(1)+r+':'+L(sc[2]-1)+r);
     if(t.k==='works'){put(sc[2],t.prev,5,S2>=S1?'SUM('+L(sc[2])+S1+':'+L(sc[2])+S2+')':null);put(sc[3],t.cur,5,S2>=S1?'SUM('+L(sc[3])+S1+':'+L(sc[3])+S2+')':null);put(sc[4],t.v,5,S2>=S1?'SUM('+L(sc[4])+S1+':'+L(sc[4])+S2+')':null);refs.works=L(sc[4])+r;refs.run=refs.works}
-    else if(t.k==='pct'){const f=refs.works?refs.works+'*'+t.p+'/100'+(t.sign<0?'*-1':''):null;put(sc[4],t.v,5,f);refs.add=(refs.add||[]).concat(L(sc[4])+r)}
+    else if(t.k==='pct'){const f=refs.works&&t.mode!=='amt'&&t.base!=='run'?refs.works+'*'+t.p+'/100'+(t.sign<0?'*-1':''):null;put(sc[4],t.v,5,f);refs.add=(refs.add||[]).concat(L(sc[4])+r)}
     else if(t.k==='sub'||t.k==='net'){const parts=[refs.works,...(refs.add||[])].filter(Boolean);put(sc[4],t.v,5,parts.length?parts.join('+'):null);refs.works2=L(sc[4])+r;refs.add=[];refs.works=refs.works2}
     else{put(sc[4],t.v,5);refs.add=(refs.add||[]).concat(L(sc[4])+r)}
     r++}
@@ -9396,7 +9443,7 @@ async function ocExcel(c){
   const secTot=new Map();
   for(const x of K.secs){if(!x.ls.length)continue;const codes=ocCodes(x);
     put(0,x.i+' — '+(x.s.g||x.s.title||''),6);merges.push('A'+r+':'+L(N-1)+r);r++;hdr();const r0=r;
-    for(const [p,pl] of OC_PARTS){const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length)continue;put(0,pl,6);merges.push('A'+r+':'+L(N-1)+r);r++;
+    for(const [p,pl] of OC_PARTS){const ls=x.ls.filter(l=>(l.part||'lab')===p);if(!ls.length)continue;if(!ocIsBoq(T)){put(0,pl,6);merges.push('A'+r+':'+L(N-1)+r);r++}
       for(const l of ls){const R_=r,cl=k=>ci(k)>=0?L(ci(k))+R_:null;
         const v={no:codes[l.id],desc:ocPrDesc(l),unit:l.unit||'',cq:l.cq===''||l.cq==null?'-':ocNum(l.cq),rate:ocNum(l.rate),prev:ocNum(l.prevQ),tot:ocNum(l.totQ),pct:ocPct(l)/100,note:[l.note,l.numNote].filter(Boolean).join(' — ')};
         for(const [k] of C){if(k==='cur'){put(ci(k),r2(v.tot-v.prev),3,cl('tot')&&cl('prev')?cl('tot')+'-'+cl('prev'):null);continue}
@@ -9407,6 +9454,7 @@ async function ocExcel(c){
     r+=2}
   /* الإجمالي في الملخص بيقرا من إجمالي كل بند عام */
   for(const {x,r:rr} of sumRows)if(secTot.has(x.s.id))cells.set(L(sc[4])+rr,{f:secTot.get(x.s.id),v:x.tot,s:3});
+  if(K.note){put(0,'ملاحظة: '+K.note,7);merges.push('A'+r+':'+L(N-1)+r);r+=2}
   /* التوقيعات */
   const sg=(T&&T.data.sigs&&T.data.sigs.length)?T.data.sigs:['المهندس','مدير المشروع','الاستشاري','المالك'];r++;
   sg.forEach((t,i)=>{cells.set(L(Math.min(N-1,Math.round(i*(N-1)/Math.max(1,sg.length-1))))+r,{v:t,s:4})});
@@ -9502,7 +9550,7 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
   if(a==='tab'){if(OC.tab!==b.dataset.v&&!leave())return;if(OC.dirty){OC.ce=null;OC.pe=null;OC.dirty=false}OC.tab=b.dataset.v;OC.cur=null;OC.te=null;render();window.scrollTo({top:0});return}
   if(a==='rf'){OC.rf=b.dataset.v;render();return}
   /* النماذج */
-  if(a==='tnew'){OC.te={isNew:true,id:'t'+newId(),data:b.dataset.v==='def'?ocDefTpl():{...ocDefTpl(),name:'نموذج جديد',rows:[{id:'w',k:'works',label:'إجمالي الأعمال',sign:1},{id:'n',k:'net',label:'المستحق',sign:1}]}};render();return}
+  if(a==='tnew'){OC.te={isNew:true,id:'t'+newId(),data:b.dataset.v==='boq'?ocBoqTpl():b.dataset.v==='def'?ocDefTpl():{...ocDefTpl(),name:'نموذج جديد',rows:[{id:'w',k:'works',label:'إجمالي الأعمال',sign:1},{id:'n',k:'net',label:'المستحق',sign:1}]}};render();return}
   if(a==='tedit'||a==='tcopy'){const t=OC.rows.find(r=>r.id===b.dataset.id);if(!t)return;OC.te=a==='tedit'?{id:t.id,data:ocClone(t.data),site_owner:t.site_owner}:{isNew:true,id:'t'+newId(),data:{...ocClone(t.data),name:(t.data.name||'')+' (نسخة)'}};render();return}
   if(a==='tdel'){const t=OC.rows.find(r=>r.id===b.dataset.id);if(!t||!confirm('حذف «'+t.data.name+'»؟'))return;if(await ocDel(t.id))render();return}
   if(a==='tcancel'){OC.te=null;render();return}
@@ -9515,7 +9563,7 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
     const old=OC.rows.find(r=>r.id===OC.te.id);if(await ocPut({id:OC.te.id,kind:'tpl',site_id:null,site_owner:old?old.site_owner:(S.isManager?null:S.uid),data:d})){OC.te=null;flash('حُفظ النموذج.');render()}return}
   if(!site)return;
   /* ملف المشروع */
-  if(a==='pnew'||a==='pnewdef'){let tid=(document.getElementById('ocNewTpl')||{}).value;if(a==='pnewdef'){const t={id:'t'+newId(),kind:'tpl',site_id:null,site_owner:S.isManager?null:S.uid,data:ocDefTpl()};if(!await ocPut(t))return;tid=t.id}
+  if(a==='pnew'||a==='pnewdef'){let tid=(document.getElementById('ocNewTpl')||{}).value;if(a==='pnewdef'||!tid||tid==='__boq'){const t={id:'t'+newId(),kind:'tpl',site_id:null,site_owner:S.isManager?null:S.uid,data:a==='pnewdef'&&tid!=='__boq'&&tid?ocDefTpl():ocBoqTpl()};if(!await ocPut(t))return;tid=t.id}
     const row={id:'p_'+site.id,kind:'proj',site_id:site.id,site_owner:ocOwnerOf(site),data:ocNewProjData(site,tid)};if(await ocPut(row)){OC.pe=null;flash('أُنشئ ملف المشروع — راجع الأقسام وبنود تعاقد المالك.');render()}return}
   if(OC.pe&&['sadd','saddall','sdel','sup','badd','bdel'].includes(a)){const d=OC.pe;d.secs=d.secs||[];d.boq=d.boq||[];
     if(a==='sadd')d.secs.push({id:'s'+newId(),g:'',title:'قسم جديد',parts:{}});
@@ -9525,7 +9573,18 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
     if(a==='badd')d.boq.push({id:'b'+newId(),s:b.dataset.s,desc:'',unit:'',cq:'',rate:''});
     if(a==='bdel')d.boq.splice(+b.dataset.i,1);
     OC.dirty=true;render();return}
-  if(a==='psave'&&OC.pe){const P=ocProj(site.id);for(const x of OC.pe.boq||[]){if(x.cq!==''&&x.cq!=null)x.cq=ocNum(x.cq);x.rate=ocNum(x.rate)}if(await ocPut({...P,data:OC.pe})){OC.dirty=false;OC.pe=null;flash('حُفظ ملف المشروع.');render()}return}
+  if(OC.pe&&['radd','rdel','rup','rimp'].includes(a)){const d=OC.pe,R=d.rows=d.rows||[],at=()=>{const i=R.findIndex(r=>r.k==='prev'||r.k==='net');return i<0?R.length:i};
+    if(a==='radd'){const v=b.dataset.v,hasVat=R.some(r=>/القيمة المضافة/.test(r.label||''));
+      const nr=v==='tax'?{id:'r'+newId(),k:'pct',label:hasVat?'ضريبة أخرى':'ضريبة القيمة المضافة',sign:1,mode:'pct',def:hasVat?'':14,base:'works',on:true}
+        :v==='ded'?{id:'r'+newId(),k:'pct',label:'خصم',sign:-1,mode:'pct',def:'',base:'works',on:true}:v==='add'?{id:'r'+newId(),k:'pct',label:'إضافة',sign:1,mode:'pct',def:'',base:'works',on:true}
+        :v==='adv'?{id:'adv',k:'adv',label:'استرداد الدفعة المقدمة',sign:-1,on:true}:{id:'r'+newId(),k:'sub',label:'الإجمالي',sign:1,on:true};
+      R.splice(at(),0,nr)}
+    if(a==='rdel')R.splice(+b.dataset.i,1);
+    if(a==='rup'){const i=+b.dataset.i;if(i>1)[R[i-1],R[i]]=[R[i],R[i-1]]}
+    if(a==='rimp'){const v=(document.getElementById('oc_rimp')||{}).value,Q=ocProj(v);if(!Q)return;const QT=ocTplOf(Q);if(!confirm('استبدال سطور الإجمالي والنسب والملاحظة في هذا المشروع بإعدادات «'+siteNameOf(v)+'»؟'))return;
+      d.rows=ocClone(ocRowsOf(Q,QT));d.note=Q.data.note||'';d.adv={amt:(d.adv||{}).amt||'',pct:((Q.data.adv||{}).pct)??''}}
+    OC.dirty=true;render();return}
+  if(a==='psave'&&OC.pe){for(const r of OC.pe.rows||[]){r.sign=+r.sign<0?-1:1;if(r.k==='prev')r.sign=-1;if(r.def!==''&&r.def!=null)r.def=ocNum(r.def)}if(OC.pe.adv){OC.pe.adv.amt=OC.pe.adv.amt===''?'':ocNum(OC.pe.adv.amt);OC.pe.adv.pct=OC.pe.adv.pct===''?'':ocNum(OC.pe.adv.pct)}const P=ocProj(site.id);for(const x of OC.pe.boq||[]){if(x.cq!==''&&x.cq!=null)x.cq=ocNum(x.cq);x.rate=ocNum(x.rate)}if(await ocPut({...P,data:OC.pe})){OC.dirty=false;OC.pe=null;flash('حُفظ ملف المشروع.');render()}return}
   if(a==='pundo'){OC.pe=null;OC.dirty=false;render();return}
   /* مصاريف الشركة */
   if(a==='coadd'){const v=(document.getElementById('ocCoAdd')||{}).value;if(!v)return;ocSetCo(site.id,[...ocCoList(site.id),v]);render();return}
@@ -9548,6 +9607,17 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
   if(a==='open'){OC.cur=b.dataset.id;OC.ce=null;OC.dirty=false;render();window.scrollTo({top:0});return}
   if(a==='close'){if(!leave())return;OC.cur=null;OC.ce=null;OC.dirty=false;render();return}
   const c0=OC.rows.find(r=>r.id===OC.cur);if(!c0)return;
+  if(['nbopen','nbcancel','nbsave','lreg','lregall','lregnew'].includes(a)&&OC.ce){const site=S.sites.find(s=>s.id===OC.site);if(!site)return;
+    if(a==='nbopen'){OC.nb=b.dataset.s;render();setTimeout(()=>{const e=document.getElementById('ocnb_desc');if(e)e.focus()},0);return}
+    if(a==='nbcancel'){OC.nb=null;render();return}
+    if(a==='nbsave'){const g=id=>((document.getElementById(id)||{}).value||'').trim(),desc=g('ocnb_desc');if(!desc){flash('اكتب بيان البند.',1);return}
+      const P=ocProj(site.id);if(!P)return;const bq={id:'b'+newId(),s:b.dataset.s,desc,unit:g('ocnb_unit'),cq:g('ocnb_cq')===''?'':ocNum(g('ocnb_cq')),rate:ocNum(g('ocnb_rate'))};
+      if(!await ocPut({...P,data:{...P.data,boq:[...(P.data.boq||[]),bq]}}))return;
+      OC.ce.data.lines.push({id:'l'+newId(),s:bq.s,part:'lab',boq:bq.id,desc:bq.desc,unit:bq.unit,cq:bq.cq,rate:bq.rate,prevQ:0,totQ:0,pct:100});OC.nb=null;OC.dirty=true;flash('تمت إضافة البند للمستخلص ولملف المشروع.');render();return}
+    let names=[];if(a==='lreg'){const l=OC.ce.data.lines.find(x=>x.id===b.dataset.id);if(l)names=[l.desc]}
+    if(a==='lregall')names=OC.ce.data.lines.map(l=>l.desc);
+    if(a==='lregnew'){const v=prompt('اسم البند العام الجديد للموقع:');if(!v)return;names=[v]}
+    const n=ocRegGen(site,names);flash(n?'تم تسجيل '+n+' '+(n===1?'بند عام':'بنود عامة')+' للموقع.':'البنود متسجلة قبل كدا.');render();return}
   if(a==='ladd'&&OC.ce){OC.ce.data.lines.push({id:'l'+newId(),s:b.dataset.s,part:b.dataset.p,desc:'',unit:'',cq:'',rate:0,prevQ:0,totQ:0,pct:100});OC.dirty=true;render();return}
   if(a==='ldel'&&OC.ce){const l=OC.ce.data.lines.find(x=>x.id===b.dataset.id);if(!l)return;if(ocNum(l.prevQ)&&!confirm('هذا السطر كان في مستخلص سابق. هل تحذفه من هذا المستخلص؟'))return;OC.ce.data.lines=OC.ce.data.lines.filter(x=>x!==l);OC.dirty=true;render();return}
   if(a==='csave'&&OC.ce){const r=await ocSafePut(OC.ce,OC.ceBase);if(r==='conf'){render();return}if(r==='ok'){OC.dirty=false;OC.ce=null;ocLockSync(site);flash('حُفظت المسودة.');render()}return}
