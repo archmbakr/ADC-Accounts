@@ -273,7 +273,7 @@ select.auto-flash{animation:autoFlash 1.2s ease-out}
 .j-newb{margin:0 0 12px}.j-newb button{width:100%;padding:12px;justify-content:center}.j-more{justify-content:center;margin:8px 0}.j-more button{width:100%;justify-content:center}
 .sp-more{width:100%;margin-top:8px;justify-content:center;white-space:normal}.sp-more-l{margin:6px 0 0;white-space:normal}
 .ct-ret{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--sunk);padding:8px 12px;border-radius:10px;margin-top:6px}.ct-retp{display:inline-flex;align-items:center;gap:6px}
-.cr-acts{gap:8px;flex-wrap:wrap;margin-bottom:8px}.cr-in td{padding:4px 6px;vertical-align:middle}.cr-in input,.cr-in select{min-width:60px}.cr-in select{min-width:92px}.cr-pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}.cr-pick input,.cr-pick select{width:auto;max-width:260px}
+.cr-t th.c{text-align:center}.cr-acts{gap:8px;flex-wrap:wrap;margin-bottom:8px}.cr-in td{padding:4px 6px;vertical-align:middle}.cr-in input,.cr-in select{min-width:60px}.cr-in select{min-width:92px}.cr-pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}.cr-pick input,.cr-pick select{width:auto;max-width:260px}
 .pg-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:10px 0 2px}.pg-bar span{color:var(--muted,#666);font-size:13px;padding:0 6px}.pg-bar button{min-width:44px}
 .pg-filt{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pg-filt select{width:auto;max-width:200px}
 
@@ -1591,7 +1591,20 @@ function custNeedSql(){return CU.missing?`<div class="card"><p class="msg err">�
    لكل موقع: بنود المقايسة (توصيف، وحدة، كمية، سعر تعاقد) + خصومات (نسبة أو مبلغ، أكتر من خصم) + تحليل سعر البند (اختياري)
    + ربط بنود معيّنة: بنود المصروفات / بنود التوريد / خامات المخزن / مستخلصات (مقاول على بند) / مبلغ يدوي.
    جدول cost_items (id, site_id, site_owner, data). للمدير وصاحب الموقع بس. */
-const CR={rows:null,loaded:false,missing:false,busy:false,site:'',edit:null,msg:null,pick:null,printing:null,_ld:null};
+const CR={rows:null,loaded:false,missing:false,busy:false,site:'',edit:null,msg:null,pick:null,printing:null,_ld:null,oc:{},auto:{}};
+/* 26 نوفمبر (2): كل بند مربوط ببند «ملف مستخلص المشروع» (data.boq) — الاسم والوحدة والكمية والسعر من هناك،
+   والكمية المنفذة من مستخلص مالك تختاره (الافتراضي آخر معتمد) = totQ × نسبة التنفيذ؛ والعرض بسعر الوحدة + الإجمالي. */
+const crProj=site=>typeof ocProj==='function'&&typeof OC!=='undefined'&&OC.loaded?ocProj(site):null;
+function crBoqList(site){const P=crProj(site);if(!P)return [];const secs=new Map((P.data.secs||[]).map((x,i)=>[x.id,{t:x.title||x.g||'',i}]));
+  return (P.data.boq||[]).map((b,k)=>({...b,sec:(secs.get(b.s)||{}).t||'',si:(secs.get(b.s)||{}).i??999,k})).sort((a,b)=>a.si-b.si||a.k-b.k)}
+function crInfo(site,d){const b=d.boq?crBoqList(site).find(x=>x.id===d.boq):null;
+  if(b)return {linked:true,name:String(b.desc||'').trim(),unit:b.unit||'',qty:crN(b.cq),rate:crN(b.rate),sec:b.sec,code:b.code||''};
+  return {linked:false,name:d.name||'',unit:d.unit||'',qty:crN(d.qty),rate:crN(d.rate),sec:d.sec||'',code:''}}
+/* مستخلصات المالك للموقع واللي متختار */
+function crCerts(site){return typeof ocCerts==='function'&&typeof OC!=='undefined'&&OC.loaded?ocCerts(site):[]}
+function crCert(site){const L=crCerts(site);if(!L.length)return null;const want=CR.oc[site];if(want){const x=L.find(c=>c.id===want);if(x)return x}
+  const ap=L.filter(c=>c.data.status==='approved');return ap[ap.length-1]||L[L.length-1]}
+function crExe(cert,boqId){if(!cert||!boqId)return 0;return r2((cert.data.lines||[]).filter(l=>l.boq===boqId&&!l.gone).reduce((a,l)=>a+crN(l.totQ)*(typeof ocPct==='function'?ocPct(l):100)/100,0))}
 const CR_TYPES=[['mat','خامات'],['lab','مصنعيات'],['eq','معدات'],['oth','أخرى']];
 const CR_LT={exp:'مصروف',sup:'توريد',mat:'خامة',cert:'مستخلص',man:'يدوي'};
 const crSites=()=>S.sites.filter(s=>siteBoss(s));
@@ -1602,7 +1615,7 @@ function crLoad(){if(CR._ld)return CR._ld;CR._ld=(async()=>{
     else{CR.missing=false;CR.rows=r.data||[];appLs('adc_cost_v1',CR.rows)}}catch(e){CR.rows=CR.rows||appLs('adc_cost_v1')||[]}
   CR.loaded=true;CR.at=Date.now()})().finally(()=>{CR._ld=null});return CR._ld}
 const crN=v=>{const n=typeof v==='number'?v:parseAmount(v);return isFinite(n)?n:0};
-const crSiteRows=site=>(CR.rows||[]).filter(r=>r.site_id===site).sort((a,b)=>(crN(a.data.ord)-crN(b.data.ord))||String(a.data.name||'').localeCompare(String(b.data.name||''),'ar'));
+const crSiteRows=site=>{const L=crBoqList(site),pos=new Map(L.map((b,i)=>[b.id,i]));return (CR.rows||[]).filter(r=>r.site_id===site).sort((a,b)=>((pos.get(a.data.boq)??1e6+crN(a.data.ord))-(pos.get(b.data.boq)??1e6+crN(b.data.ord)))||String(a.data.name||'').localeCompare(String(b.data.name||''),'ar'))};
 /* ---------- الأرقام الفعلية ---------- */
 function crSoMoves(site){return ((typeof SO!=='undefined'&&SO.d&&SO.d.moves)||[]).filter(m=>!m.deleted&&m.site_id===site)}
 function crInvDue(list,kind){return typeof soInvoices==='function'?soInvoices(list,kind).reduce((a,x)=>a+(+x.due||0),0):0}
@@ -1620,14 +1633,15 @@ function crLinkTxt(l){
   if(l.t==='mat')return 'خامة: '+(typeof soLabel==='function'?soLabel(l.id):l.id);
   if(l.t==='cert')return 'مستخلص: '+l.con+' / '+l.item;
   return CR_LT[l.t]+': '+l.n}
-function crCalc(site,d){
-  const qty=crN(d.qty),contract=r2(qty*crN(d.rate));
+function crCalc(site,d,cert){
+  const I=crInfo(site,d),qty=I.qty,rate=I.rate,contract=r2(qty*rate),exe=crExe(cert===undefined?crCert(site):cert,d.boq),un=v=>qty?v/qty:0;
   const deds=(d.deds||[]).map(x=>({n:x.n||'خصم',m:x.m==='amt'?'amt':'pct',v:crN(x.v),amt:r2(x.m==='amt'?crN(x.v):contract*crN(x.v)/100)}));
   const dedT=r2(deds.reduce((a,x)=>a+x.amt,0)),allowed=r2(contract-dedT);
-  const parts=(d.parts||[]).map(p=>{const est=r2(p.lump?crN(p.amt):crN(p.per)*crN(p.price)*qty),act=crLinksVal(site,p.links);return {...p,est,act,diff:r2(est-act)}});
+  const parts=(d.parts||[]).map(p=>{const estU=p.lump?un(crN(p.amt)):crN(p.per)*crN(p.price),est=r2(estU*qty),act=crLinksVal(site,p.links),actU=exe>0?act/exe:null;return {...p,est,estU,act,actU,diff:r2(est-act),diffU:actU==null?null:estU-actU}});
   const est=parts.length?r2(parts.reduce((a,p)=>a+p.est,0)):null;
   const act=parts.length?r2(parts.reduce((a,p)=>a+p.act,0)+crLinksVal(site,d.links)):crLinksVal(site,d.links);
-  return {qty,contract,deds,dedT,allowed,parts,est,act,diff:r2(allowed-act),pct:allowed?Math.round((allowed-act)/allowed*100):0};
+  const allowU=un(allowed),estU=est==null?null:un(est),actU=exe>0?act/exe:null,earned=r2(allowU*exe),save=r2(earned-act);
+  return {I,qty,rate,exe,exePct:qty?Math.round(exe/qty*100):0,contract,deds,dedT,allowed,allowU,parts,est,estU,act,actU,earned,save,diff:r2(allowed-act),pct:allowed?Math.round((allowed-act)/allowed*100):0};
 }
 const crAllLinks=d=>[...(d.links||[]),...(d.parts||[]).flatMap(p=>p.links||[])];
 /* مصروفات وتوريدات الموقع اللي مش داخلة في أي بند */
@@ -1647,41 +1661,54 @@ function crPickOpts(site,t){const k=regNormK,uq=a=>[...new Map(a.filter(Boolean)
   if(t==='cert'){const m=new Map();for(const c of (CT.rows||[]).filter(c=>c.site_id===site)){const it=ctItem(c);m.set(c.contractor+'|'+it,{con:c.contractor,item:it})}return [...m.values()].map(x=>({v:x.con+'|'+x.item,t:x.con+' / '+x.item+' — '+fmt(crLinkVal(site,{t:'cert',...x}))}))}
   return []}
 /* ---------- الصفحة ---------- */
+const crU=v=>v==null||!isFinite(v)?'—':fmt(Math.round(v*100)/100);
+function crAutoLink(site){if(CR.auto[site.id])return;const L=crBoqList(site.id);if(!L.length)return;CR.auto[site.id]=1;const k=regNormK;
+  for(const r of crSiteRows(site.id)){const d=r.data||{};if(d.boq&&L.some(b=>b.id===d.boq))continue;const used=new Set(crSiteRows(site.id).map(x=>x.data.boq).filter(Boolean));
+    const b=L.find(x=>!used.has(x.id)&&k(x.desc)===k(d.name)&&k(x.unit||'')===k(d.unit||''))||L.find(x=>!used.has(x.id)&&k(x.desc)===k(d.name));
+    if(b)crSave(site,{id:r.id,data:{...d,boq:b.id}}).then(()=>{if(S.sel==='__cost')render()})}}
 function crRender(){
   if(!CR.loaded){crLoad().then(()=>{if(S.sel==='__cost')render()});$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
   if(!CR.edit&&Date.now()-(CR.at||0)>60000){CR.at=Date.now();crLoad().then(()=>{if(S.sel==='__cost'&&!CR.edit)render()})}
-  const sites=crSites();if(!sites.some(s=>s.id===CR.site))CR.site=(sites.find(s=>s.id===S.lastSite)||sites[0]||{}).id||'';
+  if(typeof OC!=='undefined'&&!OC.loaded&&typeof ocLoad==='function'){if(!CR.ocTry){CR.ocTry=1;ocLoad().then(()=>{if(S.sel==='__cost')render()}).catch(()=>{})}$('#pane').innerHTML='<div class="blank"><h3>جاري تحميل ملف مستخلص المشروع…</h3></div>';return}
+  const sites=crSites();if(!sites.some(s=>s.id===CR.site))CR.site=(sites[0]||{}).id||'';
   const site=sites.find(s=>s.id===CR.site),m=CR.msg;CR.msg=null;
   if(!site){$('#pane').innerHTML='<div class="pane-h"><h2>مراجعة التكاليف</h2></div><div class="card blank"><h3>لا توجد مواقع تخصك</h3><p>مراجعة التكاليف متاحة للمدير وصاحب الموقع فقط.</p></div>';return}
-  const rows=crSiteRows(site.id),K=rows.map(r=>({r,k:crCalc(site.id,r.data||{})})),T=k=>r2(K.reduce((a,x)=>a+x.k[k],0));
-  const tot={contract:T('contract'),dedT:T('dedT'),allowed:T('allowed'),act:T('act')},dedBy=new Map();for(const x of K)for(const d of x.k.deds)dedBy.set(d.n,r2((dedBy.get(d.n)||0)+d.amt));
-  const un=crUnlinked(site.id),diff=r2(tot.allowed-tot.act),P=typeof ocProj==='function'&&typeof OC!=='undefined'&&OC.loaded?ocProj(site.id):null;
-  if(typeof OC!=='undefined'&&!OC.loaded&&typeof ocLoad==='function'&&!CR.ocTry){CR.ocTry=1;ocLoad().then(()=>{if(S.sel==='__cost')render()}).catch(()=>{})}
+  crAutoLink(site);
+  const P=crProj(site.id),BQ=crBoqList(site.id),certs=crCerts(site.id),cert=crCert(site.id);
+  const rows=crSiteRows(site.id),K=rows.map(r=>({r,k:crCalc(site.id,r.data||{},cert)})),T=k=>r2(K.reduce((a,x)=>a+(x.k[k]||0),0));
+  const tot={contract:T('contract'),dedT:T('dedT'),allowed:T('allowed'),act:T('act'),earned:T('earned'),save:T('save')},dedBy=new Map();for(const x of K)for(const d of x.k.deds)dedBy.set(d.n,r2((dedBy.get(d.n)||0)+d.amt));
+  const un=crUnlinked(site.id),free=BQ.filter(b=>!rows.some(r=>r.data.boq===b.id)),bad=K.filter(x=>!x.k.I.linked);
   const sgn=v=>v>0.004?'+'+fmt(v):v<-0.004?'−'+fmt(-v):'0';
   $('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة التكاليف</h2><div class="actions">${sites.length>1?`<select id="cr_site" aria-label="الموقع" style="width:auto">${sites.map(s=>`<option value="${esc(s.id)}" ${s.id===site.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>`:`<b>${esc(site.name)}</b>`}</div></div>
   ${CR.missing?'<div class="card"><p class="msg err">شغّل ملف «ADC-مراجعة-التكاليف.sql» في Supabase لتعمل هذه الصفحة.</p></div>':''}
-  <div class="row cr-acts"><button type="button" class="primary" data-cr="new">+ بند مقايسة</button>${P&&(P.data.boq||[]).length?'<button type="button" data-cr="impoc">استيراد من ملف مستخلص المشروع</button>':''}<span class="filebtn"><button type="button">استيراد Excel</button><input type="file" id="cr_xl" accept=".xlsx" aria-label="ملف Excel لبنود المقايسة"></span>${rows.length?'<button type="button" data-cr="print">طباعة / PDF</button><button type="button" data-cr="xl">Excel</button>':''}</div>
-  <p class="foot-note" style="margin-top:0">للمدير وصاحب الموقع فقط. المصروف فعلًا = البنود اللي تختارها لكل بند مقايسة (مصروفات، توريدات، خامات، مستخلصات المقاولين، مبالغ يدوية).</p>
+  ${!P||!BQ.length?`<div class="card blank"><h3>لا يوجد ملف مستخلص المشروع لهذا الموقع</h3><p>بنود مراجعة التكاليف هي نفس بنود «ملف مستخلص المشروع». أنشئه أولًا من «مستخلص المالك» ← ملف المشروع، وأضف بنود التعاقد.</p><button type="button" class="primary" data-site="__ocert">فتح مستخلص المالك</button></div>`:''}
+  ${P&&BQ.length?`<div class="row cr-acts"><button type="button" class="primary" data-cr="new" ${free.length?'':'disabled'}>+ بند من ملف المشروع</button>${free.length?`<button type="button" data-cr="impoc">إضافة كل بنود ملف المشروع (${free.length})</button>`:''}${rows.length?'<button type="button" data-cr="print">طباعة / PDF</button><button type="button" data-cr="xl">Excel</button>':''}</div>
+  <div class="row cr-acts" style="align-items:center"><label for="cr_oc">الكمية المنفذة من مستخلص المالك:</label>${certs.length?`<select id="cr_oc" style="width:auto">${certs.slice().reverse().map(c=>`<option value="${esc(c.id)}" ${cert&&c.id===cert.id?'selected':''}>رقم ${esc(String(c.data.no||''))} — ${esc(c.data.date||'')}${c.data.status==='approved'?'':' (غير معتمد)'}</option>`).join('')}</select>`:'<b class="neg">لا توجد مستخلصات مالك بعد — الكمية المنفذة = 0</b>'}</div>`:''}
+  <p class="foot-note" style="margin-top:0">للمدير وصاحب الموقع فقط. البنود والكميات والأسعار من ملف مستخلص المشروع، والمنفذ = الكمية في المستخلص × نسبة التنفيذ. الفعلي للوحدة = المصروف فعلًا ÷ المنفذ.</p>
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
+  ${bad.length?`<div class="card due-card"><b>⚠ ${bad.length} بند غير مربوط ببند في ملف المشروع:</b> ${bad.map(x=>esc(x.r.data.name||'')).join('، ')}. افتح البند واختر بنده من ملف المشروع.</div>`:''}
   ${CR.edit?crFormHTML(site):''}
-  ${rows.length?`<div class="stats"><div class="stat"><div class="l">قيمة التعاقد</div><div class="v in">${fmt(tot.contract)}<small>${CUR}</small></div></div>
-  <div class="stat"><div class="l">الخصومات</div><div class="v">${fmt(tot.dedT)}<small>${CUR}</small></div>${dedBy.size?`<div class="split">${[...dedBy].map(([n,v])=>`<span>${esc(n)} <b>${fmt(v)}</b></span>`).join('')}</div>`:''}</div>
-  <div class="stat"><div class="l">المسموح صرفه</div><div class="v">${fmt(tot.allowed)}<small>${CUR}</small></div></div>
-  <div class="stat"><div class="l">المصروف فعلًا</div><div class="v${diff<0?' neg':''}">${fmt(tot.act)}<small>${CUR}</small></div><div class="split"><span>${diff>=0?'وفر':'زيادة'} <b class="${diff<0?'neg':'in'}">${fmt(Math.abs(diff))}</b>${tot.allowed?' ('+Math.abs(Math.round(diff/tot.allowed*100))+'٪)':''}</span></div></div></div>`:''}
-  ${un.total>0.004&&rows.length?`<div class="card due-card"><b>⚠ مصروفات وتوريدات في الموقع غير داخلة في أي بند مقايسة: ${fmt(un.total)} ${CUR}</b><div class="note" style="margin-top:4px">${un.list.slice(0,8).map(([n,v])=>esc(n)+' ('+fmt(v)+')').join('، ')}${un.list.length>8?' …':''}</div></div>`:''}
-  <div class="card"><div class="sec-h">بنود المقايسة${rows.length?' ('+rows.length+')':''}</div>
-  ${rows.length?`<div class="tbl-wrap"><table class="cr-t"><thead><tr><th>البند</th><th class="num">قيمة التعاقد</th><th class="num">الخصومات</th><th class="num">المسموح</th><th class="num">التكلفة المقدّرة</th><th class="num">المصروف فعلًا</th><th class="num">الفرق</th><th></th></tr></thead><tbody>
-  ${K.map(({r,k})=>{const d=r.data||{},n=crAllLinks(d).length;return `<tr${CR.edit&&CR.edit.id===r.id?' class="hl"':''}><td><b>${esc(d.name||'')}</b>${d.desc?`<br><span class="note">${esc(String(d.desc).slice(0,120))}</span>`:''}<br><span class="note">${fmt(k.qty)} ${esc(d.unit||'')} × ${fmt(crN(d.rate))}${k.parts.length?' · تحليل '+k.parts.length+' عنصر':''} · ${n?n+' ربط':'<b class="neg">غير مربوط</b>'}</span></td>
-    <td class="num">${fmt(k.contract)}</td><td class="num">${fmt(k.dedT)}</td><td class="num">${fmt(k.allowed)}</td><td class="num">${k.est==null?'—':fmt(k.est)}</td><td class="num${k.diff<0?' neg':''}">${fmt(k.act)}</td><td class="num ${k.diff<0?'neg':'in'}">${sgn(k.diff)}${k.allowed?' ('+Math.abs(k.pct)+'٪)':''}</td>
+  ${rows.length?`<div class="stats"><div class="stat"><div class="l">قيمة التعاقد</div><div class="v in">${fmt(tot.contract)}<small>${CUR}</small></div><div class="split"><span>المسموح بعد الخصومات <b>${fmt(tot.allowed)}</b></span>${[...dedBy].map(([n,v])=>`<span>${esc(n)} <b>${fmt(v)}</b></span>`).join('')}</div></div>
+  <div class="stat"><div class="l">المسموح للمنفذ حتى الآن</div><div class="v">${fmt(tot.earned)}<small>${CUR}</small></div><div class="split"><span>${cert?'مستخلص المالك رقم '+esc(String(cert.data.no||'')):'لا يوجد مستخلص'}</span></div></div>
+  <div class="stat"><div class="l">المصروف فعلًا</div><div class="v${tot.save<0?' neg':''}">${fmt(tot.act)}<small>${CUR}</small></div><div class="split"><span>${tot.save>=0?'وفر حتى الآن':'زيادة حتى الآن'} <b class="${tot.save<0?'neg':'in'}">${fmt(Math.abs(tot.save))}</b></span></div></div></div>`:''}
+  ${un.total>0.004&&rows.length?`<div class="card due-card"><b>⚠ مصروفات وتوريدات في الموقع غير داخلة في أي بند: ${fmt(un.total)} ${CUR}</b><div class="note" style="margin-top:4px">${un.list.slice(0,8).map(([n,v])=>esc(n)+' ('+fmt(v)+')').join('، ')}${un.list.length>8?' …':''}</div></div>`:''}
+  ${rows.length?`<div class="card"><div class="sec-h">بنود المراجعة (${rows.length})</div><div class="tbl-wrap"><table class="cr-t"><thead>
+  <tr><th rowspan="2">البند</th><th rowspan="2">الوحدة</th><th colspan="3" class="c">الكمية</th><th colspan="4" class="c">للوحدة</th><th colspan="3" class="c">الإجمالي</th><th rowspan="2"></th></tr>
+  <tr><th class="num">التعاقد</th><th class="num">المنفذ</th><th class="num">٪</th><th class="num">سعر التعاقد</th><th class="num">المسموح</th><th class="num">المقدّر</th><th class="num">الفعلي</th><th class="num">قيمة التعاقد</th><th class="num">المصروف فعلًا</th><th class="num">الوفر حتى الآن</th></tr></thead><tbody>
+  ${K.map(({r,k})=>{const n=crAllLinks(r.data||{}).length,bu=k.actU!=null&&k.actU>k.allowU+0.004;return `<tr${CR.edit&&CR.edit.id===r.id?' class="hl"':''}><td><b>${esc(k.I.name)}</b>${k.I.sec?`<br><span class="note">${esc(k.I.sec)}</span>`:''}<br><span class="note">${k.parts.length?'تحليل '+k.parts.length+' عنصر · ':''}${n?n+' ربط':'<b class="neg">غير مربوط بمصروفات</b>'}${k.I.linked?'':' · <b class="neg">مش في ملف المشروع</b>'}</span></td>
+    <td>${esc(k.I.unit)}</td><td class="num">${fmt(k.qty)}</td><td class="num">${fmt(k.exe)}</td><td class="num">${k.exePct}٪</td>
+    <td class="num">${crU(k.rate)}</td><td class="num">${crU(k.allowU)}</td><td class="num">${crU(k.estU)}</td><td class="num${bu?' neg':k.actU!=null?' in':''}">${crU(k.actU)}</td>
+    <td class="num">${fmt(k.contract)}</td><td class="num">${fmt(k.act)}</td><td class="num ${k.save<0?'neg':'in'}">${k.exe>0?sgn(k.save):k.act?'<span class="note">مصروف قبل التنفيذ</span>':'—'}</td>
     <td class="acts"><button type="button" class="ghost" data-cr="edit" data-id="${esc(r.id)}">تعديل</button></td></tr>`}).join('')}
-  </tbody><tfoot><tr><td>الإجمالي</td><td class="num">${fmt(tot.contract)}</td><td class="num">${fmt(tot.dedT)}</td><td class="num">${fmt(tot.allowed)}</td><td class="num">${(()=>{const e=K.filter(x=>x.k.est!=null);return e.length?fmt(r2(e.reduce((a,x)=>a+x.k.est,0))):'—'})()}</td><td class="num">${fmt(tot.act)}</td><td class="num ${diff<0?'neg':'in'}">${sgn(diff)}</td><td></td></tr></tfoot></table></div>`
-  :'<p class="note">لا توجد بنود بعد. أضف بندًا، أو استورد البنود من ملف مستخلص المشروع أو من Excel (أعمدة: الكود، البند، الوحدة، الكمية، السعر).</p>'}</div>`;
+  </tbody><tfoot><tr><td colspan="9">الإجمالي</td><td class="num">${fmt(tot.contract)}</td><td class="num">${fmt(tot.act)}</td><td class="num ${tot.save<0?'neg':'in'}">${sgn(tot.save)}</td><td></td></tr></tfoot></table></div>
+  <p class="note">المسموح للوحدة = سعر التعاقد − الخصومات للوحدة. الوفر حتى الآن = (المسموح للوحدة × المنفذ) − المصروف فعلًا.</p></div>`
+  :P&&BQ.length?'<div class="card"><p class="note">لا توجد بنود في المراجعة بعد. أضف بندًا من ملف المشروع، أو أضف كل البنود مرة واحدة.</p></div>':''}`;
   const ss=$('#cr_site');if(ss)ss.onchange=()=>{CR.site=ss.value;CR.edit=null;CR.pick=null;render()};
-  const xi=$('#cr_xl');if(xi)xi.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)crImportXl(site,f)};
+  const so=$('#cr_oc');if(so)so.onchange=()=>{CR.oc[site.id]=so.value;render()};
   crBindForm();
 }
 /* ---------- فورم البند ---------- */
-function crNewForm(r){const d=r?JSON.parse(JSON.stringify(r.data||{})):{};return {id:r?r.id:'',name:d.name||'',desc:d.desc||'',unit:d.unit||'',qty:d.qty??'',rate:d.rate??'',sec:d.sec||'',ord:d.ord,deds:d.deds||[{n:'تكاليف إدارية',m:'pct',v:''}],parts:d.parts||[],links:d.links||[]}}
+function crNewForm(r,boq){const d=r?JSON.parse(JSON.stringify(r.data||{})):{};return {id:r?r.id:'',boq:d.boq||boq||'',name:d.name||'',unit:d.unit||'',qty:d.qty??'',rate:d.rate??'',ord:d.ord,deds:d.deds||[{n:'تكاليف إدارية',m:'pct',v:''}],parts:d.parts||[],links:d.links||[]}}
 function crFormHTML(site){
   const f=CR.edit,k=crCalc(site.id,f),pk=CR.pick;
   const chips=(L,where)=>(L||[]).map((l,i)=>`<span class="chip">${esc(crLinkTxt(l))} <small>(${fmt(crLinkVal(site.id,l))})</small> <button type="button" class="linkish" data-cr="unlink" data-w="${where}" data-i="${i}" aria-label="إزالة">✕</button></span>`).join(' ');
@@ -1691,26 +1718,21 @@ function crFormHTML(site){
       :o.length?`<select id="cr_pv"><option value="">اختر</option>${o.map(x=>`<option value="${esc(x.v)}">${esc(x.t)}</option>`).join('')}</select>`:'<span class="note">لا يوجد في هذا الموقع.</span>'}
       <button type="button" class="primary" data-cr="link" data-w="${where}">إضافة</button><button type="button" class="ghost" data-cr="pickno">إلغاء</button></div>`};
   return `<div class="card entry-card" id="crForm"><div class="sec-h">${f.id?'تعديل بند مقايسة':'بند مقايسة جديد'}</div>
-  <form class="entry" onsubmit="return false"><div class="f c2"><label for="cr_name">اسم البند</label><input id="cr_name" data-crf="name" maxlength="150" value="${esc(f.name)}" placeholder="مثال: أعمال الخرسانة المسلحة للأسقف"></div>
-  <div class="f c2"><label for="cr_sec">القسم (اختياري)</label><input id="cr_sec" data-crf="sec" maxlength="100" value="${esc(f.sec)}" placeholder="مثال: الأعمال الإنشائية"></div>
-  <div class="f c4"><label for="cr_desc">توصيف البند</label><textarea id="cr_desc" data-crf="desc" rows="2" maxlength="1500">${esc(f.desc)}</textarea></div>
-  <div class="f c1"><label for="cr_unit">الوحدة</label><input id="cr_unit" data-crf="unit" maxlength="20" value="${esc(f.unit)}"></div>
-  <div class="f c1"><label for="cr_qty">الكمية</label><input id="cr_qty" data-crf="qty" type="number" inputmode="decimal" step="any" value="${esc(String(f.qty))}"></div>
-  <div class="f c1"><label for="cr_rate">سعر الوحدة (تعاقد)</label><input id="cr_rate" data-crf="rate" type="number" inputmode="decimal" step="any" value="${esc(String(f.rate))}"></div>
-  <div class="f c1"><label>قيمة التعاقد</label><input value="${fmt(k.contract)}" disabled id="cr_contract"></div></form>
+  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><label for="cr_boq"><b>بند ملف المشروع:</b></label><select id="cr_boq" data-crf="boq" style="width:auto;max-width:100%"><option value="">اختر البند</option>${crBoqList(site.id).filter(b=>b.id===f.boq||!crSiteRows(site.id).some(r=>r.id!==f.id&&r.data.boq===b.id)).map(b=>`<option value="${esc(b.id)}" ${b.id===f.boq?'selected':''}>${esc((b.code?b.code+' — ':'')+String(b.desc||'').slice(0,90)+' — '+(b.unit||'')+' — '+fmt(crN(b.cq))+' × '+fmt(crN(b.rate)))}</option>`).join('')}</select></div>
+  <p class="note">${k.I.linked?`${k.I.sec?esc(k.I.sec)+' · ':''}الوحدة <b>${esc(k.I.unit)}</b> · كمية التعاقد <b>${fmt(k.qty)}</b> · سعر الوحدة <b>${fmt(k.rate)}</b> · قيمة التعاقد <b id="cr_contract">${fmt(k.contract)}</b> · المنفذ <b>${fmt(k.exe)}</b> (${k.exePct}٪). التعديل في ملف المشروع.`:'<b class="neg">اختر بند هذا البند من ملف مستخلص المشروع.</b>'}</p>
   <div class="sec-h" style="margin-top:12px">الخصومات من قيمة التعاقد</div>
   <div class="tbl-wrap"><table class="cr-in"><tbody>${f.deds.map((x,i)=>`<tr><td><input data-crd="${i}" data-k="n" value="${esc(x.n||'')}" placeholder="مثال: تكاليف إدارية" maxlength="60"></td><td><select data-crd="${i}" data-k="m"><option value="pct" ${x.m!=='amt'?'selected':''}>نسبة ٪</option><option value="amt" ${x.m==='amt'?'selected':''}>مبلغ</option></select></td><td><input data-crd="${i}" data-k="v" type="number" inputmode="decimal" step="any" value="${esc(String(x.v??''))}" style="width:110px"></td><td class="num" id="cr_da_${i}">${fmt((k.deds[i]||{}).amt||0)}</td><td><button type="button" class="ghost" data-cr="deddel" data-i="${i}">حذف</button></td></tr>`).join('')}</tbody></table></div>
-  <div class="row"><button type="button" class="ghost" data-cr="dedadd">+ خصم</button><span class="note" id="cr_allow">المسموح صرفه = ${fmt(k.contract)} − ${fmt(k.dedT)} = <b>${fmt(k.allowed)}</b></span></div>
+  <div class="row"><button type="button" class="ghost" data-cr="dedadd">+ خصم</button><span class="note" id="cr_allow">المسموح صرفه = ${fmt(k.contract)} − ${fmt(k.dedT)} = <b>${fmt(k.allowed)}</b> · للوحدة <b>${crU(k.allowU)}</b></span></div>
   <div class="sec-h" style="margin-top:12px">تحليل سعر البند <small class="note">(اختياري — الكمية لكل وحدة من البند، أو مبلغ مقطوع)</small></div>
-  ${f.parts.length?`<div class="tbl-wrap"><table class="cr-in"><thead><tr><th>العنصر</th><th>النوع</th><th>الوحدة</th><th>الكمية لكل ${esc(f.unit||'وحدة')}</th><th>سعر الوحدة</th><th>مقطوع</th><th class="num">المقدّرة</th><th class="num">المصروف فعلًا</th><th>منين الفعلي</th><th></th></tr></thead><tbody>
+  ${f.parts.length?`<div class="tbl-wrap"><table class="cr-in"><thead><tr><th>العنصر</th><th>النوع</th><th>الوحدة</th><th>الكمية لكل ${esc(k.I.unit||'وحدة')}</th><th>سعر الوحدة</th><th>مقطوع</th><th class="num">المقدّر لكل ${esc(k.I.unit||'وحدة')}</th><th class="num">المصروف فعلًا</th><th class="num">الفعلي لكل ${esc(k.I.unit||'وحدة')}</th><th>منين الفعلي</th><th></th></tr></thead><tbody>
   ${f.parts.map((p,i)=>{const kp=k.parts[i]||{};return `<tr><td><input data-crp="${i}" data-k="name" value="${esc(p.name||'')}" placeholder="مثال: حديد تسليح" maxlength="80"></td><td><select data-crp="${i}" data-k="type">${CR_TYPES.map(([v,t])=>`<option value="${v}" ${p.type===v?'selected':''}>${t}</option>`).join('')}</select></td><td><input data-crp="${i}" data-k="unit" value="${esc(p.unit||'')}" style="width:70px" maxlength="20"></td>
     ${p.lump?`<td colspan="2"><input data-crp="${i}" data-k="amt" type="number" inputmode="decimal" step="any" value="${esc(String(p.amt??''))}" placeholder="المبلغ المقطوع"></td>`:`<td><input data-crp="${i}" data-k="per" type="number" inputmode="decimal" step="any" value="${esc(String(p.per??''))}" style="width:90px"></td><td><input data-crp="${i}" data-k="price" type="number" inputmode="decimal" step="any" value="${esc(String(p.price??''))}" style="width:100px"></td>`}
-    <td><input type="checkbox" data-crp="${i}" data-k="lump" ${p.lump?'checked':''} aria-label="مبلغ مقطوع"></td><td class="num" id="cr_pe_${i}">${fmt(kp.est||0)}</td><td class="num${kp.diff<0?' neg':''}">${fmt(kp.act||0)}</td><td>${chips(p.links,'p'+i)} ${picker('p'+i)}</td><td><button type="button" class="ghost" data-cr="partdel" data-i="${i}">حذف</button></td></tr>`}).join('')}
-  </tbody><tfoot><tr><td colspan="6">إجمالي التحليل</td><td class="num" id="cr_est">${fmt(k.est||0)}</td><td class="num">${fmt(r2(k.parts.reduce((a,p)=>a+p.act,0)))}</td><td colspan="2"></td></tr></tfoot></table></div>`:''}
+    <td><input type="checkbox" data-crp="${i}" data-k="lump" ${p.lump?'checked':''} aria-label="مبلغ مقطوع"></td><td class="num" id="cr_pe_${i}">${crU(kp.estU)}</td><td class="num">${fmt(kp.act||0)}</td><td class="num${kp.diffU!=null&&kp.diffU<0?' neg':kp.actU!=null?' in':''}">${crU(kp.actU)}</td><td>${chips(p.links,'p'+i)} ${picker('p'+i)}</td><td><button type="button" class="ghost" data-cr="partdel" data-i="${i}">حذف</button></td></tr>`}).join('')}
+  </tbody><tfoot><tr><td colspan="6">إجمالي التحليل (للوحدة)</td><td class="num" id="cr_est">${crU(k.estU)}</td><td class="num">${fmt(r2(k.parts.reduce((a,p)=>a+p.act,0)))}</td><td class="num">${crU(k.exe>0?k.parts.reduce((a,p)=>a+p.act,0)/k.exe:null)}</td><td colspan="2"></td></tr></tfoot></table></div>`:''}
   <div class="row"><button type="button" class="ghost" data-cr="partadd">+ عنصر</button>${crSiteRows(site.id).some(r=>r.id!==f.id&&(r.data.parts||[]).length)?`<select id="cr_cpf" style="width:auto"><option value="">نسخ تحليل من بند…</option>${crSiteRows(site.id).filter(r=>r.id!==f.id&&(r.data.parts||[]).length).map(r=>`<option value="${esc(r.id)}">${esc(r.data.name)}</option>`).join('')}</select><button type="button" class="ghost" data-cr="partcopy">نسخ</button>`:''}</div>
   <div class="sec-h" style="margin-top:12px">${f.parts.length?'ربط إضافي على البند كله (اختياري)':'اللي يدخل قصاد البند ده'}</div>
   <div class="row" style="flex-wrap:wrap;gap:6px;align-items:center">${chips(f.links,'i')} ${picker('i')}</div>
-  <div class="stats" style="margin-top:10px"><div class="stat"><div class="l">قيمة التعاقد</div><div class="v in">${fmt(k.contract)}</div></div><div class="stat"><div class="l">المسموح صرفه</div><div class="v">${fmt(k.allowed)}</div></div>${k.est!=null?`<div class="stat"><div class="l">التكلفة المقدّرة (التحليل)</div><div class="v">${fmt(k.est)}</div></div>`:''}<div class="stat"><div class="l">المصروف فعلًا</div><div class="v${k.diff<0?' neg':''}">${fmt(k.act)}</div><div class="split"><span>${k.diff>=0?'وفر':'زيادة'} <b class="${k.diff<0?'neg':'in'}">${fmt(Math.abs(k.diff))}</b></span></div></div></div>
+  <div class="stats" style="margin-top:10px"><div class="stat"><div class="l">للوحدة: سعر التعاقد / المسموح</div><div class="v in">${crU(k.rate)}</div><div class="split"><span>المسموح <b>${crU(k.allowU)}</b></span>${k.estU!=null?`<span>المقدّر <b>${crU(k.estU)}</b></span>`:''}</div></div><div class="stat"><div class="l">الفعلي للوحدة (÷ ${fmt(k.exe)} منفذ)</div><div class="v${k.actU!=null&&k.actU>k.allowU?' neg':''}">${crU(k.actU)}</div><div class="split"><span>المصروف فعلًا <b>${fmt(k.act)}</b></span></div></div><div class="stat"><div class="l">الوفر حتى الآن</div><div class="v ${k.save<0?'neg':'in'}">${k.exe>0?fmt(k.save):'—'}</div><div class="split"><span>قيمة التعاقد <b>${fmt(k.contract)}</b></span><span>المسموح <b>${fmt(k.allowed)}</b></span></div></div></div>
   <p class="note">«مبلغ يدوي» للمصروفات اللي ما اتسجلتش في التطبيق — يظهر هنا بس ومش بيدخل في حسابات الموقع ولا كشوفه.</p>
   <div class="form-foot"><button type="button" class="primary" data-cr="save">حفظ البند</button><button type="button" class="ghost" data-cr="cancel">إلغاء</button>${f.id?'<button type="button" class="danger" data-cr="del">حذف البند</button>':''}</div></div>`;
 }
@@ -1719,10 +1741,10 @@ function crRead(){const f=CR.edit;if(!f)return;
   document.querySelectorAll('#crForm [data-crd]').forEach(e=>{const x=f.deds[+e.dataset.crd];if(x)x[e.dataset.k]=e.value});
   document.querySelectorAll('#crForm [data-crp]').forEach(e=>{const x=f.parts[+e.dataset.crp];if(x)x[e.dataset.k]=e.type==='checkbox'?e.checked:e.value})}
 function crBindForm(){const fm=$('#crForm');if(!fm)return;const site=S.sites.find(s=>s.id===CR.site);
-  fm.querySelectorAll('input,select,textarea').forEach(e=>{if(e.dataset.k==='lump'||e.id==='cr_pt'){e.onchange=()=>{if(e.id==='cr_pt'){CR.pick={...CR.pick,t:e.value}}crRead();S.justSaved=true;render()};return}
+  fm.querySelectorAll('input,select,textarea').forEach(e=>{if(e.dataset.k==='lump'||e.id==='cr_pt'||e.id==='cr_boq'){e.onchange=()=>{if(e.id==='cr_pt'){CR.pick={...CR.pick,t:e.value}}crRead();S.justSaved=true;render()};return}
     e.oninput=()=>{crRead();if(!site)return;const k=crCalc(site.id,CR.edit);const set=(id,v)=>{const x=document.getElementById(id);if(x){if('value' in x&&x.tagName==='INPUT')x.value=v;else x.textContent=v}};
-      set('cr_contract',fmt(k.contract));k.deds.forEach((d,i)=>set('cr_da_'+i,fmt(d.amt)));k.parts.forEach((p,i)=>set('cr_pe_'+i,fmt(p.est)));set('cr_est',fmt(k.est||0));
-      const a=$('#cr_allow');if(a)a.innerHTML='المسموح صرفه = '+fmt(k.contract)+' − '+fmt(k.dedT)+' = <b>'+fmt(k.allowed)+'</b>'};
+      k.deds.forEach((d,i)=>set('cr_da_'+i,fmt(d.amt)));k.parts.forEach((p,i)=>set('cr_pe_'+i,crU(p.estU)));set('cr_est',crU(k.estU));
+      const a=$('#cr_allow');if(a)a.innerHTML='المسموح صرفه = '+fmt(k.contract)+' − '+fmt(k.dedT)+' = <b>'+fmt(k.allowed)+'</b> · للوحدة <b>'+crU(k.allowU)+'</b>'};
     if(e.tagName==='SELECT'&&e.dataset.k)e.onchange=e.oninput})}
 async function crSave(site,row){
   if(!SB||!navigator.onLine){CR.msg={t:'مراجعة التكاليف تحتاج إلى اتصال بالإنترنت للحفظ.'};return false}
@@ -1731,34 +1753,26 @@ async function crSave(site,row){
   if(r&&r.error){CR.msg={t:'تعذّر الحفظ: '+errMsg(r.error,140)};return false}
   const i=(CR.rows||[]).findIndex(x=>x.id===row.id),nr={...(i>=0?CR.rows[i]:{}),id:row.id,site_id:site.id,data:row.data};if(i>=0)CR.rows[i]=nr;else (CR.rows=CR.rows||[]).push(nr);appLs('adc_cost_v1',CR.rows);return true}
 function crClean(f){const n=v=>v===''||v==null?'':crN(v);
-  return {name:String(f.name||'').trim(),desc:String(f.desc||'').trim(),unit:String(f.unit||'').trim(),qty:n(f.qty),rate:n(f.rate),sec:String(f.sec||'').trim(),ord:f.ord,
+  return {boq:f.boq||'',name:String(f.name||'').trim(),unit:String(f.unit||'').trim(),qty:n(f.qty),rate:n(f.rate),ord:f.ord,
     deds:(f.deds||[]).filter(x=>String(x.n||'').trim()||crN(x.v)).map(x=>({n:String(x.n||'').trim()||'خصم',m:x.m==='amt'?'amt':'pct',v:crN(x.v)})),
     parts:(f.parts||[]).filter(p=>String(p.name||'').trim()||crN(p.per)||crN(p.amt)||(p.links||[]).length).map(p=>({id:p.id||newId(),name:String(p.name||'').trim(),type:p.type||'mat',unit:String(p.unit||'').trim(),per:n(p.per),price:n(p.price),lump:!!p.lump,amt:n(p.amt),links:p.links||[]})),
     links:f.links||[]}}
-async function crImportRows(site,list,src){
-  const have=crSiteRows(site.id),k=x=>regNormK(x||'');let n=0,skip=0,ord=have.length;
-  for(const x of list){if(!String(x.desc||'').trim()){continue}if(have.some(r=>k(r.data.name)===k(x.desc)&&k(r.data.unit)===k(x.unit))){skip++;continue}
-    const ok=await crSave(site,{id:'cr'+newId(),data:{name:String(x.desc).trim().slice(0,150),desc:String(x.desc).trim(),unit:x.unit||'',qty:crN(x.qty),rate:crN(x.rate),sec:x.sec||'',ord:ord++,deds:[],parts:[],links:[],src}});if(!ok)break;n++}
-  if(!CR.msg)CR.msg={ok:1,t:'تم استيراد '+n+' بند'+(skip?' (و'+skip+' موجودين بالفعل اتسابوا)':'')+'. افتح كل بند لتحديد الخصومات والربط.'}}
-async function crImportXl(site,file){let rows;try{rows=await XLSX_R.read(await file.arrayBuffer())}catch(e){CR.msg={t:'تعذّرت قراءة الملف. تأكد أنه ملف Excel ‏(‎.xlsx).'};return render()}
-  const p=typeof ctBoqParse==='function'?ctBoqParse(rows):{err:'تعذّرت قراءة الأعمدة.'};if(p.err){CR.msg={t:p.err};return render()}
-  let sec='';const L=[];for(const l of p.lines){if(l.kind==='sec'){sec=l.desc||'';continue}L.push({desc:l.desc,unit:l.unit,qty:l.qty,rate:l.rate,sec})}
-  await crImportRows(site,L,'excel');render()}
-async function crImportOc(site){const P=ocProj(site.id);if(!P)return;const secs=new Map((P.data.secs||[]).map(x=>[x.id,x.title||x.g||'']));
-  await crImportRows(site,(P.data.boq||[]).map(b=>({desc:b.desc,unit:b.unit,qty:b.cq,rate:b.rate,sec:secs.get(b.s)||''})),'oc');render()}
-function crDoc(site){const rows=crSiteRows(site.id),K=rows.map(r=>({d:r.data||{},k:crCalc(site.id,r.data||{})}));const m=v=>fmt(v).replace(/[⁦⁩]/g,'');
-  const body=`<table><thead><tr><th>م</th><th>البند</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>قيمة التعاقد</th><th>الخصومات</th><th>المسموح</th><th>المقدّرة</th><th>المصروف فعلًا</th><th>الفرق</th></tr></thead><tbody>
-  ${K.map(({d,k},i)=>`<tr><td>${i+1}</td><td class="tl"><b>${esc(d.name)}</b>${d.desc&&d.desc!==d.name?'<br><small>'+esc(d.desc)+'</small>':''}${k.deds.length?'<br><small>'+k.deds.map(x=>esc(x.n)+(x.m==='pct'?' '+x.v+'٪':'')+': '+m(x.amt)).join(' · ')+'</small>':''}</td><td>${esc(d.unit||'')}</td><td class="n">${m(k.qty)}</td><td class="n">${m(crN(d.rate))}</td><td class="n">${m(k.contract)}</td><td class="n">${m(k.dedT)}</td><td class="n">${m(k.allowed)}</td><td class="n">${k.est==null?'—':m(k.est)}</td><td class="n">${m(k.act)}</td><td class="n">${m(k.diff)}</td></tr>
-  ${k.parts.map(p=>`<tr class="sub-l"><td></td><td class="tl">↳ ${esc(p.name)} <small>(${esc((CR_TYPES.find(t=>t[0]===p.type)||['',''])[1])})</small>${(p.links||[]).length?'<br><small>'+(p.links||[]).map(l=>esc(crLinkTxt(l))).join(' · ')+'</small>':''}</td><td>${esc(p.unit||'')}</td><td class="n">${p.lump?'مقطوع':m(crN(p.per))}</td><td class="n">${p.lump?'':m(crN(p.price))}</td><td></td><td></td><td></td><td class="n">${m(p.est)}</td><td class="n">${m(p.act)}</td><td class="n">${m(p.diff)}</td></tr>`).join('')}`).join('')}
-  </tbody><tfoot><tr><td colspan="5">الإجمالي</td>${['contract','dedT','allowed'].map(x=>`<td class="n">${m(r2(K.reduce((a,y)=>a+y.k[x],0)))}</td>`).join('')}<td class="n">${m(r2(K.filter(y=>y.k.est!=null).reduce((a,y)=>a+y.k.est,0)))}</td><td class="n">${m(r2(K.reduce((a,y)=>a+y.k.act,0)))}</td><td class="n">${m(r2(K.reduce((a,y)=>a+y.k.diff,0)))}</td></tr></tfoot></table>`;
-  return {title:'مراجعة التكاليف — '+site.name,sub:'حتى '+today(),body}}
-async function crExportXl(site){const rows=crSiteRows(site.id),head=['البند','التوصيف','القسم','الوحدة','الكمية','سعر الوحدة','قيمة التعاقد','الخصومات','المسموح صرفه','التكلفة المقدّرة','المصروف فعلًا','الفرق','العنصر','نوع العنصر','الربط'],out=[head];
-  for(const r of rows){const d=r.data||{},k=crCalc(site.id,d);out.push([d.name,d.desc||'',d.sec||'',d.unit||'',k.qty,crN(d.rate),k.contract,k.dedT,k.allowed,k.est==null?'':k.est,k.act,k.diff,'','',(d.links||[]).map(crLinkTxt).join(' · ')]);
-    for(const p of k.parts)out.push(['','','','',p.lump?'':crN(p.per),p.lump?'':crN(p.price),'','','',p.est,p.act,p.diff,p.name,(CR_TYPES.find(t=>t[0]===p.type)||['',''])[1],(p.links||[]).map(crLinkTxt).join(' · ')])}
-  try{await saveFile('مراجعة التكاليف - '+site.name+' - '+today()+'.xlsx',XLSX_W.build([{name:'مراجعة التكاليف',rows:out,styles:{0:1},widths:[30,40,18,8,10,12,14,12,14,14,14,12,22,10,40],freeze:1}]))}catch(e){}}
+async function crImportOc(site){const L=crBoqList(site.id).filter(b=>!crSiteRows(site.id).some(r=>r.data.boq===b.id));let n=0;
+  for(const b of L){const ok=await crSave(site,{id:'cr'+newId(),data:{boq:b.id,name:String(b.desc||'').trim().slice(0,150),unit:b.unit||'',deds:[],parts:[],links:[]}});if(!ok)break;n++}
+  if(!CR.msg)CR.msg={ok:1,t:'أُضيف '+n+' بند من ملف المشروع. افتح كل بند لتحديد الخصومات والتحليل والربط.'};render()}
+function crDoc(site){const cert=crCert(site.id),rows=crSiteRows(site.id),K=rows.map(r=>({d:r.data||{},k:crCalc(site.id,r.data||{},cert)}));const m=v=>fmt(v).replace(/[⁦⁩]/g,''),u=v=>crU(v).replace(/[⁦⁩]/g,'');
+  const body=`<table><thead><tr><th>م</th><th>البند</th><th>الوحدة</th><th>كمية التعاقد</th><th>المنفذ</th><th>سعر التعاقد</th><th>المسموح/وحدة</th><th>المقدّر/وحدة</th><th>الفعلي/وحدة</th><th>قيمة التعاقد</th><th>المصروف فعلًا</th><th>الوفر حتى الآن</th></tr></thead><tbody>
+  ${K.map(({d,k},i)=>`<tr><td>${i+1}</td><td class="tl"><b>${esc(k.I.name)}</b>${k.deds.length?'<br><small>'+k.deds.map(x=>esc(x.n)+(x.m==='pct'?' '+x.v+'٪':'')+': '+m(x.amt)).join(' · ')+'</small>':''}</td><td>${esc(k.I.unit)}</td><td class="n">${m(k.qty)}</td><td class="n">${m(k.exe)}</td><td class="n">${u(k.rate)}</td><td class="n">${u(k.allowU)}</td><td class="n">${u(k.estU)}</td><td class="n">${u(k.actU)}</td><td class="n">${m(k.contract)}</td><td class="n">${m(k.act)}</td><td class="n">${k.exe>0?m(k.save):'—'}</td></tr>
+  ${k.parts.map(p=>`<tr class="sub-l"><td></td><td class="tl">↳ ${esc(p.name)} <small>(${esc((CR_TYPES.find(t=>t[0]===p.type)||['',''])[1])})</small>${(p.links||[]).length?'<br><small>'+(p.links||[]).map(l=>esc(crLinkTxt(l))).join(' · ')+'</small>':''}</td><td>${esc(p.unit||'')}</td><td></td><td></td><td></td><td></td><td class="n">${u(p.estU)}</td><td class="n">${u(p.actU)}</td><td></td><td class="n">${m(p.act)}</td><td></td></tr>`).join('')}`).join('')}
+  </tbody><tfoot><tr><td colspan="9">الإجمالي</td><td class="n">${m(r2(K.reduce((a,y)=>a+y.k.contract,0)))}</td><td class="n">${m(r2(K.reduce((a,y)=>a+y.k.act,0)))}</td><td class="n">${m(r2(K.reduce((a,y)=>a+y.k.save,0)))}</td></tr></tfoot></table>`;
+  return {title:'مراجعة التكاليف — '+site.name,sub:(cert?'الكمية المنفذة من مستخلص المالك رقم '+(cert.data.no||'')+' بتاريخ '+(cert.data.date||'')+' · ':'')+'حتى '+today(),body}}
+async function crExportXl(site){const cert=crCert(site.id),rows=crSiteRows(site.id),head=['البند','القسم','الوحدة','كمية التعاقد','المنفذ','نسبة التنفيذ','سعر التعاقد','المسموح للوحدة','المقدّر للوحدة','الفعلي للوحدة','قيمة التعاقد','الخصومات','المسموح','المصروف فعلًا','الوفر حتى الآن','العنصر','نوع العنصر','الربط'],out=[head],R=v=>v==null||!isFinite(v)?'':Math.round(v*100)/100;
+  for(const r of rows){const d=r.data||{},k=crCalc(site.id,d,cert);out.push([k.I.name,k.I.sec||'',k.I.unit,k.qty,k.exe,k.exePct/100,k.rate,R(k.allowU),R(k.estU),R(k.actU),k.contract,k.dedT,k.allowed,k.act,k.exe>0?k.save:'','','',(d.links||[]).map(crLinkTxt).join(' · ')]);
+    for(const p of k.parts)out.push(['','','','','','','','',R(p.estU),R(p.actU),'','','',p.act,'',p.name,(CR_TYPES.find(t=>t[0]===p.type)||['',''])[1],(p.links||[]).map(crLinkTxt).join(' · ')])}
+  try{await saveFile('مراجعة التكاليف - '+site.name+' - '+today()+'.xlsx',XLSX_W.build([{name:'مراجعة التكاليف',rows:out,styles:{0:1},widths:[36,18,8,10,10,8,12,12,12,12,14,12,14,14,14,20,10,40],freeze:1}]))}catch(e){}}
 document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-cr]');if(!b||S.sel!=='__cost')return;const a=b.dataset.cr,site=S.sites.find(s=>s.id===CR.site);if(!site||!siteBoss(site))return;
   if(CR.edit)crRead();const f=CR.edit;
-  if(a==='new'){CR.edit=crNewForm(null);CR.pick=null;render();const x=$('#crForm');if(x)x.scrollIntoView({block:'start'});return}
+  if(a==='new'){CR.edit=crNewForm(null,'');CR.pick=null;render();const x=$('#crForm');if(x)x.scrollIntoView({block:'start'});return}
   if(a==='edit'){const r=(CR.rows||[]).find(x=>x.id===b.dataset.id);if(!r)return;CR.edit=crNewForm(r);CR.pick=null;render();const x=$('#crForm');if(x)x.scrollIntoView({block:'start'});return}
   if(a==='cancel'){CR.edit=null;CR.pick=null;render();return}
   if(a==='impoc'){await crImportOc(site);return}
@@ -1779,7 +1793,9 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-cr
     else{const v=($('#cr_pv')||{}).value;if(!v){flash('اختر من القائمة.',1);return}l=t==='mat'?{t,id:v}:t==='cert'?{t,con:v.split('|')[0],item:v.split('|').slice(1).join('|')}:{t,n:v};
       const key=JSON.stringify(l);if(crAllLinks(f).some(x=>JSON.stringify(x)===key)){flash('مربوط بالفعل في هذا البند.',1);return}}
     L.push(l);CR.pick=null;S.justSaved=true;return render()}
-  if(a==='save'){const d=crClean(f);if(!d.name){CR.msg={t:'اكتب اسم البند.'};return render()}if(d.ord==null)d.ord=crSiteRows(site.id).length;
+  if(a==='save'){const d=crClean(f);const b=crBoqList(site.id).find(x=>x.id===d.boq);if(!b){CR.msg={t:'اختر البند من ملف مستخلص المشروع.'};return render()}
+    if(crSiteRows(site.id).some(r=>r.id!==f.id&&r.data.boq===d.boq)){CR.msg={t:'هذا البند موجود بالفعل في المراجعة.'};return render()}
+    d.name=String(b.desc||'').trim().slice(0,150);d.unit=b.unit||'';if(d.ord==null)d.ord=crSiteRows(site.id).length;
     b.disabled=true;const ok=await crSave(site,{id:f.id||'cr'+newId(),data:d});if(ok){CR.edit=null;CR.pick=null;CR.msg={ok:1,t:'حُفظ البند «'+d.name+'».'}}render();return}
   if(a==='del'){if(!confirm('حذف بند المقايسة «'+f.name+'» من مراجعة التكاليف؟ (المصروفات نفسها مش هتتأثر)'))return;let r;try{r=await SB.from('cost_items').delete().eq('id',f.id)}catch(e){r={error:e}}
     if(r&&r.error){CR.msg={t:'تعذّر الحذف: '+errMsg(r.error,120)};return render()}CR.rows=(CR.rows||[]).filter(x=>x.id!==f.id);appLs('adc_cost_v1',CR.rows);CR.edit=null;CR.msg={ok:1,t:'حُذف البند.'};render()}
@@ -8845,7 +8861,7 @@ async function printReport(kind){
     S.printMsg='تم حفظ ملف الطباعة. افتحه، وستُفتح نافذة الطباعة تلقائيًا: اختر الطابعة، أو «Save as PDF» لحفظه بصيغة PDF.';render()}catch(e){}
 }
 /* ---------- render ---------- */
-const KEEP=['cr_name','cr_sec','cr_desc','cr_unit','cr_qty','cr_rate','r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','r_type','r_stype','r_kind','r_grp','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
+const KEEP=['r_name','r_spec','r_phone','r_claim','r_item','r_code','r_desc','r_type','r_stype','r_kind','r_grp','e_contractor_new','e_item_new','j_contractor_new','j_item_new','j_site','j_amount','j_date','j_method','j_notes','j_item','j_contractor','j_remarks','e_amount','e_date','e_contractor','e_item','e_method','e_due','e_chq','j_due','j_chq','e_bank','e_bank_o','j_bank','j_bank_o','e_notes','e_remarks','k_date','k_cash','k_bank','k_notes'];
 /* ---------- الشيكات: لا تدخل الرصيد إلا بعد تأكيد التحصيل ---------- */
 function dueSoon(days){
   const t=today(),lim=addDays(t,days);
