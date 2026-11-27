@@ -5883,7 +5883,32 @@ async function cdtMove(mv,v){
   CDP.mv=null;cdtMsg(t+(oc?' الكود '+oc+' يبقى كما هو'+(APPU.owner?' (يمكنك تعديله من زر الكود).':'.'):''),true);
 }
 function cdtMsg(t,ok){CDP.msg={ok:ok!==false,t,at:Date.now()};S.justSaved=true;render()}
+/* اختيار التقسيم في الشجرة: المشترك، أو موقع بالمقايسة (عرض بنود المقايسة وما عليها) */
+function cdtSites(){return APP?S.sites.filter(s=>typeof bqOn==='function'&&bqOn(s.id)):[]}
+function cdtScopeHTML(){const L=cdtSites();if(!L.length)return '';if(CDP.tsite&&!L.some(s=>s.id===CDP.tsite))CDP.tsite='';
+  return `<div class="row" style="gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><label for="cdtSite"><b>التقسيم:</b></label><select id="cdtSite" style="width:auto"><option value="">المشترك (البنود العامة)</option>${L.map(s=>`<option value="${esc(s.id)}" ${CDP.tsite===s.id?'selected':''}>${esc(s.name)} — بالمقايسة</option>`).join('')}</select></div>`}
+document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='cdtSite'){CDP.tsite=ev.target.value;render()}});
+function bqTreeHTML(siteId){const site=S.sites.find(s=>s.id===siteId);if(!site)return '';
+  let CK=null;const ready=typeof CR!=='undefined'&&CR.loaded&&typeof OC!=='undefined'&&OC.loaded;
+  if(!ready){if(!CDP._bqld){CDP._bqld=1;Promise.all([typeof crLoad==='function'?crLoad():0,typeof ocLoad==='function'&&typeof ocCan==='function'&&ocCan()?ocLoad():0]).then(()=>{CDP._bqld=0;render()}).catch(()=>{CDP._bqld=0})}}
+  else{try{CK=crK(siteId,crCert(siteId))}catch(e){CK=null}}
+  const E=(S.exp||[]).filter(e=>e.siteId===siteId&&!e.deleted),q=arNorm(CDP.tq||''),sum=L=>r2(L.reduce((a,e)=>a+amt(e),0)),uq=a=>[...new Set(a.filter(Boolean))];
+  const grp=(title,L,extra,open)=>{if(q&&!arNorm(title).includes(q)&&!L.some(e=>arNorm((e.item||'')+' '+(e.contractor||'')).includes(q)))return '';
+    return `<details class="card cdt-bq" ${open?'open':''}><summary><b>${esc(title)}</b> <span class="note" style="margin-inline-start:10px">— ${L.length} مصروف · ${fmt(sum(L))} ${CUR}</span></summary>
+     ${L.length?`<p class="note" style="margin:6px 0 2px"><b>بنود المصروفات:</b> ${uq(L.map(e=>e.item)).map(esc).join(' · ')||'—'}</p><p class="note" style="margin:2px 0"><b>المقاولين / الموردين:</b> ${uq(L.map(e=>e.contractor)).map(esc).join(' · ')||'—'}</p>`:'<p class="note">لا توجد مصروفات مسجّلة عليه بعد.</p>'}${extra||''}</details>`};
+  const out=[];
+  for(const b of bqList(siteId)){const L=E.filter(e=>e.boq===b.id),x=CK?CK.K.find(y=>y.d.boq===b.id):null,sh=x&&x.k.sha?`<p class="note" style="margin:2px 0"><b>+ نصيبه من المشترك:</b> ${(x.k.shd||[]).map(d=>esc(d.n)+' '+fmt(d.v)).join(' · ')} = ${fmt(x.k.sha)}</p>`:'';
+    out.push(grp((b.code?b.code+' — ':'')+b.name,L,sh))}
+  const SH=bqShared(siteId),shL=E.filter(e=>String(e.boq||'').startsWith('sh:'));
+  const shT=SH.map(x=>{const L=E.filter(e=>e.boq==='sh:'+x.id);const B=CK&&CK.SH?CK.SH.B.find(y=>y.x.id===x.id):null;return `<p class="note" style="margin:2px 0">• <b>${esc(x.n)}</b>: ${L.length} مصروف · ${fmt(sum(L))}${B?' · اتوزع '+fmt(B.alloc)+(B.left>0.004?' · رصيد/غير موزع '+fmt(B.left):''):''}${x.sc?' · البنود '+esc(x.sc):''}</p>`}).join('');
+  out.push(grp('خامات مشتركة (تتوزع على البنود)',shL,shT));
+  out.push(grp('مصروفات على الشركة',E.filter(e=>e.boq===BQ_CO)));
+  const none=E.filter(e=>!e.boq);if(none.length)out.push(grp('⚠ من غير بند مقايسة',none,`<button type="button" class="ghost" data-cdtnone="${esc(siteId)}">اعرضهم في الموقع وسجّلهم</button>`,true));
+  return `<p class="note" style="margin:0 0 8px">البنود العامة للموقع ده = بنود المقايسة من ملف المشروع. تحت كل بند: المصروفات المسجّلة عليه ونصيبه من الخامات المشتركة. تعديل البنود نفسها من ملف المشروع.${ready?'':' (جاري تحميل ملف المشروع…)'}</p>
+   <div class="row" style="gap:8px;margin-bottom:8px"><input id="cdtQ" placeholder="بحث في البنود والأسماء…" value="${esc(CDP.tq||'')}" style="max-width:260px"></div>${out.join('')}`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-cdtnone]');if(!b)return;S.sel=b.dataset.cdtnone;S.siteTab='mov';S.tab='exp';S.kind='exp';S.filt={...(S.filt||{}),b:'__none'};S.siteLim=200;S.justSaved=true;render();window.scrollTo({top:0})});
 function cdTreeTab(hub){
+  {const sc=cdtScopeHTML();if(sc&&CDP.tsite)return `<div class="card">${sc}${bqTreeHTML(CDP.tsite)}</div>`;if(sc)CDP._sc=sc;else CDP._sc=''}
   if(typeof SO==='undefined'||!SO.d)return '<div class="card"><p class="note">جاري تحميل المخزن…</p></div>';
   const D=cdtData(),q=arNorm(CDP.tq||''),hit=s=>!q||arNorm(s).includes(q)||(cdOn()&&String(s).toLowerCase().includes(q)),own=APPU.owner&&cdOn();
   const code=(k,key,c)=>c?`${own?`<button type="button" class="linkish cdt-code" data-cd="setcode" data-kind="${k}" data-key="${esc(key)}" data-code="${esc(c)}" title="تعديل الكود">${cdTag(c)}</button>`:cdTag(c)}`:'';
@@ -5903,7 +5928,7 @@ function cdTreeTab(hub){
     return `<div class="cdt-n l0" data-drop="g|${esc(g.name)}"><button type="button" class="cdt-t" data-cdttog="g:${esc(g.name)}">${o?'▾':'◂'}</button>${code('G',arNorm(g.name),cdG(g.name))}<span class="grow">${esc(g.name)} <small>(بند عام · ${g.items.length})</small></span>${gb(g.name)}</div>${o?body||'<p class="note" style="margin:4px 30px">لا توجد بنود تحته.</p>':''}`};
   const sug=D.loose.map(m=>({m,s:cdMatSuggest(m)})).filter(x=>x.s);
   const freeB=D.free.map(item).join(''),looseB=D.loose.filter(m=>!q||matHit(m)).map(m=>mat(m,'l1')+(cdMatSuggest(m)?`<small class="note cdt-sg">الاقتراح: ← ${esc(cdMatSuggest(m))}</small>`:'')).join('');
-  return `<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px"><input id="cdNewG" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:200px"><button class="primary" type="button" data-cd="newg">+ بند عام</button></div><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><input id="cdtQ" placeholder="بحث بالاسم${cdOn()?' أو الكود':''}، مثال: طوب" value="${esc(CDP.tq||'')}" style="flex:1;min-width:200px" autocomplete="off"><span class="note">اضغط «نقل» أو اسحب ⋮ على الكمبيوتر وأفلت على المكان الجديد.</span></div></div>
+  return `<div class="card">${CDP._sc||''}<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px"><input id="cdNewG" placeholder="اسم بند عام جديد، مثال: أعمال السباكة" style="flex:1;min-width:200px"><button class="primary" type="button" data-cd="newg">+ بند عام</button></div><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><input id="cdtQ" placeholder="بحث بالاسم${cdOn()?' أو الكود':''}، مثال: طوب" value="${esc(CDP.tq||'')}" style="flex:1;min-width:200px" autocomplete="off"><span class="note">اضغط «نقل» أو اسحب ⋮ على الكمبيوتر وأفلت على المكان الجديد.</span></div></div>
   ${(()=>{const sg=igSvcSuggest(D.pf);return sg.length?`<div class="warn-box" style="margin-bottom:10px"><b>${sg.length} ${sg.length===1?'بند خدمات ومصاريف':'بنود خدمات ومصاريف'} من دون بند عام.</b> اقتراح التطبيق: ${sg.map(x=>esc(x.name)+' ← '+esc(x.g)).join('، ')}. <button type="button" class="primary" data-igsvc>طبّق الاقتراح</button><br><small>المصاريف التي تخص شغلانة تحت بندها العام، والباقي تحت «${IG_GEN}».</small></div>`:''})()}
   ${D.free.length||D.loose.length?`<div class="card cdt-loose" data-drop="g|" data-ck="cdt-loose" data-cks="${D.free.length} بند · ${D.loose.length} خامة"><div class="sec-h">لم تُوضع في مكانها بعد</div>
     ${D.free.length?`<div class="note">بنود من غير بند عام (${D.free.length})</div>${freeB||'<p class="note">—</p>'}`:''}
