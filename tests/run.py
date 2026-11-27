@@ -529,10 +529,45 @@ def t_owner_boq(b, port):
     finally:
         a.close()
 
+def t_fixes27(b, port):
+    """تصليحات 27 نوفمبر: حذف قسم في ملف المشروع، أقسام المشروع الجديد من بنود الموقع، قايمة المواقع ما تطلعش برا عمودها، وجدول مراجعة التكاليف."""
+    seed = cost_seed()
+    a = App(b, port, seed, OWNER)
+    try:
+        a.p.set_viewport_size({'width': 1100, 'height': 800})
+        a.ev("S.sites[0].name='مخزن PharmaOverSeas — فيلا د.ممدوح التجمع الخامس';render()"); a.p.wait_for_timeout(300)
+        over = a.ev("[...document.querySelectorAll('.rail .site-btn')].some(e=>e.scrollWidth>e.clientWidth+1)")
+        expect(not over, 'اسم موقع طويل بيطلع برا عمود المواقع')
+        a.go('__cost'); a.p.wait_for_timeout(1000)
+        a.p.click('[data-cr="impoc"]'); a.p.wait_for_timeout(800)
+        expect(a.ev("!!document.querySelector('.cr-t td:first-child [data-cr=edit]')"), 'زرار «تعديل» المفروض جنب اسم البند')
+        a.go('__ocert'); a.p.wait_for_timeout(500)
+        a.ev("OC.site='s1';OC.tab='proj';OC.pe=null;render()"); a.p.wait_for_timeout(400)
+        a.ev("OC.pe.secs.push({id:'scX',title:'قسم قديم',g:'',parts:{}});render()"); a.p.wait_for_timeout(200)
+        a.p.once('dialog', lambda d: d.accept())
+        a.p.click('[data-oc="sdel"][aria-label="حذف القسم قسم قديم"]'); a.p.wait_for_timeout(300)
+        expect(a.ev("!OC.pe.secs.some(s=>s.id==='scX')"), '«حذف القسم» ما اشتغلش')
+        n0 = a.ev("OC.pe.secs.length")
+        a.p.click('[data-oc="sdel"] >> nth=0'); a.p.wait_for_timeout(300)
+        expect(a.ev("OC.pe.secs.length") == n0, 'قسم عليه كميات في مستخلص اتحذف')
+        a.ev("S.sites.find(x=>x.id==='s1').igMode='off'")
+        d = a.ev("ocNewProjData(S.sites.find(x=>x.id==='s1'),'')")
+        expect(len(d['secs']) == 0, f'مشروع جديد لموقع «بدون بنود عامة» جه بأقسام ({d["secs"]})')
+        a.ev("OC.rows.push({id:'tq',kind:'tpl',data:ocBoqTpl()})")
+        a.ev("S.sites.find(x=>x.id==='s1').igMode=''")
+        expect(len(a.ev("ocNewProjData(S.sites.find(x=>x.id==='s1'),'tq').secs")) == 0, 'نموذج بالمقايسة المفروض يبدأ من غير أقسام')
+        a.ev("igSiteMode(S.sites.find(x=>x.id==='s1'),'own');igSiteNew(S.sites.find(x=>x.id==='s1'),'مجموعة خاصة',['أعمال السباكة'])"); a.p.wait_for_timeout(500)
+        expect(a.ev("igOf('أعمال السباكة',igPfOfSite('s1'))") == 'مجموعة خاصة', 'التقسيم الخاص ما اتطبقش')
+        mv = a.ev("(()=>{const s=S.sites.find(x=>x.id==='s1'),P={data:{secs:[{id:'q1',g:'مجموعة خاصة',title:'مجموعة خاصة',parts:{}}],boq:[]}};return ocMoves(s,P,{data:ocDefTpl()}).filter(m=>m.s==='q1').length})()")
+        expect(mv > 0, 'مستخلص المالك لسه بيقسّم الحركات بالتقسيم المشترك مش الخاص بالموقع')
+        a.check('تصليحات 27 نوفمبر')
+    finally:
+        a.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27)]
 
 def main():
     from playwright.sync_api import sync_playwright
