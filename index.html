@@ -273,7 +273,8 @@ select.auto-flash{animation:autoFlash 1.2s ease-out}
 .j-newb{margin:0 0 12px}.j-newb button{width:100%;padding:12px;justify-content:center}.j-more{justify-content:center;margin:8px 0}.j-more button{width:100%;justify-content:center}
 .sp-more{width:100%;margin-top:8px;justify-content:center;white-space:normal}.sp-more-l{margin:6px 0 0;white-space:normal}
 .ct-ret{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--sunk);padding:8px 12px;border-radius:10px;margin-top:6px}.ct-retp{display:inline-flex;align-items:center;gap:6px}
-.cr-t th.c{text-align:center}.cr-acts{gap:8px;flex-wrap:wrap;margin-bottom:8px}.cr-in td{padding:4px 6px;vertical-align:middle}.cr-in input,.cr-in select{min-width:60px}.cr-in select{min-width:92px}.cr-pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}.cr-pick input,.cr-pick select{width:auto;max-width:260px}
+.cr-t th.c{text-align:center}.cr-t th:first-child,.cr-t td:first-child{position:sticky;inset-inline-start:0;background:var(--surface);z-index:1;min-width:170px;max-width:220px;white-space:normal}.cr-t td:first-child br{display:none}.cr-swipe{display:none;margin:0 0 6px}@media (max-width:820px){.cr-swipe{display:block}}.cr-t td:first-child [data-cr=edit]{display:block;margin-top:4px}.cr-t thead th:first-child,.cr-t tfoot td:first-child{background:var(--sunk)}.cr-t td.num,.cr-t th.num{white-space:nowrap}.oc-sdel{margin-inline-start:4px;color:var(--danger,#b42318)}
+@media (min-width:821px){.rail .site-btn{white-space:normal}.rail .site-btn .n{min-width:0;overflow-wrap:anywhere}.rail .site-btn .t{flex:none}}.cr-acts{gap:8px;flex-wrap:wrap;margin-bottom:8px}.cr-in td{padding:4px 6px;vertical-align:middle}.cr-in input,.cr-in select{min-width:60px}.cr-in select{min-width:92px}.cr-pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}.cr-pick input,.cr-pick select{width:auto;max-width:260px}
 .pg-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:10px 0 2px}.pg-bar span{color:var(--muted,#666);font-size:13px;padding:0 6px}.pg-bar button{min-width:44px}
 .pg-filt{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pg-filt select{width:auto;max-width:200px}
 
@@ -334,7 +335,7 @@ body.eng-mode .layout{grid-template-columns:minmax(0,1fr)}
 
 /* ---- mobile UI (bottom bar, floating button, menu, notices, search) ---- */
 .ui-ic{width:20px;height:20px;flex:none}
-.pop-tools{width:min(320px,calc(100vw - 32px))}
+.pop-tools{width:min(400px,calc(100vw - 32px))}
 .pop-tools .site-btn{display:flex;align-items:center;gap:12px;white-space:normal;padding:10px 10px;border:0;margin:0;border-radius:10px}
 .pop-tools .site-btn .ui-ic{color:var(--accent)}
 .pop-tools .site-btn .n{flex:1;min-width:0;color:var(--fg);font-weight:500}
@@ -839,7 +840,7 @@ function newAccWatch(){if(NEWACC_CH||!SB||!APPU.owner)return;
     APPU.members=null;appLoadMembers()}).subscribe()}catch(e){}}
 setInterval(()=>{if(APPU.owner&&SB&&navigator.onLine&&!document.hidden)appLoadMembers()},10*60*1000);
 /* سجل تحديثات قاعدة البيانات */
-const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql'],['2026-11-14-devices-read','موافقة الأجهزة وتضييق القراءة','ADC-الدفعة-3-الأجهزة-وتضييق-القراءة.sql'],['2026-11-14-limits','تنبيه حدود Supabase','ADC-الدفعة-4-حدود-Supabase.sql'],['2026-11-26-cost-review','مراجعة التكاليف','ADC-مراجعة-التكاليف.sql']];
+const MIG_KNOWN=[['2026-11-08-notice-ignores','تجاهل التنبيهات','ADC-تحديث-تجاهل-التنبيهات.sql'],['2026-11-09-custody-eng-tech','عهدة مهندس الموقع + المكتب الفني','ADC-إصلاح-عهدة-مهندس-ومكتب-فني.sql'],['2026-11-10-tech-entry-rename','المكتب الفني ووضع التسجيل والأسماء','ADC-تحديث-المكتب-الفني-ووضع-التسجيل-والأسماء.sql'],['2026-11-11-custody-owner-claim','اعتماد العهدة للمدير وصاحب الموقع','ADC-إصلاح-اعتماد-العهدة-للمدير.sql'],['2026-11-13-migrations-table','سجل تحديثات قاعدة البيانات','ADC-الدفعة-3-سجل-التحديثات-وفحص-القواعد.sql'],['2026-11-14-devices-read','موافقة الأجهزة وتضييق القراءة','ADC-الدفعة-3-الأجهزة-وتضييق-القراءة.sql'],['2026-11-14-limits','تنبيه حدود Supabase','ADC-الدفعة-4-حدود-Supabase.sql'],['2026-11-26-cost-review','مراجعة التكاليف','ADC-مراجعة-التكاليف.sql'],['2026-11-27-tech-site-groups','البنود العامة لكل موقع للمكتب الفني','ADC-بنود-المكتب-الفني.sql']];
 const MIG={rows:null,busy:false,missing:false};
 async function migLoad(){if(MIG.busy||!SB||!APPU.owner)return;MIG.busy=true;try{const {data,error}=await SB.from('adc_migrations').select('*').order('name');if(error){MIG.missing=/adc_migrations|does not exist|schema cache/i.test(error.message||'');MIG.rows=[]}else{MIG.rows=data||[];MIG.missing=false}}catch(e){}MIG.busy=false;try{render()}catch(e){}}
 function migCard(){if(!APPU.owner)return '';if(MIG.rows===null){setTimeout(migLoad,0);return ''}
@@ -1599,7 +1600,7 @@ function crBoqList(site){const P=crProj(site);if(!P)return [];const secs=new Map
   return (P.data.boq||[]).map((b,k)=>({...b,sec:(secs.get(b.s)||{}).t||'',si:(secs.get(b.s)||{}).i??999,k})).sort((a,b)=>a.si-b.si||a.k-b.k).map((b,_,A)=>({...b,code:b.si<999?(b.si+1)+'.'+(A.filter(x=>x.si===b.si).indexOf(b)+1):''}))}
 function crInfo(site,d){const b=d.boq?crBoqList(site).find(x=>x.id===d.boq):null;
   if(b)return {linked:true,name:String(b.desc||'').trim(),unit:b.unit||'',qty:crN(b.cq),rate:crN(b.rate),sec:b.sec,code:b.code||''};
-  return {linked:false,name:d.name||'',unit:d.unit||'',qty:crN(d.qty),rate:crN(d.rate),sec:d.sec||'',code:''}}
+  return {linked:false,gone:!!d.boq,name:d.name||'',unit:d.unit||'',qty:crN(d.qty),rate:crN(d.rate),sec:d.sec||'',code:''}}
 /* مستخلصات المالك للموقع واللي متختار */
 function crCerts(site){return typeof ocCerts==='function'&&typeof OC!=='undefined'&&OC.loaded?ocCerts(site):[]}
 function crCert(site){const L=crCerts(site);if(!L.length)return null;const want=CR.oc[site];if(want){const x=L.find(c=>c.id===want);if(x)return x}
@@ -1692,15 +1693,15 @@ function crRender(){
   <div class="stat"><div class="l">المسموح للمنفذ حتى الآن</div><div class="v">${fmt(tot.earned)}<small>${CUR}</small></div><div class="split"><span>${cert?'مستخلص المالك رقم '+esc(String(cert.data.no||'')):'لا يوجد مستخلص'}</span></div></div>
   <div class="stat"><div class="l">المصروف فعلًا</div><div class="v${tot.save<0?' neg':''}">${fmt(tot.act)}<small>${CUR}</small></div><div class="split"><span>${tot.save>=0?'وفر حتى الآن':'زيادة حتى الآن'} <b class="${tot.save<0?'neg':'in'}">${fmt(Math.abs(tot.save))}</b></span></div></div></div>`:''}
   ${un.total>0.004&&rows.length?`<div class="card due-card"><b>⚠ مصروفات وتوريدات في الموقع غير داخلة في أي بند: ${fmt(un.total)} ${CUR}</b><div class="note" style="margin-top:4px">${un.list.slice(0,8).map(([n,v])=>esc(n)+' ('+fmt(v)+')').join('، ')}${un.list.length>8?' …':''}</div></div>`:''}
-  ${rows.length?`<div class="card"><div class="sec-h">بنود المراجعة (${rows.length})</div><div class="tbl-wrap"><table class="cr-t"><thead>
-  <tr><th rowspan="2">البند</th><th rowspan="2">الوحدة</th><th colspan="3" class="c">الكمية</th><th colspan="4" class="c">للوحدة</th><th colspan="3" class="c">الإجمالي</th><th rowspan="2"></th></tr>
+  ${rows.length?`<div class="card"><div class="sec-h">بنود المراجعة (${rows.length})</div><p class="note cr-swipe">اسحب الجدول لليسار لعرض الكميات والأسعار ←</p><div class="tbl-wrap"><table class="cr-t"><thead>
+  <tr><th rowspan="2">البند</th><th rowspan="2">الوحدة</th><th colspan="3" class="c">الكمية</th><th colspan="4" class="c">للوحدة</th><th colspan="3" class="c">الإجمالي</th></tr>
   <tr><th class="num">التعاقد</th><th class="num">المنفذ</th><th class="num">٪</th><th class="num">سعر التعاقد</th><th class="num">المسموح</th><th class="num">المقدّر</th><th class="num">الفعلي</th><th class="num">قيمة التعاقد</th><th class="num">المصروف فعلًا</th><th class="num">الوفر حتى الآن</th></tr></thead><tbody>
-  ${K.map(({r,k})=>{const n=crAllLinks(r.data||{}).length,bu=k.actU!=null&&k.actU>k.allowU+0.004;return `<tr${CR.edit&&CR.edit.id===r.id?' class="hl"':''}><td><b>${esc(k.I.name)}</b>${k.I.sec?`<br><span class="note">${esc(k.I.sec)}</span>`:''}<br><span class="note">${k.parts.length?'تحليل '+k.parts.length+' عنصر · ':''}${n?n+' ربط':'<b class="neg">غير مربوط بمصروفات</b>'}${k.I.linked?'':' · <b class="neg">مش في ملف المشروع</b>'}</span></td>
+  ${K.map(({r,k})=>{const n=crAllLinks(r.data||{}).length,bu=k.actU!=null&&k.actU>k.allowU+0.004;return `<tr${CR.edit&&CR.edit.id===r.id?' class="hl"':''}><td><b>${esc(k.I.name)}</b>${k.I.sec?`<br><span class="note">${esc(k.I.sec)}</span>`:''}<br><span class="note">${k.parts.length?'تحليل '+k.parts.length+' عنصر · ':''}${n?n+' ربط':'<b class="neg">غير مربوط بمصروفات</b>'}${k.I.linked?'':k.I.gone?' · <b class="neg">⚠ البند اتشال من ملف المشروع</b>':' · <b class="neg">مش في ملف المشروع</b>'}</span><br><button type="button" class="linkish" data-cr="edit" data-id="${esc(r.id)}">تعديل</button></td>
     <td>${esc(k.I.unit)}</td><td class="num">${fmt(k.qty)}</td><td class="num">${fmt(k.exe)}</td><td class="num">${k.exePct}٪</td>
     <td class="num">${crU(k.rate)}</td><td class="num">${crU(k.allowU)}</td><td class="num">${crU(k.estU)}</td><td class="num${bu?' neg':k.actU!=null?' in':''}">${crU(k.actU)}</td>
     <td class="num">${fmt(k.contract)}</td><td class="num">${fmt(k.act)}</td><td class="num ${k.save<0?'neg':'in'}">${k.exe>0?sgn(k.save):k.act?'<span class="note">مصروف قبل التنفيذ</span>':'—'}</td>
-    <td class="acts"><button type="button" class="ghost" data-cr="edit" data-id="${esc(r.id)}">تعديل</button></td></tr>`}).join('')}
-  </tbody><tfoot><tr><td colspan="9">الإجمالي</td><td class="num">${fmt(tot.contract)}</td><td class="num">${fmt(tot.act)}</td><td class="num ${tot.save<0?'neg':'in'}">${sgn(tot.save)}</td><td></td></tr></tfoot></table></div>
+</tr>`}).join('')}
+  </tbody><tfoot><tr><td colspan="9">الإجمالي</td><td class="num">${fmt(tot.contract)}</td><td class="num">${fmt(tot.act)}</td><td class="num ${tot.save<0?'neg':'in'}">${sgn(tot.save)}</td></tr></tfoot></table></div>
   <p class="note">المسموح للوحدة = سعر التعاقد − الخصومات للوحدة. الوفر حتى الآن = (المسموح للوحدة × المنفذ) − المصروف فعلًا.</p></div>`
   :P&&BQ.length?'<div class="card"><p class="note">لا توجد بنود في المراجعة بعد. أضف بندًا من ملف المشروع، أو أضف كل البنود مرة واحدة.</p></div>':''}`;
   const ss=$('#cr_site');if(ss)ss.onchange=()=>{CR.site=ss.value;CR.edit=null;CR.pick=null;render()};
@@ -5072,7 +5073,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-recopen]
 function recNote(){if(!chkCan()||typeof spScope!=='function')return '';let sites;try{sites=S.sites.filter(s=>!s.hidden)}catch(e){return ''}if(!sites.length)return '';
   const key=sites.length+'|'+S.exp.length+'|'+((typeof CT!=='undefined'&&CT.rows)||[]).length;if(!recNote.c||recNote.c.k!==key){try{const D=recData(sites,today());recNote.c={k:key,out:D.T.out,n:D.OUT.reduce((a,o)=>a+o.n,0),names:D.OUT.length,dC:r2(D.T.con-D.conEng),dS:r2(D.T.sup-D.supEng)}}catch(e){return ''}}
   const c=recNote.c;if(!(c.out>0.004)&&Math.abs(c.dC)<0.01&&Math.abs(c.dS)<0.01)return '';
-  return `<div class="card warn-box" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>⚠ ${c.out>0.004?`<b>${fmt(c.out)}</b> ${CUR} (${c.n} ${c.n===1?'دفعة':'دفعات'} لـ${c.names} ${c.names===1?'اسم':'أسماء'}) خارج إجماليات كشوف المقاولين والموردين — على بنود ليس لها مستخلص معتمد أو فواتير.`:''}${Math.abs(c.dC)>=0.01||Math.abs(c.dS)>=0.01?' في فرق بين المصروفات والكشوف.':''}</span><button type="button" class="primary" data-recgo>عرض المطابقة</button></div></div>`}
+  return `<div class="card warn-box" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span style="flex:1 1 280px;min-width:0">⚠ ${c.out>0.004?`<b>${fmt(c.out)}</b> ${CUR} (${c.n} ${c.n===1?'دفعة':'دفعات'} لـ${c.names} ${c.names===1?'اسم':'أسماء'}) خارج إجماليات كشوف المقاولين والموردين — على بنود ليس لها مستخلص معتمد أو فواتير.`:''}${Math.abs(c.dC)>=0.01||Math.abs(c.dS)>=0.01?' في فرق بين المصروفات والكشوف.':''}</span><button type="button" class="primary" data-recgo>عرض المطابقة</button></div></div>`}
 document.addEventListener('click',ev=>{if(!ev.target.closest('[data-recgo]'))return;SP.type='rec';SP.site='';SP.name='';SP.to='';S.sel='__stmts';S.justSaved=true;render();window.scrollTo({top:0})});
 function spCheck(){
   if(!chkCan())return null;const D=chkData(),multi=D.sites.length>1;
@@ -8104,15 +8105,17 @@ function itBindLabel(itemId,conId){const it=document.getElementById(itemId),lb=d
    الـpf بيتكتب «base#s:siteId» أو «base#off» وigGroups/igOf/igNames بيفهموه. */
 function igSplit(pf){const m=/^(.*?)#(s:(.+)|off)$/.exec(String(pf||''));return m?{base:m[1],site:m[3]||'',off:m[2]==='off'}:{base:String(pf||''),site:'',off:false}}
 const igSiteSuffix=s=>s&&s.igMode==='own'?'#s:'+s.id:s&&s.igMode==='off'?'#off':'';
-const igPfOfSite=id=>{const s=S.sites.find(x=>x.id===id);if(s)return (s._p||'')+igSiteSuffix(s);if(typeof spTech==='function'&&spTech()){const a=spAllSites().find(x=>x.id===id);if(a)return a._p||''}return S.isManager?'':(S.pfx||'')};
+const igPfOfSite=id=>{const s=S.sites.find(x=>x.id===id);if(s)return (s._p||'')+igSiteSuffix(s);if(typeof spTech==='function'&&spTech()){const a=spAllSites().find(x=>x.id===id);if(a){let b=a._p||'';if(b&&!b.endsWith('/'))b+='/';const m=TG.modes&&TG.modes[id];
+    if(m==='off')return b+'#off';if(m==='own'&&(TG.rows||[]).some(r=>r.site===id))return b+'#s:'+id;return b}}return S.isManager?'':(S.pfx||'')};
 const igMyPf=()=>S.isManager?'':(S.pfx||'');
 /* المكتب الفني: البنود العامة بتاعة أصحاب المواقع المسجّل عليها بتيجي من السيرفر (tech_item_groups) — 10 نوفمبر */
-const TG={rows:null,at:0,busy:false,missing:false};
+const TG={rows:null,at:0,busy:false,missing:false,modes:null};
 async function tgLoad(){if(!APP||!SB||TG.busy||TG.missing||!navigator.onLine)return;if(TG.rows&&Date.now()-TG.at<300e3)return;TG.busy=true;
   try{const r=await netTO(SB.rpc('tech_item_groups'),8000);if(r.error){if(/tech_item_groups|function|does not exist|schema cache/i.test(r.error.message||''))TG.missing=true}
-    else{TG.rows=(r.data||[]).map(x=>{const p=String(x.path||''),m=p.match(/^(u\/[^/]+\/)?items\/(.+)$/);return m?{...(x.data||{}),id:m[2],_p:m[1]||''}:null}).filter(Boolean);TG.at=Date.now();appLs('adc_tg_v1',TG.rows);try{render()}catch(e){}}}
+    else{try{const m=await netTO(SB.rpc('tech_site_modes'),8000);if(!m.error){TG.modes={};for(const x of m.data||[])TG.modes[x.site_id]=x.ig_mode||'';appLs('adc_tgm_v1',TG.modes)}}catch(e){}
+      TG.rows=(r.data||[]).map(x=>{const p=String(x.path||''),m=p.match(/^(u\/[^/]+\/)?items\/(.+)$/);return m?{...(x.data||{}),id:m[2],_p:m[1]||''}:null}).filter(Boolean);TG.at=Date.now();appLs('adc_tg_v1',TG.rows);try{render()}catch(e){}}}
   catch(e){}finally{TG.busy=false}}
-function igGroups(pf){const tech=typeof spTech==='function'&&spTech();if(tech&&!TG.rows){TG.rows=appLs('adc_tg_v1')||null;tgLoad()}
+function igGroups(pf){const tech=typeof spTech==='function'&&spTech();if(tech&&!TG.rows){TG.rows=appLs('adc_tg_v1')||null;TG.modes=TG.modes||appLs('adc_tgm_v1')||null;tgLoad()}
   const sp=igSplit(pf);if(sp.off)return [];const ok=r=>r&&r.kind==='group'&&!r.hidden&&(r._p||'')===sp.base&&(sp.site?r.site===sp.site:!r.site);
   const L=(S.items||[]).filter(ok);
   if(tech&&TG.rows)for(const r of TG.rows)if(ok(r)&&!L.some(x=>regNormK(x.name)===regNormK(r.name)))L.push(r);
@@ -9112,7 +9115,7 @@ function ocTypeOf(it){const t=(typeof itType==='function'&&itType(it))||(typeof 
 const ocPrDesc=l=>{const d=String(l.desc||'');if(l.part!=='sup')return d;const i=d.lastIndexOf(' — ');return i>0?d.slice(0,i):d};
 function ocInvDesc(it,no,date,inv,sup){return (it&&no?'فاتورة '+it+' رقم ('+no+')':'فاتورة'+(inv?' رقم '+inv:''))+' بتاريخ ('+ocDmy(date)+')'+(sup?' — '+sup:'')}
 function ocMoves(site,P,T){
-  const sid=site.id,pf=site._p||'',co=ocCoSet(sid),out=[],secs=(P&&P.data.secs)||[];
+  const sid=site.id,pf=igPfOfSite(site.id),co=ocCoSet(sid),out=[],secs=(P&&P.data.secs)||[];
   const secOf=g=>g?secs.find(s=>s.g&&regNormK(s.g)===regNormK(g))||null:null;
   const use=(s,part,src)=>ocSrc(T,s,part)===src;
   if(typeof SO!=='undefined'&&SO.d){
@@ -9185,7 +9188,7 @@ function ocCalc(c,P,T,depth){
 function ocCodes(sec){const m={};let n=0;for(const [p] of OC_PARTS)for(const l of sec.ls.filter(l=>(l.part||'lab')===p)){n++;m[l.id]=sec.i+'.'+n}return m}
 /* سطور «نفس بنود المقاول»: آخر مستخلص معتمد لكل مقاول وبند تحت البند العام */
 function ocConLines(site,P,T,lines){
-  if(typeof CT==='undefined'||!CT.rows)return;const pf=site._p||'';
+  if(typeof CT==='undefined'||!CT.rows)return;const pf=igPfOfSite(site.id);
   for(const sec of (P.data.secs||[])){if(!sec.g||ocSrc(T,sec,'lab')!=='con')continue;
     const last=new Map();for(const c of CT.rows){if(c.site_id!==site.id||c.status!=='approved'||regNormK(igOf(ctItem(c),pf))!==regNormK(sec.g))continue;const k=ctKey(c),p=last.get(k);if(!p||c.no>p.no)last.set(k,c)}
     for(const c of last.values()){let kc;try{kc=ctCalc(c)}catch(e){continue}
@@ -9253,8 +9256,8 @@ function ocTplEdit(){const t=OC.te.data,sel=(p,v)=>`<select data-te="parts.${p}"
    <div class="row" style="gap:8px;margin-top:10px"><button type="button" class="primary" data-oc="tsave">حفظ النموذج</button><button type="button" class="ghost" data-oc="tcancel">إلغاء</button></div></div>`}
 /* ---------- ملف المشروع ---------- */
 function ocPeOf(site){const P=ocProj(site.id);if(!OC.pe||OC.peFor!==site.id){OC.pe=P?ocClone(P.data):null;OC.peFor=site.id;OC.dirty=false}return OC.pe}
-function ocNewProjData(site,tplId){const T=OC.rows.find(r=>r.id===tplId),pf=site._p||'';
-  const gs=igNames(pf);const head={};for(const h of (T?T.data.head:[])||[])head[h]='';if('اسم المشروع' in head)head['اسم المشروع']=site.name;
+function ocNewProjData(site,tplId){const T=OC.rows.find(r=>r.id===tplId),pf=igPfOfSite(site.id);
+  const gs=T&&ocIsBoq(T)?[]:igNames(pf);const head={};for(const h of (T?T.data.head:[])||[])head[h]='';if('اسم المشروع' in head)head['اسم المشروع']=site.name;
   return {tpl:tplId,head,vals:{},secs:gs.map(g=>({id:'s'+newId(),g,title:g,parts:{}})),boq:[],rev:{},oldTo:''}}
 function ocProjTab(site){
   const P=ocProj(site.id),tpls=ocTpls();
@@ -9267,7 +9270,7 @@ function ocProjTab(site){
   const secRow=(s,i)=>{const boq=(d.boq||[]).map((b,j)=>({b,j})).filter(x=>x.b.s===s.id);
     const sn=i+1;let bn=0;
     return `<div class="oc-sec" data-ocdrop="${i}"><div class="oc-sh"><span class="oc-hdl" draggable="true" data-ocdrag="${i}" title="اسحب لتغيير الترتيب" aria-hidden="true">⠿</span><b class="oc-sno">${sn}</b><input type="number" class="oc-ord" min="1" max="${(d.secs||[]).length}" value="${i+1}" data-ocsord="${i}" aria-label="ترتيب القسم — اكتب الرقم" title="اكتب الرقم والقسم يتنقل لمكانه"><b style="flex:1;min-width:140px">${esc(s.g||s.title||'')}</b><select data-pe="secs.${i}.g" aria-label="البند العام"><option value="">— من غير بند عام —</option>${gs.map(g=>`<option ${regNormK(g)===regNormK(s.g)?'selected':''}>${esc(g)}</option>`).join('')}</select>
-      ${i?`<button type="button" class="linkish" data-oc="sup" data-i="${i}" aria-label="لأعلى">↑</button>`:''}</div>
+      ${i?`<button type="button" class="linkish" data-oc="sup" data-i="${i}" aria-label="لأعلى">↑</button>`:''}<button type="button" class="linkish oc-sdel" data-oc="sdel" data-i="${i}" aria-label="حذف القسم ${esc(s.g||s.title||'')}" title="حذف القسم">✕</button></div>
      ${ocIsBoq(T)?'':`<div class="row oc-src" style="gap:10px;flex-wrap:wrap">`}${ocIsBoq(T)?'':OC_PARTS.map(([p,l])=>`<label>${l}: <select data-pe="secs.${i}.parts.${p}"><option value="">النموذج (${OC_SRC[ocSrc(T,null,p)]})</option>${OC_SRCOK[p].map(k=>`<option value="${k}" ${(s.parts||{})[p]===k?'selected':''}>${OC_SRC[k]}</option>`).join('')}</select></label>`).join('')+'</div>'}
      ${ocSrc(T,s,'lab')==='own'||boq.length?`<div class="tbl-wrap"><table class="oc-t"><thead><tr><th>م</th><th>البيان (توصيف المالك)</th><th>الوحدة</th><th>كمية التعاقد</th><th>الفئة</th><th></th></tr></thead><tbody>${boq.map(({b,j})=>`<tr><td class="n">${sn}.${++bn}</td><td><input data-pe="boq.${j}.desc" value="${esc(b.desc||'')}" class="w-d"></td><td><input data-pe="boq.${j}.unit" value="${esc(b.unit||'')}" class="w-s"></td><td><input data-pe="boq.${j}.cq" value="${esc(b.cq??'')}" inputmode="decimal" class="w-n"></td><td><input data-pe="boq.${j}.rate" value="${esc(b.rate??'')}" inputmode="decimal" class="w-n"></td><td><button type="button" class="linkish" data-oc="bdel" data-i="${j}" aria-label="حذف البند">✕</button></td></tr>`).join('')||'<tr><td colspan="6" class="note">لا توجد بنود تعاقد للمالك في هذا القسم.</td></tr>'}</tbody></table></div>
      <div class="row" style="gap:8px"><button type="button" class="ghost" data-oc="badd" data-s="${esc(s.id)}">+ بند تعاقد</button><span class="filebtn"><button type="button" class="ghost">استيراد بنود من Excel</button><input type="file" data-ocboq="${esc(s.id)}" accept=".xlsx" aria-label="استيراد بنود تعاقد من Excel"></span></div>`:''}</div>`};
@@ -9493,7 +9496,7 @@ function ocParseCert(rows){
   return {no:no||1,date:date||today(),owner,proj,secs,prevPaid,svPct,sumTitles,sumPrev};
 }
 function ocImpCard(site){const I=OC.imp;if(!I||I.site!==site.id)return '';if(I.err)return `<div class="warn-box">${esc(I.err)}</div>`;
-  const pf=site._p||'',gs=igNames(pf),guess=t=>{const n=regNormK(t).replace(/^(اعمال|أعمال)\s+/,'');return gs.find(g=>regNormK(g)===regNormK(t))||gs.find(g=>{const x=regNormK(g).replace(/^(اعمال|أعمال)\s+/,'');return x&&n&&(n.includes(x)||x.includes(n))})||''};
+  const pf=igPfOfSite(site.id),gs=igNames(pf),guess=t=>{const n=regNormK(t).replace(/^(اعمال|أعمال)\s+/,'');return gs.find(g=>regNormK(g)===regNormK(t))||gs.find(g=>{const x=regNormK(g).replace(/^(اعمال|أعمال)\s+/,'');return x&&n&&(n.includes(x)||x.includes(n))})||''};
   {const usedG=new Set(I.d.secs.filter(s=>s.g).map(s=>regNormK(s.g)));for(const s of I.d.secs)if(s.g===undefined){const g=guess(s.title);s.g=g&&!usedG.has(regNormK(g))?g:'';if(s.g)usedG.add(regNormK(s.g))}}
   const nL=I.d.secs.reduce((a,s)=>a+s.lines.length,0),tot=r2(I.d.secs.reduce((a,s)=>a+s.lines.reduce((b,l)=>b+ocV(l),0),0));
   return `<div class="card" style="margin-top:10px"><div class="sec-h">استيراد مستخلص رقم (${esc(I.d.no)}) — ${esc(I.name)}</div>
@@ -9567,8 +9570,11 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
     const row={id:'p_'+site.id,kind:'proj',site_id:site.id,site_owner:ocOwnerOf(site),data:ocNewProjData(site,tid)};if(await ocPut(row)){OC.pe=null;flash('أُنشئ ملف المشروع — راجع الأقسام وبنود تعاقد المالك.');render()}return}
   if(OC.pe&&['sadd','saddall','sdel','sup','badd','bdel'].includes(a)){const d=OC.pe;d.secs=d.secs||[];d.boq=d.boq||[];
     if(a==='sadd')d.secs.push({id:'s'+newId(),g:'',title:'قسم جديد',parts:{}});
-    if(a==='saddall'){for(const g of igNames(site._p||''))if(!d.secs.some(s=>regNormK(s.g)===regNormK(g)))d.secs.push({id:'s'+newId(),g,title:g,parts:{}})}
-    if(a==='sdel'){const s=d.secs[+b.dataset.i];if(s){d.secs.splice(+b.dataset.i,1);d.boq=d.boq.filter(x=>x.s!==s.id)}}
+    if(a==='saddall'){for(const g of igNames(igPfOfSite(site.id)))if(!d.secs.some(s=>regNormK(s.g)===regNormK(g)))d.secs.push({id:'s'+newId(),g,title:g,parts:{}})}
+    if(a==='sdel'){const s=d.secs[+b.dataset.i];const nb=s?d.boq.filter(x=>x.s===s.id).length:0,used=s&&ocCerts(site.id).some(c=>(c.data.lines||[]).some(l=>l.s===s.id&&(ocNum(l.totQ)||ocNum(l.prevQ))));
+      if(s&&used){flash('القسم ده عليه كميات في مستخلص — مايتحذفش. شيل الكميات الأول أو سيبه.',1);return}
+      if(s&&!confirm('حذف القسم «'+(s.g||s.title||'')+'»'+(nb?' ومعاه '+nb+' بند تعاقد':'')+'؟'))return;
+      if(s){d.secs.splice(+b.dataset.i,1);d.boq=d.boq.filter(x=>x.s!==s.id)}}
     if(a==='sup'){const i=+b.dataset.i;[d.secs[i-1],d.secs[i]]=[d.secs[i],d.secs[i-1]]}
     if(a==='badd')d.boq.push({id:'b'+newId(),s:b.dataset.s,desc:'',unit:'',cq:'',rate:''});
     if(a==='bdel')d.boq.splice(+b.dataset.i,1);
