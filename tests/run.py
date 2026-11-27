@@ -438,7 +438,8 @@ def b12_seed():
     seed['owner_docs'].append({'id': 'tb', 'kind': 'tpl', 'data': {'name': 'نموذج بالمقايسة', 'type': 'boq'}})
     seed['docs'] += [doc('expenses/t1', {'siteId': 's1', 'amount': 30000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'على البند', 'boq': 'b1', 'created': 5000}),
                      doc('expenses/t2', {'siteId': 's1', 'amount': 50000, 'date': d(3), 'item': 'توريدات حديد', 'contractor': 'مورد الحديد', 'method': 'cash', 'notes': 'حديد مشترك', 'boq': 'sh:steel', 'created': 5001}),
-                     doc('expenses/t3', {'siteId': 's1', 'amount': 2000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'مكتب', 'boq': 'co', 'created': 5002})]
+                     doc('expenses/t3', {'siteId': 's1', 'amount': 2000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'مكتب', 'boq': 'co', 'created': 5002}),
+                     doc('expenses/t4', {'siteId': 's1', 'amount': 1000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'يوميات صب', 'boq': 'sh:misc', 'created': 5003})]
     seed['cost_items'] = [{'id': 'ci1', 'site_id': 's1', 'data': {'boq': 'b1', 'name': 'أعمال السباكة', 'deds': [], 'links': [], 'parts': [
                               {'id': 'p1', 'name': 'حديد تسليح', 'type': 'mat', 'per': 0.1, 'price': 40000}, {'id': 'p2', 'name': 'Over Head', 'type': 'oh', 'per': 1, 'price': 1000},
                               {'id': 'p3', 'name': 'أرباح', 'type': 'oth', 'per': 1, 'price': 500}]}},
@@ -469,6 +470,11 @@ def t_batch12(b, port):
         expect(abs(st['alloc'] - 50000) < 0.05 and abs(st['left']) < 0.05, f'التوزيع غلط (المدفوع أقل من النظري): {st}')
         expect(abs(SH['b1'] - 3200 * 50000 / 153200) < 0.05, f'نصيب البند من الحديد غلط: {SH["b1"]}')
         expect(SH['hasOh'], 'الأوفر هيد مش متعرف')
+        expect(a.ev("bqResolve('s1','نثريات خرسانة — مشترك')") == 'sh:misc', 'قراءة «نثريات خرسانة — مشترك» غلط')
+        expect(a.ev("bqInSc('4-13','7')") and not a.ev("bqInSc('4-13','2')") and a.ev("bqInSc('','2')") and a.ev("bqInSc('4,7','7')"), 'نطاق البنود غلط')
+        ms = a.ev("(()=>{ocProj('s1').data.shared=[...BQ_SH_DEF.slice(0,4),{...BQ_MISC,sc:'1.2'}];const K=crK('s1',crCert('s1'));const b=K.SH.B.find(x=>x.x.id==='misc');return {paid:b.paid,rows:b.rows.map(r=>r.id),alloc:b.alloc}})()")
+        expect(ms['paid'] == 1000 and ms['rows'] == ['ci2'] and abs(ms['alloc'] - 1000) < 0.01, f'نثريات الخرسانة اتوزعت برّه النطاق: {ms}')
+        a.ev("delete ocProj('s1').data.shared")
         t = a.text()
         expect('مقابل الأوفر هيد' in t and 'الخامات المشتركة' in t and 'المصروف حتى الآن' in t, 'كروت الأوفر هيد / الخامات المشتركة / المصروف حتى الآن ما ظهرتش')
         expect(abs(a.ev("crCoSpent('s1')") - 2000) < 0.01, 'مصروفات على الشركة غلط')
