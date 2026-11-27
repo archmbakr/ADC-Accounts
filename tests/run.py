@@ -430,6 +430,46 @@ def cost_seed():
                                                                                                          {'id': 'l2', 's': 'sc1', 'boq': 'b2', 'desc': 'توريدات حديد', 'unit': 'طن', 'cq': 20, 'rate': 40000, 'totQ': 10, 'pct': 50}]}}]
     return seed
 
+def t_overhead(b, port):
+    """أوفر هيد وضريبة جوه تحليل السعر: مباشر + أوفر هيد + ضريبة = حد الصرف (إجمالي البند + للوحدة) وعمود حد الصرف في المراجعة."""
+    a = App(b, port, cost_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(600)
+        if a.ev("CR.site") != 's1':
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(300)
+        a.p.click('[data-cr="new"]'); a.p.wait_for_timeout(200)
+        a.p.select_option('#cr_boq', 'b1'); a.p.wait_for_timeout(300)
+        a.p.click('[data-cr="partadd"]'); a.p.wait_for_timeout(200)
+        a.p.fill('[data-crp="0"][data-k="name"]', 'مواد')
+        a.p.fill('[data-crp="0"][data-k="per"]', '1'); a.p.fill('[data-crp="0"][data-k="price"]', '1000')
+        a.p.click('[data-cr="partadd"]'); a.p.wait_for_timeout(200)
+        a.p.fill('[data-crp="1"][data-k="name"]', 'Over Head 10%')
+        a.p.fill('[data-crp="1"][data-k="per"]', '0.1'); a.p.fill('[data-crp="1"][data-k="price"]', '1000')
+        a.p.click('[data-cr="partadd"]'); a.p.wait_for_timeout(200)
+        a.p.fill('[data-crp="2"][data-k="name"]', 'ضريبة 14%')
+        a.p.fill('[data-crp="2"][data-k="per"]', '0.14'); a.p.fill('[data-crp="2"][data-k="price"]', '1000')
+        a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="save"]'); a.p.wait_for_timeout(700)
+        rows = a.ev("window.__DB.cost_items||[]")
+        expect(len(rows) == 1, f'البند ما اتحفظش ({rows})')
+        k = a.ev("crCalc('s1',window.__DB.cost_items[0].data)")
+        sp = k['split']
+        expect(sp['has'] and sp['dir'] > 0, f'التقسيم ما اتحسبش: {sp}')
+        expect(abs(sp['oh'] - 0.1 * sp['dir']) < 0.01 and abs(sp['tax'] - 0.14 * sp['dir']) < 0.01, f'أوفر هيد/ضريبة غلط: {sp}')
+        expect(abs(k['lim'] - 1.24 * sp['dir']) < 0.01, f'حد الصرف غلط: {k["lim"]}')
+        expect('حد الصرف' in a.text(), 'عمود حد الصرف ما ظهرش في المراجعة')
+        a.p.click('[data-cr="edit"] >> nth=0'); a.p.wait_for_timeout(300)
+        txt = a.text()
+        expect('أوفر هيد للوحدة' in txt and 'ضريبة للوحدة' in txt and 'حد الصرف المفروض للوحدة' in txt, 'كروت التحليل ما ظهروش')
+        expect(a.p.locator('table.cr-an').count() == 1, 'جدول التحليل مش متعلم بـ cr-an')
+        a.p.click('[data-cr="cancel"]'); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="tog"] >> nth=0'); a.p.wait_for_timeout(200)
+        a.p.check('[data-cr="full"]'); a.p.wait_for_timeout(300)
+        expect('حد الصرف' in a.text(), '«عرض كل الأعمدة» ما فيهوش حد الصرف')
+        a.p.uncheck('[data-cr="full"]'); a.p.wait_for_timeout(200)
+    finally:
+        a.close()
+
 def t_cost_review(b, port):
     """مراجعة التكاليف: البند من ملف المشروع، المنفذ من مستخلص المالك (× نسبة التنفيذ) واختيار المستخلص، وسعر الوحدة + الإجمالي."""
     a = App(b, port, cost_seed(), OWNER)
@@ -659,7 +699,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead)]
 
 def main():
     from playwright.sync_api import sync_playwright
