@@ -116,7 +116,7 @@
     storage_usage: () => ({ db: 40 * 1048576, files: 120 * 1048576, buckets: { receipts: 100 * 1048576 } }),
     usage_detail: () => ({ db: 40 * 1048576, files: 120 * 1048576, buckets: {}, tables: [{ name: 'docs', rows: 1200, bytes: 9e6 }, { name: 'custody', rows: 300, bytes: 2e6 }], log: [{ day: day(), db: 40 * 1048576, files: 120 * 1048576 }], day: day() }),
     quota_left: () => 10,
-    cert_paid_rows: () => [], site_items: () => [], site_regs: () => [], tech_item_groups: () => [], acct_private_totals: () => [],
+    cert_paid_rows: () => [], site_items: () => [], site_regs: () => [], tech_item_groups: () => [], tech_site_modes: () => [], acct_private_totals: () => [],
     codes_alloc: () => null, custody_sync: () => null
   };
   const auth = {
