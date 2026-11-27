@@ -634,10 +634,32 @@ def t_batch_abc(b, port):
     finally:
         a.close()
 
+def t_batch_d(b, port):
+    """الدفعة د: تابات الموقع (التكاليف ومستخلص المالك جوه صفحة الموقع)، القائمة الرئيسية من غيرهم، خيارات الموقع مختصرة، وفورم المصروف ورا زرار."""
+    a = App(b, port, cost_seed(), OWNER)
+    try:
+        a.go('s1'); a.p.wait_for_timeout(700)
+        tabs = a.ev("[...document.querySelectorAll('.site-tabs button')].map(x=>x.textContent.trim())")
+        expect('مستخلص المالك' in tabs and 'التكاليف' in tabs, f'تابات الموقع ناقصة ({tabs})')
+        expect(not a.ev("!!document.getElementById('entryForm')"), 'فورم المصروف مفتوح على طول')
+        a.p.click('[data-entry="exp"]'); a.p.wait_for_timeout(300)
+        expect(a.ev("!!document.getElementById('entryForm')"), '«+ تسجيل مصروف» ما فتحش الفورم')
+        menu = a.ev("document.getElementById('siteMenu').textContent")
+        expect('مراجعة التكاليف' not in menu and 'مخزن الموقع' not in menu and 'كشف الحساب' not in menu, 'خيارات الموقع لسه فيها حاجات مكررة')
+        main = a.ev("document.querySelector('.pop-tools').textContent")
+        expect('مستخلص المالك' not in main and 'مراجعة التكاليف' not in main and 'التقارير' in main, 'القائمة الرئيسية لسه فيها مستخلص المالك/مراجعة التكاليف')
+        a.p.click('.site-tabs [data-crgo]'); a.p.wait_for_timeout(1200)
+        expect(a.ev("S.sel") == '__cost' and a.ev("!!document.querySelector('.site-bar')"), 'تاب التكاليف ما فتحش بشريط الموقع')
+        a.p.click('.site-bar ~ .site-tabs [data-tab2="sum"]'); a.p.wait_for_timeout(500)
+        expect(a.ev("S.sel") == 's1' and a.ev("S.siteTab") == 'sum', 'الرجوع لتاب الملخص من شريط الموقع ما اشتغلش')
+        a.check('الدفعة د')
+    finally:
+        a.close()
+
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d)]
 
 def main():
     from playwright.sync_api import sync_playwright
