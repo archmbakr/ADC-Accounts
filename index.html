@@ -1690,9 +1690,13 @@ function crK(site,cert){const rows=crSiteRows(site),K=rows.map(r=>({r,d:r.data||
 /* مصروفات وتوريدات الموقع اللي مش داخلة في أي بند */
 /* ---------- 27 نوفمبر (الدفعة 1+2): بند المقايسة على المصروف، «مصروفات على الشركة»، الخامات المشتركة اللي بتتوزع ---------- */
 const BQ_CO='co';
-const BQ_SH_DEF=[{id:'steel',n:'حديد تسليح',m:'mat',kw:'حديد',price:''},{id:'conc',n:'خرسانة',m:'mat',kw:'خرسان',price:''},{id:'form',n:'شدات ونجارة',m:'mat',kw:'شدات|نجار|خشب',price:''},{id:'surv',n:'مساحة',m:'exe',kw:'',price:''}];
+const BQ_SH_DEF=[{id:'steel',n:'حديد تسليح',m:'mat',kw:'حديد',price:''},{id:'conc',n:'خرسانة',m:'mat',kw:'خرسان',price:''},{id:'form',n:'شدات ونجارة',m:'mat',kw:'شدات|نجار|خشب',price:''},{id:'surv',n:'مساحة',m:'exe',kw:'',price:''},{id:'misc',n:'نثريات خرسانة',m:'exe',kw:'',price:'',sc:'4-13'}];
+const BQ_MISC=BQ_SH_DEF[4];
+/* نطاق البنود للخامة المشتركة: فاضي = كل البنود، أو «4-13» أو «4,7,8» (بأرقام بنود المقايسة) */
+function bqInSc(sc,code){sc=toLatinDigits(String(sc||'')).trim();if(!sc)return true;const c=String(code||'').trim(),cn=parseFloat(c);
+  return sc.split(/[,،\s]+/).filter(Boolean).some(t=>{const m=/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/.exec(t);if(m)return isFinite(cn)&&cn>=+m[1]&&cn<=+m[2];return t===c||(isFinite(cn)&&+t===cn)})}
 function crRe(k){k.actU=k.exe>0?k.act/k.exe:null;k.save=k.act>0.004?r2(k.earned-k.act):0;k.diff=r2(k.allowed-k.act);k.pct=k.allowed?Math.round((k.allowed-k.act)/k.allowed*100):0}
-function bqShared(site){const P=crProj(site);if(P&&Array.isArray(P.data.shared))return P.data.shared;const s=S.sites.find(x=>x.id===site);return Array.isArray(s&&s.shL)&&s.shL.length?s.shL:(P||bqList(site).length?BQ_SH_DEF:[])}
+function bqShared(site){const P=crProj(site);if(P&&Array.isArray(P.data.shared))return !P.data.sharedV&&!P.data.shared.some(x=>x.id==='misc')?[...P.data.shared,BQ_MISC]:P.data.shared;const s=S.sites.find(x=>x.id===site);return Array.isArray(s&&s.shL)&&s.shL.length?s.shL:(P||bqList(site).length?BQ_SH_DEF:[])}
 function bqList(site){const L=crBoqList(site);if(L.length)return L.map(b=>({id:b.id,code:b.code||'',name:String(b.desc||'')}));const s=S.sites.find(x=>x.id===site);return Array.isArray(s&&s.boqL)?s.boqL:[]}
 const bqOn=site=>!!(APP&&site&&bqList(site).length);
 function bqOpts(site){return [...bqList(site).map(b=>[b.id,(b.code?b.code+' — ':'')+b.name]),...bqShared(site).map(x=>['sh:'+x.id,x.n+' — مشترك (يتوزع على البنود)']),[BQ_CO,'مصروفات على الشركة (لا تدخل المستخلص)']]}
@@ -1704,13 +1708,13 @@ function bqResolve(site,raw){const v=String(raw??'').trim();if(!v)return '';cons
   if(/شرك/.test(n))return BQ_CO;
   const num=(/^(\d+(?:\.\d+)?)/.exec(toLatinDigits(v))||[])[1];if(num){const b=L.find(b=>String(b.code)===num);if(b)return b.id}
   const id=L.find(b=>b.id===v);if(id)return id.id;
-  for(const x of bqShared(site))if(n.includes(regNormK(x.n))||(/مشترك/.test(n)&&x.kw&&new RegExp(x.kw).test(n)))return 'sh:'+x.id;
+  const SL=bqShared(site).slice().sort((a,b)=>String(b.n||'').length-String(a.n||'').length);for(const x of SL)if(x.n&&n.includes(regNormK(x.n)))return 'sh:'+x.id;for(const x of SL){try{if(/مشترك/.test(n)&&x.kw&&new RegExp(x.kw).test(n))return 'sh:'+x.id}catch(e){}}
   const nm=L.find(b=>regNormK(b.name)===n)||L.find(b=>n.includes(regNormK(b.name).replace(/…$/,'')));return nm?nm.id:''}
 const bqExp=site=>(S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&e.boq);
 function bqSum(site,v){let t=0;for(const e of S.exp||[])if(e.siteId===site&&!e.deleted&&e.boq===v)t+=amt(e);return r2(t)}
 /* نسخة مختصرة من بنود المقايسة على سجل الموقع (علشان المحاسب والمهندس يشوفوها من غير ملف المشروع) */
 function bqSync(site){if(!APP||!site||typeof siteBoss!=='function'||!siteBoss(site))return;const L=crBoqList(site.id);if(!L.length)return;
-  const boqL=L.map(b=>({id:b.id,code:b.code||'',name:String(b.desc||'')})),shL=bqShared(site.id).map(x=>({id:x.id,n:x.n,m:x.m||'mat',kw:x.kw||'',price:x.price??''}));
+  const boqL=L.map(b=>({id:b.id,code:b.code||'',name:String(b.desc||'')})),shL=bqShared(site.id).map(x=>({id:x.id,n:x.n,m:x.m||'mat',kw:x.kw||'',price:x.price??'',sc:x.sc||''}));
   if(JSON.stringify(boqL)===JSON.stringify(site.boqL||null)&&JSON.stringify(shL)===JSON.stringify(site.shL||null))return;
   site.boqL=boqL;site.shL=shL;queue('sites',site.id,{...clean(site),boqL,shL,updated:Date.now(),editedById:S.uid||''})}
 /* عنصر التحليل تبع أنهي خامة مشتركة (اختيار صريح p.sh، وإلا بالاسم) */
@@ -1720,7 +1724,7 @@ function bqPartSh(site,p){if(p.sh!==undefined&&p.sh!==null)return p.sh||'';const
    بنسبة المنفذ: المدفوع كله بيتوزع بنسبة قيمة الأعمال المنفذة (المسموح للمنفذ). */
 function crShAlloc(site,K){const B=[],byRow=new Map(),add=(id,n,v)=>{if(!v)return;const m=byRow.get(id)||{v:0,d:[]};m.v=r2(m.v+v);m.d.push({n,v});byRow.set(id,m)};
   for(const x of bqShared(site)){const paid=bqSum(site,'sh:'+x.id),mode=x.m||'mat',rows=[];
-    for(const {r,d,k} of K){let unitAn=0,unitEff=0,has=false;
+    for(const {r,d,k} of K){let unitAn=0,unitEff=0,has=false;if(!bqInSc(x.sc,k.I.code))continue;
       if(mode==='exe'){rows.push({id:r.id,name:k.I.name,theo:k.earned,an:null,eff:null});continue}
       for(const p of d.parts||[]){if(bqPartSh(site,p)!==x.id)continue;has=true;const pr=crN(x.price)||crN(p.price);
         if(p.lump){const u=k.qty?crN(p.amt)/k.qty:0;unitAn+=u;unitEff+=u;continue}
@@ -1744,7 +1748,7 @@ function crAdmItemsHTML(site,A){const its=(typeof siteItems==='function'?siteIte
 function crShCard(site,CK){const SH=CK.SH;if(!SH||!SH.B.length)return '';const any=SH.B.some(b=>b.paid||b.rows.length);if(!any)return '';
   return `<div class="card"><div class="sec-h">الخامات المشتركة — التوزيع على البنود ${hq('المصروفات المسجّلة على «… — مشترك» بتتوزع: بالتحليل = نسبة العنصر في تحليل السعر (أو «النسبة الفعلية» في فورم البند) × سعره × الكمية المنفذة؛ والزيادة عن المستهلك نظريًا = رصيد بالموقع + هالك. بنسبة المنفذ = بنسبة قيمة الأعمال المنفذة لكل بند. الخامات وطريقة توزيعها من ملف المشروع.')}</div>
    <div class="tbl-wrap"><table class="cr-t cr-c"><thead><tr><th>الخامة</th><th>التوزيع</th><th class="num">المدفوع</th><th class="num">المستهلك نظريًا</th><th class="num">اتوزع على البنود</th><th class="num">رصيد بالموقع + هالك</th></tr></thead><tbody>
-   ${SH.B.map(b=>`<tr><td><b>${esc(b.x.n)}</b><span class="cr-sub">${b.rows.length} بند${b.mode==='mat'&&!b.rows.length&&b.paid?' · <b class="neg">مفيش عنصر في التحليل مربوط بيها</b>':''}</span></td><td>${b.mode==='exe'?'بنسبة المنفذ':'بالتحليل'}</td><td class="num">${fmt(b.paid)}</td><td class="num">${b.mode==='exe'?'—':fmt(b.theoT)}</td><td class="num">${fmt(b.alloc)}</td><td class="num${b.left>0.004&&b.paid?' neg':''}">${b.left>0.004?fmt(b.left)+(b.mode==='exe'||!b.theoT?' <small>(مفيش تنفيذ للتوزيع)</small>':b.paid?' ('+Math.round(b.left/b.paid*100)+'٪)':''):'0'}</td></tr>`).join('')}
+   ${SH.B.map(b=>`<tr><td><b>${esc(b.x.n)}</b><span class="cr-sub">${b.rows.length} بند${b.mode==='mat'&&!b.rows.length&&b.paid?' · <b class="neg">مفيش عنصر في التحليل مربوط بيها</b>':''}</span></td><td>${b.mode==='exe'?'بنسبة المنفذ':'بالتحليل'}${b.x.sc?'<span class="cr-sub">البنود '+esc(b.x.sc)+'</span>':''}</td><td class="num">${fmt(b.paid)}</td><td class="num">${b.mode==='exe'?'—':fmt(b.theoT)}</td><td class="num">${fmt(b.alloc)}</td><td class="num${b.left>0.004&&b.paid?' neg':''}">${b.left>0.004?fmt(b.left)+(b.mode==='exe'||!b.theoT?' <small>(مفيش تنفيذ للتوزيع)</small>':b.paid?' ('+Math.round(b.left/b.paid*100)+'٪)':''):'0'}</td></tr>`).join('')}
    </tbody><tfoot><tr><td colspan="2">الإجمالي</td><td class="num">${fmt(SH.paid)}</td><td></td><td class="num">${fmt(r2(SH.paid-SH.left))}</td><td class="num">${fmt(SH.left)}</td></tr></tfoot></table></div>
    ${SH.left>0.004?`<p class="note" style="margin:6px 0 0">⚠ ${fmt(SH.left)} ${CUR} مدفوعة في خامات مشتركة أكتر من المستهلك نظريًا — راجع الجرد (رصيد بالموقع) أو النسب الفعلية.</p>`:''}
    <div class="row" style="gap:8px;margin-top:8px"><button type="button" data-cr="var">تقرير بنود فرقت عن الدراسة — طباعة</button><button type="button" data-cr="varxl">Excel</button></div></div>`}
@@ -9518,11 +9522,11 @@ function ocAnCell(site,b){if(typeof CR==='undefined')return '';if(!CR.loaded){if
   return `<button type="button" class="linkish" data-crboq="${esc(b.id)}" data-crsite="${esc(site.id)}">${t} ✎</button>`}
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-crboq]');if(!b)return;ev.preventDefault();if(typeof OC!=='undefined'&&OC.dirty&&!confirm('فيه تعديلات في ملف المشروع لسه ما اتحفظتش. تفتح التحليل من غير حفظها؟'))return;
   const sid=b.dataset.crsite,id=b.dataset.crboq,r=(CR.rows||[]).find(x=>x.site_id===sid&&(x.data||{}).boq===id);CR.site=sid;CR.edit=r?crNewForm(r):crNewForm(null,id);CR.pick=null;S.sel='__cost';S.fromSite=sid;S.justSaved=true;render();setTimeout(()=>{const x=$('#crForm');if(x)x.scrollIntoView({block:'start'})},30)});
-function ocSharedHTML(d){if(!Array.isArray(d.shared))d.shared=ocClone(BQ_SH_DEF);const F=OC.fold||(OC.fold={});
+function ocSharedHTML(d){if(!Array.isArray(d.shared))d.shared=ocClone(BQ_SH_DEF);if(!d.sharedV&&!d.shared.some(x=>x.id==='misc'))d.shared.push(ocClone(BQ_MISC));const F=OC.fold||(OC.fold={});
   return `<details class="card oc-fold" data-fold="shared" ${F.shared?'open':''}><summary><b>الخامات المشتركة اللي بتتوزع على البنود</b><span class="note">${d.shared.map(x=>esc(x.n||'—')).join(' · ')}</span></summary>
-   <p class="note" style="margin:6px 0">المصروف المسجّل على «… — مشترك» بيتوزع في مراجعة التكاليف ${hq('بالتحليل: بنسبة العنصر في تحليل سعر كل بند × الكمية المنفذة (وعنصر التحليل بيتعرف بالكلمات أو باختيار «خامة مشتركة» جنبه). بنسبة المنفذ: بنسبة قيمة الأعمال المنفذة لكل بند (زي المساحة). متوسط سعر التوريد اختياري — لو فاضي بيتاخد سعر الوحدة من التحليل.')}</p>
-   <div class="tbl-wrap"><table class="oc-t"><thead><tr><th>الخامة</th><th>التوزيع</th><th>متوسط سعر التوريد</th><th>كلمات التعرف في التحليل</th><th></th></tr></thead><tbody>
-   ${d.shared.map((x,i)=>`<tr><td><input data-pe="shared.${i}.n" value="${esc(x.n||'')}" aria-label="اسم الخامة"></td><td><select data-pe="shared.${i}.m" aria-label="طريقة التوزيع"><option value="mat" ${(x.m||'mat')==='mat'?'selected':''}>بالتحليل</option><option value="exe" ${x.m==='exe'?'selected':''}>بنسبة المنفذ</option></select></td><td><input data-pe="shared.${i}.price" value="${esc(x.price??'')}" inputmode="decimal" class="w-n" placeholder="من التحليل"></td><td><input data-pe="shared.${i}.kw" value="${esc(x.kw||'')}" class="w-s" placeholder="مثال: حديد" aria-label="كلمات التعرف"></td><td><button type="button" class="linkish" data-oc="shdel" data-i="${i}" aria-label="حذف">✕</button></td></tr>`).join('')}
+   <p class="note" style="margin:6px 0">المصروف المسجّل على «… — مشترك» بيتوزع في مراجعة التكاليف ${hq('بالتحليل: بنسبة العنصر في تحليل سعر كل بند × الكمية المنفذة (وعنصر التحليل بيتعرف بالكلمات أو باختيار «خامة مشتركة» جنبه). بنسبة المنفذ: بنسبة قيمة الأعمال المنفذة لكل بند (زي المساحة). «البنود»: فاضي = كل البنود، أو أرقام بنود المقايسة زي 4-13 أو 4,7,8 والتوزيع بيبقى عليها بس. متوسط سعر التوريد اختياري — لو فاضي بيتاخد سعر الوحدة من التحليل.')}</p>
+   <div class="tbl-wrap"><table class="oc-t"><thead><tr><th>الخامة</th><th>التوزيع</th><th>البنود</th><th>متوسط سعر التوريد</th><th>كلمات التعرف في التحليل</th><th></th></tr></thead><tbody>
+   ${d.shared.map((x,i)=>`<tr><td><input data-pe="shared.${i}.n" value="${esc(x.n||'')}" aria-label="اسم الخامة"></td><td><select data-pe="shared.${i}.m" aria-label="طريقة التوزيع"><option value="mat" ${(x.m||'mat')==='mat'?'selected':''}>بالتحليل</option><option value="exe" ${x.m==='exe'?'selected':''}>بنسبة المنفذ</option></select></td><td><input data-pe="shared.${i}.sc" value="${esc(x.sc||'')}" class="w-s" placeholder="كل البنود" title="فاضي = كل البنود، أو أرقام زي 4-13 أو 4,7,8" aria-label="نطاق البنود"></td><td><input data-pe="shared.${i}.price" value="${esc(x.price??'')}" inputmode="decimal" class="w-n" placeholder="من التحليل"></td><td><input data-pe="shared.${i}.kw" value="${esc(x.kw||'')}" class="w-s" placeholder="مثال: حديد" aria-label="كلمات التعرف"></td><td><button type="button" class="linkish" data-oc="shdel" data-i="${i}" aria-label="حذف">✕</button></td></tr>`).join('')}
    </tbody></table></div><button type="button" class="ghost" data-oc="shadd">+ خامة مشتركة</button></details>`}
 function ocProjTab(site){
   const P=ocProj(site.id),tpls=ocTpls();
@@ -9844,7 +9848,7 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
   if(a==='pnew'||a==='pnewdef'){let tid=(document.getElementById('ocNewTpl')||{}).value;if(a==='pnewdef'||!tid||tid==='__boq'){const t={id:'t'+newId(),kind:'tpl',site_id:null,site_owner:S.isManager?null:S.uid,data:a==='pnewdef'&&tid!=='__boq'&&tid?ocDefTpl():ocBoqTpl()};if(!await ocPut(t))return;tid=t.id}
     {const TT=OC.rows.find(r=>r.id===tid);if(TT&&ocIsBoq(TT)&&siteBoss(site)&&site.igMode!=='boq'&&!(site.igMode==='own'&&igSiteGroups(site).length))igSiteMode(site,'boq')}
     const row={id:'p_'+site.id,kind:'proj',site_id:site.id,site_owner:ocOwnerOf(site),data:ocNewProjData(site,tid)};if(await ocPut(row)){OC.pe=null;flash('أُنشئ ملف المشروع — راجع الأقسام وبنود تعاقد المالك.');render()}return}
-  if(OC.pe&&(a==='shadd'||a==='shdel')){const d=OC.pe;if(!Array.isArray(d.shared))d.shared=ocClone(BQ_SH_DEF);if(a==='shadd')d.shared.push({id:'x'+newId(),n:'',m:'mat',kw:'',price:''});else d.shared.splice(+b.dataset.i,1);OC.dirty=true;render();return}
+  if(OC.pe&&(a==='shadd'||a==='shdel')){const d=OC.pe;if(!Array.isArray(d.shared))d.shared=ocClone(BQ_SH_DEF);if(a==='shadd')d.shared.push({id:'x'+newId(),n:'',m:'mat',kw:'',price:'',sc:''});else d.shared.splice(+b.dataset.i,1);OC.dirty=true;render();return}
   if(OC.pe&&['sadd','saddall','sdel','sup','badd','bdel'].includes(a)){const d=OC.pe;d.secs=d.secs||[];d.boq=d.boq||[];
     if(a==='sadd')d.secs.push({id:'s'+newId(),g:'',title:'قسم جديد',parts:{}});
     if(a==='saddall'){for(const g of igNames(igPfOfSite(site.id)))if(!d.secs.some(s=>regNormK(s.g)===regNormK(g)))d.secs.push({id:'s'+newId(),g,title:g,parts:{}})}
@@ -9868,7 +9872,7 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-oc
     if(a==='rimp'){const v=(document.getElementById('oc_rimp')||{}).value,Q=ocProj(v);if(!Q)return;const QT=ocTplOf(Q);if(!confirm('استبدال سطور الإجمالي والنسب والملاحظة في هذا المشروع بإعدادات «'+siteNameOf(v)+'»؟'))return;
       d.rows=ocClone(ocRowsOf(Q,QT));d.note=Q.data.note||'';d.adv={amt:(d.adv||{}).amt||'',pct:((Q.data.adv||{}).pct)??''}}
     OC.dirty=true;render();return}
-  if(a==='psave'&&OC.pe){for(const r of OC.pe.rows||[]){r.sign=+r.sign<0?-1:1;if(r.k==='prev')r.sign=-1;if(r.def!==''&&r.def!=null)r.def=ocNum(r.def)}if(OC.pe.adv){OC.pe.adv.amt=OC.pe.adv.amt===''?'':ocNum(OC.pe.adv.amt);OC.pe.adv.pct=OC.pe.adv.pct===''?'':ocNum(OC.pe.adv.pct)}const P=ocProj(site.id);for(const x of OC.pe.boq||[]){if(x.cq!==''&&x.cq!=null)x.cq=ocNum(x.cq);x.rate=ocNum(x.rate)}if(await ocPut({...P,data:OC.pe})){OC.dirty=false;OC.pe=null;bqSync(site);flash('حُفظ ملف المشروع.');render()}return}
+  if(a==='psave'&&OC.pe){for(const r of OC.pe.rows||[]){r.sign=+r.sign<0?-1:1;if(r.k==='prev')r.sign=-1;if(r.def!==''&&r.def!=null)r.def=ocNum(r.def)}if(OC.pe.adv){OC.pe.adv.amt=OC.pe.adv.amt===''?'':ocNum(OC.pe.adv.amt);OC.pe.adv.pct=OC.pe.adv.pct===''?'':ocNum(OC.pe.adv.pct)}const P=ocProj(site.id);for(const x of OC.pe.boq||[]){if(x.cq!==''&&x.cq!=null)x.cq=ocNum(x.cq);x.rate=ocNum(x.rate)}if(Array.isArray(OC.pe.shared))OC.pe.sharedV=2;if(await ocPut({...P,data:OC.pe})){OC.dirty=false;OC.pe=null;bqSync(site);flash('حُفظ ملف المشروع.');render()}return}
   if(a==='pundo'){OC.pe=null;OC.dirty=false;render();return}
   /* مصاريف الشركة */
   if(a==='coadd'){const v=(document.getElementById('ocCoAdd')||{}).value;if(!v)return;ocSetCo(site.id,[...ocCoList(site.id),v]);render();return}
