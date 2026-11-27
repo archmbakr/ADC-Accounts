@@ -338,7 +338,7 @@ def t_resync(b, port):
         a.p.wait_for_timeout(800)
         expect(a.ev(pend) == 0, 'الرجوع من الخلفية ما حدّثش العهد')
         a.ev("for(const r of window.__DB.custody)if(r.kind==='claim')r.status='pending'")
-        a.p.click('#hdrSync')
+        a.p.click('#hdrNet')
         a.p.wait_for_function("!document.getElementById('hdrSync').disabled", timeout=15000)
         expect(a.ev(pend) == n0, 'زرار «تحديث» ما جابش آخر بيانات العهد')
         a.check('التحديث')
@@ -541,6 +541,34 @@ def t_batch14(b, port):
         # الدخول من غير نت
         ok = a.ev("(async()=>{await appOffPwSave('owner@test.local','Pass1234!','u-owner');return [await appOffPwOk('owner@test.local','Pass1234!','u-owner'),await appOffPwOk('owner@test.local','wrong','u-owner'),await appOffPwOk('x@test.local','Pass1234!','u-owner')]})()")
         expect(ok == [True, False, False], f'التحقق من كلمة المرور من غير نت غلط: {ok}')
+    finally:
+        a.close()
+
+def t_simplify(b, port):
+    """التبسيط: أيقونة الاتصال، الإعدادات والخروج في القائمة، الفلاتر ورا «فلتر»، «⋯» في السطر، الرئيسية من غير متابعة، الإعدادات أقسام."""
+    a = App(b, port, base_seed(), OWNER)
+    try:
+        a.go('s1'); a.p.wait_for_timeout(400)
+        expect(a.ev("getComputedStyle(document.getElementById('hdrNet')).display!=='none'&&getComputedStyle(document.getElementById('setBtn')).display==='none'"), 'أيقونة الاتصال مش ظاهرة أو الإعدادات لسه في الهيدر')
+        a.p.click('#menuBtn'); a.p.wait_for_timeout(200)
+        expect(a.ev("!!document.querySelector('#toolMenu [data-hsync]')&&!!document.querySelector('#toolMenu [data-hlock]')&&!!document.querySelector('#toolMenu [data-site=\"__settings\"]')"), 'الحساب مش في آخر القائمة')
+        a.p.mouse.click(5, 700)
+        expect(a.ev("document.querySelector('.fl-more').hidden"), 'الفلاتر الإضافية ظاهرة من الأول')
+        a.p.click('[data-fopen]'); a.p.wait_for_timeout(200)
+        a.p.select_option('#f_i', 'أعمال السباكة'); a.p.wait_for_timeout(300)
+        expect('البند: أعمال السباكة' in a.text(), 'علامة الفلتر مش ظاهرة')
+        a.p.click('[data-fclr="i"]'); a.p.wait_for_timeout(300)
+        expect(a.ev("S.filt.i") == '', '✕ ما شالش الفلتر')
+        a.p.click('[data-rmenu] >> nth=0'); a.p.wait_for_timeout(150)
+        a.p.click('.rm-pop:not([hidden]) [data-del]'); a.p.wait_for_timeout(300)
+        expect('تأكيد الحذف' in a.text(), 'الحذف من «⋯» ما اشتغلش')
+        a.ev("S.confirmDel=null;render()")
+        a.go('__all'); a.p.wait_for_timeout(300)
+        expect('متابعة موقع' not in a.text(), 'متابعة موقع لسه في الرئيسية')
+        a.go('__settings'); a.p.wait_for_timeout(400)
+        g = a.ev("[...document.querySelectorAll('.set-grp')].map(x=>x.dataset.grp)")
+        expect('me' in g and 'sys' in g and 'log' in g, f'أقسام الإعدادات: {g}')
+        a.check('التبسيط')
     finally:
         a.close()
 
@@ -933,7 +961,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc), ('batch14', t_batch14)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc), ('batch14', t_batch14), ('simplify', t_simplify)]
 
 def main():
     from playwright.sync_api import sync_playwright
