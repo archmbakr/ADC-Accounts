@@ -545,6 +545,13 @@ def t_bq_visibility(b, port):
         expect('من غير بند مقايسة' in s['body'], 'الملخص ما فيهوش «من غير بند مقايسة»')
         a.ev("SP.type='bq';SP.site='s1'"); a.go('__stmts'); a.p.wait_for_timeout(500); a.check('التقارير ← بند مقايسة')
         expect('كشف بنود المقايسة' in a.text(), 'موضوع «بند مقايسة» في التقارير ما ظهرش')
+        a.ev("CDP.tsite=''"); a.go('__items'); a.p.wait_for_timeout(600); a.check('صفحة البنود (الشجرة)')
+        expect(a.p.locator('#cdtSite').count() == 1, 'اختيار «التقسيم» مش في الشجرة')
+        a.p.select_option('#cdtSite', 's1'); a.p.wait_for_timeout(600); a.check('شجرة المقايسة')
+        t = a.text()
+        expect('بنود المقايسة من ملف المشروع' in t and 'مصروفات على الشركة' in t and 'خامات مشتركة' in t, 'شجرة بنود المقايسة ما ظهرتش')
+        a.p.select_option('#cdtSite', ''); a.p.wait_for_timeout(500)
+        expect(a.p.locator('#cdNewG').count() == 1, 'الرجوع للتقسيم المشترك ما اشتغلش')
     finally:
         a.close()
 
