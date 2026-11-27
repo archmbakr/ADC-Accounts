@@ -430,6 +430,86 @@ def cost_seed():
                                                                                                          {'id': 'l2', 's': 'sc1', 'boq': 'b2', 'desc': 'توريدات حديد', 'unit': 'طن', 'cq': 20, 'rate': 40000, 'totQ': 10, 'pct': 50}]}}]
     return seed
 
+def b12_seed():
+    seed = cost_seed()
+    for x in seed['owner_docs']:
+        if x['kind'] == 'proj':
+            x['data']['tpl'] = 'tb'
+    seed['owner_docs'].append({'id': 'tb', 'kind': 'tpl', 'data': {'name': 'نموذج بالمقايسة', 'type': 'boq'}})
+    seed['docs'] += [doc('expenses/t1', {'siteId': 's1', 'amount': 30000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'على البند', 'boq': 'b1', 'created': 5000}),
+                     doc('expenses/t2', {'siteId': 's1', 'amount': 50000, 'date': d(3), 'item': 'توريدات حديد', 'contractor': 'مورد الحديد', 'method': 'cash', 'notes': 'حديد مشترك', 'boq': 'sh:steel', 'created': 5001}),
+                     doc('expenses/t3', {'siteId': 's1', 'amount': 2000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'مكتب', 'boq': 'co', 'created': 5002})]
+    seed['cost_items'] = [{'id': 'ci1', 'site_id': 's1', 'data': {'boq': 'b1', 'name': 'أعمال السباكة', 'deds': [], 'links': [], 'parts': [
+                              {'id': 'p1', 'name': 'حديد تسليح', 'type': 'mat', 'per': 0.1, 'price': 40000}, {'id': 'p2', 'name': 'Over Head', 'type': 'oh', 'per': 1, 'price': 1000},
+                              {'id': 'p3', 'name': 'أرباح', 'type': 'oth', 'per': 1, 'price': 500}]}},
+                          {'id': 'ci2', 'site_id': 's1', 'data': {'boq': 'b2', 'name': 'توريدات حديد', 'deds': [], 'links': [], 'parts': [{'id': 'p4', 'name': 'حديد', 'type': 'mat', 'per': 1, 'price': 30000}]}}]
+    seed['members'].append({'id': 'u-acct', 'email': 'acct@test.local', 'name': 'Taha elsayed', 'role': 'acct', 'approved': True, 'created_at': '2026-10-01T00:00:00Z'})
+    return seed
+
+def t_batch12(b, port):
+    """الدفعة 1+2: بند المقايسة على المصروف، مصروفات على الشركة، الخامات المشتركة بتتوزع، الأرباح من حد الصرف، تقرير الفروق، نسبة الإشراف، عهدة المحاسب."""
+    a = App(b, port, b12_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(700)
+        if a.ev("CR.site") != 's1':
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(400)
+        a.check('صفحة مراجعة التكاليف')
+        k = a.ev("crCalc('s1',CR.rows.find(r=>r.id==='ci1').data)")
+        expect(abs(k['tagV'] - 30000) < 0.01, f'المصروف المسجّل على البند ما اتحسبش: {k["tagV"]}')
+        sp = k['split']
+        expect(abs(sp['prf'] - 500) < 0.01 and abs(sp['oh'] - 1000) < 0.01 and abs(sp['dir'] - 4000) < 0.01 and abs(k['lim'] - 4000) < 0.01, f'الأرباح/الأوفر هيد/حد الصرف غلط: {sp}')
+        e1 = a.ev("crLinkVal('s1',{t:'exp',n:'أعمال السباكة'})")
+        all1 = a.ev("r2(S.exp.filter(e=>e.siteId==='s1'&&!e.deleted&&e.item==='أعمال السباكة'&&!e.boq).reduce((a,e)=>a+amt(e),0))")
+        expect(abs(e1 - all1) < 0.01, 'المصروف المسجّل على بند مقايسة اتحسب تاني عن طريق الربط بالبند')
+        SH = a.ev("(()=>{const K=crK('s1',crCert('s1'));return {B:K.SH.B.map(b=>({id:b.x.id,paid:b.paid,theoT:b.theoT,alloc:b.alloc,left:b.left,rows:b.rows.map(r=>({id:r.id,theo:r.theo,alloc:r.alloc}))})),hasOh:K.hasOh,b1:K.K.find(x=>x.r.id==='ci1').k.sha}})()")
+        st = [x for x in SH['B'] if x['id'] == 'steel'][0]
+        expect(abs(st['paid'] - 50000) < 0.01, f'مدفوع الحديد المشترك غلط: {st}')
+        th = {r['id']: r['theo'] for r in st['rows']}
+        expect(abs(th['ci1'] - 3200) < 0.01 and abs(th['ci2'] - 150000) < 0.01, f'المستهلك نظريًا غلط: {th}')
+        expect(abs(st['alloc'] - 50000) < 0.05 and abs(st['left']) < 0.05, f'التوزيع غلط (المدفوع أقل من النظري): {st}')
+        expect(abs(SH['b1'] - 3200 * 50000 / 153200) < 0.05, f'نصيب البند من الحديد غلط: {SH["b1"]}')
+        expect(SH['hasOh'], 'الأوفر هيد مش متعرف')
+        t = a.text()
+        expect('مقابل الأوفر هيد' in t and 'الخامات المشتركة' in t and 'المصروف حتى الآن' in t, 'كروت الأوفر هيد / الخامات المشتركة / المصروف حتى الآن ما ظهرتش')
+        expect(abs(a.ev("crCoSpent('s1')") - 2000) < 0.01, 'مصروفات على الشركة غلط')
+        expect(len(a.ev("crVarRows('s1').rows")) >= 1, 'تقرير بنود فرقت عن الدراسة فاضي')
+        a.ev("CR.printing=crVarDoc(S.sites.find(s=>s.id==='s1'))")
+        expect('فرقت عن الدراسة' in a.ev("CR.printing.title"), 'تقرير الفروق ما اتعملش')
+        # الاستيراد
+        expect(a.ev("bqResolve('s1','1.1')") == 'b1' and a.ev("bqResolve('s1','مصروفات على الشركة')") == 'co' and a.ev("bqResolve('s1','حديد تسليح — مشترك')") == 'sh:steel', 'قراءة بند المقايسة من Excel غلط')
+        # فورم المصروف
+        a.ev("S.entryOpen='s1';S.kind='exp'"); a.go('s1'); a.p.wait_for_timeout(300)
+        expect(a.p.locator('#e_boq').count() == 1, 'خانة «بند المقايسة» مش في فورم المصروف')
+        opts = a.ev("[...document.querySelectorAll('#e_boq option')].map(o=>o.value)")
+        expect('b1' in opts and 'co' in opts and 'sh:steel' in opts, f'اختيارات بند المقايسة ناقصة: {opts}')
+        a.p.fill('#e_amount', '1234'); a.p.fill('#e_notes', 'تجربة')
+        a.ev("(()=>{const s=document.getElementById('e_item');s.value=[...s.options].find(o=>o.textContent.includes('أعمال السباكة')).value;s.dispatchEvent(new Event('change'))})()")
+        a.ev("(()=>{const s=document.getElementById('e_contractor');s.value=[...s.options].find(o=>o.textContent.includes('مقاول أحمد')).value;s.dispatchEvent(new Event('change'))})()")
+        a.p.click('#saveBtn'); a.p.wait_for_timeout(300)
+        expect('بند المقايسة' in a.p.inner_text('#formMsg'), 'المصروف اتحفظ من غير بند المقايسة')
+        a.p.select_option('#e_boq', 'b2'); a.p.click('#saveBtn'); a.p.wait_for_timeout(500)
+        expect(a.ev("S.exp.some(e=>e.amount===1234&&e.boq==='b2')"), 'بند المقايسة ما اتحفظش مع المصروف')
+        # ملف المشروع
+        a.ev("OC.site='s1';OC.tab='proj';OC.pe=null"); a.go('__ocert'); a.p.wait_for_timeout(500)
+        t = a.text()
+        expect('الخامات المشتركة' in t and 'تحليل السعر' in t and 'حد المصاريف الإدارية' in t, 'ملف المشروع ما فيهوش الخامات المشتركة / التحليل / حد المصاريف')
+        a.p.click('[data-crboq="b1"]'); a.p.wait_for_timeout(500)
+        expect(a.ev("S.sel")=='__cost' and a.ev("CR.edit&&CR.edit.boq") == 'b1', 'زرار التحليل في ملف المشروع ما فتحش البند')
+        expect(a.p.locator('[data-crp="0"][data-k="sh"]').count() == 1 and 'الكمية الكلية' in a.text(), 'عمود الخامة المشتركة / الكمية الكلية مش في التحليل')
+        a.p.fill('[data-crshr="steel"]', '0.12'); a.p.click('[data-cr="save"]'); a.p.wait_for_timeout(700)
+        expect(a.ev("(CR.rows.find(r=>r.id==='ci1').data.shr||{}).steel") == 0.12, 'النسبة الفعلية ما اتحفظتش')
+        expect(any(o['n'] == 'حديد تسليح' for x in a.ev("crVarRows('s1').rows.map(r=>({o:r.ovs}))") for o in x['o']), 'البند اللي نسبته اتغيرت مش في تقرير الفروق')
+        # نسبة الإشراف
+        a.ev("OC.rows.push({id:'tp',kind:'tpl',data:ocDefTpl()});ocProj('s1').data.tpl='tp';ocProj('s1').data.admPct=30")
+        a.go('__cost'); a.p.wait_for_timeout(500); a.check('مراجعة تكاليف مشروع نسبة إشراف')
+        expect('مشروع بنسبة إشراف' in a.text() and 'صافي ربح الشركة' in a.text(), 'وضع نسبة الإشراف ما ظهرش')
+        # عهدة المحاسب
+        a.ev("CU.engs=null"); a.go('__custody'); a.p.wait_for_timeout(600)
+        expect(a.ev("(CU.engs||[]).some(e=>e.id==='u-acct')"), 'المحاسب مش في قائمة صرف العهدة')
+        a.check('الدفعة 1+2')
+    finally:
+        a.close()
+
 def t_overhead(b, port):
     """أوفر هيد وضريبة جوه تحليل السعر: مباشر + أوفر هيد + ضريبة = حد الصرف (إجمالي البند + للوحدة) وعمود حد الصرف في المراجعة."""
     a = App(b, port, cost_seed(), OWNER)
@@ -705,7 +785,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12)]
 
 def main():
     from playwright.sync_api import sync_playwright
