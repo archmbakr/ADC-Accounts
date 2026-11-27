@@ -1639,14 +1639,14 @@ function crLinkTxt(l){
   if(l.t==='mat')return 'خامة: '+(typeof soLabel==='function'?soLabel(l.id):l.id);
   if(l.t==='cert')return 'مستخلص: '+l.con+' / '+l.item;
   return CR_LT[l.t]+': '+l.n}
-/* أوفر هيد وضريبة جوه تحليل السعر (بالاسم): المباشر = باقي العناصر، وحد الصرف = مباشر + أوفر هيد + ضريبة (للمجموع مش للوحدة) */
+/* أوفر هيد وضريبة جوه تحليل السعر (بالاسم): حد الصرف = المباشر بس (التحليل بعد خصم الأوفر هيد والضريبة) — للمجموع مش للوحدة */
 const crIsOh=n=>/over\s*-?\s*head|overhead|أوفر\s*هيد|اوفر\s*هيد/i.test(String(n||''));
 const crIsTax=n=>/ضريبة|ضريبه|\btax\b|\bvat\b/i.test(String(n||''));
 function crSplit(parts,qty){if(!parts.length)return {has:false,dir:0,oh:0,tax:0,lim:null};let dir=0,oh=0,tax=0;
   for(const p of parts){const v=p.est||0;if(crIsOh(p.name))oh+=v;else if(crIsTax(p.name))tax+=v;else dir+=v}
-  dir=r2(dir);oh=r2(oh);tax=r2(tax);return {has:true,dir,oh,tax,lim:r2(dir+oh+tax)}}
+  dir=r2(dir);oh=r2(oh);tax=r2(tax);return {has:true,dir,oh,tax,tot:r2(dir+oh+tax),lim:dir}}
 function crSplitCards(k){if(!k.split||!k.split.has)return '';const s=k.split,u=v=>k.qty?crU(r2(v/k.qty)):'—';
-  return `<div class="stat"><div class="l">مباشر للوحدة</div><div class="v">${u(s.dir)}</div></div><div class="stat"><div class="l">أوفر هيد للوحدة</div><div class="v">${u(s.oh)}</div></div><div class="stat"><div class="l">ضريبة للوحدة</div><div class="v">${u(s.tax)}</div></div><div class="stat"><div class="l">حد الصرف المفروض للوحدة</div><div class="v in">${u(s.lim)}</div><div class="split"><span>إجمالي حد الصرف للبند <b>${fmt(s.lim)}</b></span></div></div>`}
+  return `<div class="stat"><div class="l">سعر التحليل للوحدة</div><div class="v">${u(s.tot)}</div></div><div class="stat"><div class="l">− أوفر هيد للوحدة</div><div class="v">${u(s.oh)}</div></div><div class="stat"><div class="l">− ضريبة للوحدة</div><div class="v">${u(s.tax)}</div></div><div class="stat"><div class="l">= حد الصرف للوحدة (المباشر)</div><div class="v in">${u(s.lim)}</div><div class="split"><span>إجمالي حد الصرف للبند <b>${fmt(s.lim)}</b></span></div></div>`}
 function crCalc(site,d,cert){
   const I=crInfo(site,d),qty=I.qty,rate=I.rate,contract=r2(qty*rate),exe=crExe(cert===undefined?crCert(site):cert,d.boq),un=v=>qty?v/qty:0;
   const deds=(d.deds||[]).map(x=>({n:x.n||'خصم',m:x.m==='amt'?'amt':'pct',v:crN(x.v),amt:r2(x.m==='amt'?crN(x.v):contract*crN(x.v)/100)}));
@@ -1714,7 +1714,7 @@ function crRender(){
   ${bad.length?`<div class="card due-card"><b>⚠ ${bad.length} بند غير مربوط ببند في ملف المشروع:</b> ${bad.map(x=>esc(x.r.data.name||'')).join('، ')}. افتح البند واختر بنده من ملف المشروع.</div>`:''}
   ${CR.edit?crFormHTML(site):''}
   ${rows.length?`<div class="stats"><div class="stat"><div class="l">قيمة التعاقد</div><div class="v in">${fmt(tot.contract)}<small>${CUR}</small></div><div class="split"><span>المسموح بعد الخصومات <b>${fmt(tot.allowed)}</b></span>${[...dedBy].map(([n,v])=>`<span>${esc(n)} <b>${fmt(v)}</b></span>`).join('')}</div></div>
-  <div class="stat"><div class="l">المسموح للمنفذ حتى الآن</div><div class="v">${fmt(tot.earned)}<small>${CUR}</small></div><div class="split"><span>${cert?'مستخلص المالك رقم '+esc(String(cert.data.no||'')):'لا يوجد مستخلص'}</span></div></div>
+  ${tot.lim>0?`<div class="stat"><div class="l">حد الصرف</div><div class="v">${fmt(tot.lim)}<small>${CUR}</small></div><div class="split"><span>بعد خصم الأوفر هيد والضرائب <b>${fmt(r2(K.reduce((a,x)=>a+(x.k.split&&x.k.split.has?x.k.split.oh+x.k.split.tax:0),0)))}</b></span><span>${tot.act>0.004?(tot.act>tot.lim?'زيادة عن الحد':'المتبقي من الحد')+' <b class="'+(tot.act>tot.lim?'neg':'in')+'">'+fmt(Math.abs(r2(tot.lim-tot.act)))+'</b>':''}</span></div></div>`:''}<div class="stat"><div class="l">المسموح للمنفذ حتى الآن</div><div class="v">${fmt(tot.earned)}<small>${CUR}</small></div><div class="split"><span>${cert?'مستخلص المالك رقم '+esc(String(cert.data.no||'')):'لا يوجد مستخلص'}</span></div></div>
   <div class="stat"><div class="l">المصروف فعلًا</div><div class="v${tot.save<0?' neg':''}">${fmt(tot.act)}<small>${CUR}</small></div><div class="split"><span>${tot.save>=0?'وفر حتى الآن':'زيادة حتى الآن'} <b class="${tot.save<0?'neg':'in'}">${fmt(Math.abs(tot.save))}</b></span></div></div></div>`:''}
   ${un.total>0.004&&rows.length?`<div class="card due-card"><b>⚠ مصروفات وتوريدات في الموقع غير داخلة في أي بند: ${fmt(un.total)} ${CUR}</b><div class="note" style="margin-top:4px">${un.list.slice(0,8).map(([n,v])=>esc(n)+' ('+fmt(v)+')').join('، ')}${un.list.length>8?' …':''}</div></div>`:''}
   ${rows.length?crAdmCard(site,CK)+crTableHTML(site,K,tot,CK)
@@ -1753,7 +1753,7 @@ function crAdmCard(site,CK){const A=CK.A,its=(typeof siteItems==='function'?site
 function crTableHTML(site,K,tot,CK){const on=CK.A.on,sgn=v=>v>0.004?'+'+fmt(v):v<-0.004?'−'+fmt(-v):'0',full=CR.full;
   const nm=(r,k)=>{const n=crAllLinks(r.data||{}).length,na=(k.auto||[]).length;return `<b>${esc((k.I.code?k.I.code+' ':'')+k.I.name)}</b><span class="cr-sub">${k.I.sec?esc(k.I.sec)+' · ':''}${k.parts.length?'تحليل '+k.parts.length+' عنصر · ':''}${n?n+' ربط':na?'ربط تلقائي من البنود العامة ('+na+')':'<b class="neg">غير مربوط بمصروفات</b>'}${k.I.linked?'':k.I.gone?' · <b class="neg">⚠ البند اتشال من ملف المشروع</b>':' · <b class="neg">مش في ملف المشروع</b>'}</span>`};
   const sv=k=>!(k.act>0.004)?'<span class="note">لا مصروفات بعد</span>':k.exe>0?sgn(k.save):'<span class="note">مصروف قبل التنفيذ</span>';
-  const det=k=>`<div class="cr-det"><span><b>الكمية:</b> تعاقد ${fmt(k.qty)} ${esc(k.I.unit||'')} · منفذ ${fmt(k.exe)} (${k.exePct}٪)</span><span><b>للوحدة:</b> سعر ${crU(k.rate)} · مسموح ${crU(k.allowU)} · مقدّر ${crU(k.estU)} · فعلي ${crU(k.actU)}</span>${k.deds.length?`<span><b>الخصومات:</b> ${k.deds.map(x=>esc(x.n)+' '+fmt(x.amt)).join(' · ')}</span>`:''}${on?`<span><b>المصروف المباشر:</b> ${fmt(k.direct)} · <b>المصاريف الإدارية:</b> ${fmt(k.adm)}</span>`:''}</div>`;
+  const det=k=>`<div class="cr-det"><span><b>الكمية:</b> تعاقد ${fmt(k.qty)} ${esc(k.I.unit||'')} · منفذ ${fmt(k.exe)} (${k.exePct}٪)</span><span><b>للوحدة:</b> سعر ${crU(k.rate)} · مسموح ${crU(k.allowU)} · مقدّر ${crU(k.estU)} · فعلي ${crU(k.actU)}</span>${k.split&&k.split.has?`<span><b>حد الصرف:</b> ${fmt(k.split.lim)} = التحليل ${fmt(k.split.tot)} − أوفر هيد ${fmt(k.split.oh)} − ضريبة ${fmt(k.split.tax)}</span>`:''}${k.deds.length?`<span><b>الخصومات:</b> ${k.deds.map(x=>esc(x.n)+' '+fmt(x.amt)).join(' · ')}</span>`:''}${on?`<span><b>المصروف المباشر:</b> ${fmt(k.direct)} · <b>المصاريف الإدارية:</b> ${fmt(k.adm)}</span>`:''}</div>`;
   const acts=r=>`<button type="button" class="linkish" data-cr="tog" data-id="${esc(r.id)}">تفاصيل ${CR.open.has(r.id)?'▾':'▸'}</button> <button type="button" class="linkish" data-cr="edit" data-id="${esc(r.id)}">تعديل</button>`;
   let tbl;
   if(!full){tbl=`<div class="tbl-wrap cr-wide"><table class="cr-t cr-c"><thead><tr><th>البند</th><th class="num">قيمة التعاقد</th><th class="num">حد الصرف</th><th class="num">المصروف فعلًا</th><th class="num">الوفر حتى الآن</th><th></th></tr></thead><tbody>
