@@ -518,6 +518,32 @@ def t_qtyconc(b, port):
     finally:
         a.close()
 
+def t_batch14(b, port):
+    """دفعة 27 نوفمبر بالليل: فورم البند لحد تاريخ المستخلص، تحذير «بنسبة المنفذ» من غير بنود، إجمالي قيمة المنفذ، فواتير المستخلص سطر واحد في الطباعة، الدخول من غير نت."""
+    a = App(b, port, b12_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(700)
+        if a.ev("CR.site") != 's1':
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(400)
+        a.check('مراجعة التكاليف')
+        x = a.ev("(()=>{const r=CR.rows.find(z=>z.id==='ci1');const k=crCalc('s1',r.data);const x=crFormTwo(S.sites.find(s=>s.id==='s1'),{...r.data,id:r.id},k);const K=crK('s1',crCert('s1')).K.find(z=>z.r.id==='ci1').k;return {act:x.act,actTo:x.actTo,kact:K.act,kto:K.actTo,toDate:x.toDate}})()")
+        expect(x['actTo'] is not None and abs(x['act'] - x['kact']) < 0.01 and abs(x['actTo'] - x['kto']) < 0.01 and x['toDate'], f'فورم البند مش بيحسب لحد تاريخ المستخلص زي الصفحة: {x}')
+        a.ev("ocProj('s1').data.shared=[{id:'lab',n:'مصنعيات',m:'exe',kw:'',price:'',sc:''}];ocProj('s1').data.sharedV=2;CR.shOpen=new Set(['lab']);render()")
+        a.ev("S.exp.push({id:'zz',siteId:'s1',amount:500,date:today(),boq:'sh:lab',item:'x'});render()")
+        t = a.text()
+        expect('بيتوزع على كل بنود المقايسة' in t, 'تحذير «بنسبة المنفذ» من غير بنود مش ظاهر')
+        expect('100٪' in t, 'إجمالي قيمة المنفذ مش ظاهر في جدول «بنسبة المنفذ»')
+        expect(a.ev("BQ_SH_DEF.find(x=>x.id==='form').sc") == '4-13', 'الافتراضي للشدات مش 4-13')
+        # فواتير مستخلص المالك سطر واحد
+        o = a.ev("(()=>{const L=ocOutLines([{id:'a',desc:'شغل',rate:10,totQ:2,prevQ:0,pct:100},{id:'b',src:'i:1',desc:'فاتورة 1',rate:100,totQ:1,pct:100},{id:'c',src:'e:2',desc:'مصروف',rate:50,totQ:1,pct:100}]);return {n:L.length,agg:L.find(l=>l.agg)?L.find(l=>l.agg)._v:null,tot:L.reduce((s,l)=>s+(l.agg?l._v:ocV(l)),0)}})()")
+        expect(o['n'] == 2 and abs(o['agg'] - 150) < 0.01 and abs(o['tot'] - 170) < 0.01, f'تجميع الفواتير في الطباعة غلط: {o}')
+        a.check('بعد التعديلات')
+        # الدخول من غير نت
+        ok = a.ev("(async()=>{await appOffPwSave('owner@test.local','Pass1234!','u-owner');return [await appOffPwOk('owner@test.local','Pass1234!','u-owner'),await appOffPwOk('owner@test.local','wrong','u-owner'),await appOffPwOk('x@test.local','Pass1234!','u-owner')]})()")
+        expect(ok == [True, False, False], f'التحقق من كلمة المرور من غير نت غلط: {ok}')
+    finally:
+        a.close()
+
 def t_batch12(b, port):
     """الدفعة 1+2: بند المقايسة على المصروف، مصروفات على الشركة، الخامات المشتركة بتتوزع، الأرباح من حد الصرف، تقرير الفروق، نسبة الإشراف، عهدة المحاسب."""
     a = App(b, port, b12_seed(), OWNER)
@@ -907,7 +933,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc), ('batch14', t_batch14)]
 
 def main():
     from playwright.sync_api import sync_playwright
