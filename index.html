@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#7a1416"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ADC حسابات"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>.sp-prev tr.ok-row td{color:var(--muted)}.chk-ed select{min-width:160px}@media print{.no-print{display:none!important}}.ent-bar{border:1px solid #c27a1a;background:rgba(217,130,43,.14)}.ni-li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ni-li>.linkish{flex:1;text-align:start}.ni-x{font-size:12px;padding:2px 10px;min-height:0}.ni-gx{display:flex;justify-content:flex-end;margin:-4px 0 8px}input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}.oc-band{background:var(--accent);color:var(--on-accent);font-weight:700;padding:6px 10px;border-radius:6px;margin:10px 0 4px}
-.oc-sec{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}.oc-sno{min-width:1.6em;text-align:center}.oc-fold>summary{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;list-style:none}.oc-fold>summary::-webkit-details-marker{display:none}.oc-fold>summary b::before{content:'▸ ';color:var(--muted)}.oc-fold[open]>summary b::before{content:'▾ '}.oc-fold>summary .note{margin:0}.oc-danger{color:var(--danger,#b42318)!important}#pane button.oc-danger-b{background:#b42318;border-color:#b42318;color:#fff}.oc-dz{border-color:#e3a7a0;margin-top:14px}.oc-dz .sec-h{color:var(--danger,#b42318)}.oc-rows tr.oc-off td{opacity:.55}#pane .oc-rows select,#pane .oc-rows input:not([type=checkbox]){width:auto;min-width:0;padding:4px 6px}#pane .oc-rows input.w-d{width:170px}#pane .oc-rows input.w-n{width:80px}#pane .oc-rows input.w-p{width:50px}.oc-rows td{padding:4px}.oc-adv{white-space:nowrap}.oc-nb td{background:var(--accent-soft,#eef5ff)}.oc-sh{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.oc-src{font-size:.92em;margin-bottom:6px}
+.oc-sec{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}.oc-sno{min-width:1.6em;text-align:center}#pane .seg.site-tabs{overflow-x:auto;flex-wrap:nowrap!important;scrollbar-width:none;max-width:100%;display:flex}#pane .seg.site-tabs>button{flex:none!important;white-space:nowrap}.site-bar{margin-bottom:4px}.oc-fold>summary{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;list-style:none}.oc-fold>summary::-webkit-details-marker{display:none}.oc-fold>summary b::before{content:'▸ ';color:var(--muted)}.oc-fold[open]>summary b::before{content:'▾ '}.oc-fold>summary .note{margin:0}.oc-danger{color:var(--danger,#b42318)!important}#pane button.oc-danger-b{background:#b42318;border-color:#b42318;color:#fff}.oc-dz{border-color:#e3a7a0;margin-top:14px}.oc-dz .sec-h{color:var(--danger,#b42318)}.oc-rows tr.oc-off td{opacity:.55}#pane .oc-rows select,#pane .oc-rows input:not([type=checkbox]){width:auto;min-width:0;padding:4px 6px}#pane .oc-rows input.w-d{width:170px}#pane .oc-rows input.w-n{width:80px}#pane .oc-rows input.w-p{width:50px}.oc-rows td{padding:4px}.oc-adv{white-space:nowrap}.oc-nb td{background:var(--accent-soft,#eef5ff)}.oc-sh{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.oc-src{font-size:.92em;margin-bottom:6px}
 table.oc-t input{padding:3px 5px;font-size:.92em}table.oc-t input{width:auto;min-width:0}table.oc-t .w-n{width:78px}table.oc-t .w-p{width:54px}table.oc-t .w-s{width:56px}table.oc-t .w-d{width:min(300px,48vw)}table.oc-t .w-m{width:120px}
 #pane .oc-pg select[data-octype],#pane .oc-pg .row select,#pane .oc-pg .row input:not([type=checkbox]),#pane .oc-pg .oc-sh select,#pane .oc-pg .oc-src select,#pane .oc-inl input,#pane .oc-inl select,#ocSum input{width:auto;display:inline-block;min-width:0}#ocSum input{width:90px}table.oc-t td{padding:4px 5px}
 tr.oc-part td{background:var(--sunk);font-weight:700}table.oc-t tr.tot td,#ocSum tr.tot td{font-weight:700;background:var(--sunk)}
@@ -1715,6 +1715,22 @@ function crRender(){
 }
 document.addEventListener('click',ev=>{if(!ev.target.closest('[data-octpl]'))return;OC.tab='tpl';OC.te=null;S.sel='__ocert';S.justSaved=true;render();window.scrollTo({top:0})});
 document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.dataset&&d.dataset.fold&&typeof OC!=='undefined'){(OC.fold||(OC.fold={}))[d.dataset.fold]=d.open}},true);
+/* ---------- الدفعة د (27 نوفمبر): كل اللي يخص الموقع تابات في صفحته، والقائمة الرئيسية للي على مستوى كل المواقع ---------- */
+const siteHasStore=site=>!!(APP&&typeof SO!=='undefined'&&SO.d&&(SO.d.sites||[]).some(x=>x.site_id===site.id));
+const siteHasOc=site=>!!(APP&&typeof ocCan==='function'&&ocCan()&&typeof revCan==='function'&&revCan(site.id));
+const siteHasCost=site=>!!(APP&&typeof siteBoss==='function'&&siteBoss(site)&&typeof crCanAny==='function'&&crCanAny());
+function siteShortcuts(site){return `${APP&&typeof spRenderPage==='function'?`<button type="button" class="more-btn store-btn" data-stmtsite="${esc(site.id)}" data-full="1">🧾 التقارير ↗</button>`:''}<button type="button" class="more-btn store-btn" data-jsite="${esc(site.id)}">📒 اليومية ↗</button>`}
+function siteTabsHTML(site,act){const T=[['mov','الحركات','data-stabgo="mov"'],['sum','الملخص','data-stabgo="sum"'],['cus','العهد والجرد','data-stabgo="cus"'],
+    ...(siteHasStore(site)?[['store','المخزن',`data-sogo="${esc(site.id)}"`]]:[]),...(siteHasOc(site)?[['oc','مستخلص المالك',`data-ocgo="${esc(site.id)}"`]]:[]),...(siteHasCost(site)?[['cost','التكاليف',`data-crgo="${esc(site.id)}"`]]:[])];
+  const sub=['store','oc','cost'].includes(act);
+  return `<div class="seg site-tabs" role="tablist">${T.map(([k,t,at])=>`<button role="tab" type="button" ${sub&&['mov','sum','cus'].includes(k)?`data-sitego="${esc(site.id)}" data-tab2="${k}"`:at} data-fs="${esc(site.id)}" aria-selected="${act===k}">${t}</button>`).join('')}</div>`}
+/* شريط الموقع فوق المخزن/مستخلص المالك/التكاليف لما تتفتح من تاب في صفحة الموقع */
+function siteBarFor(){const fs=S.fromSite;if(!fs)return '';const site=S.sites.find(x=>x.id===fs);if(!site)return '';
+  const cur=S.sel==='__store'?['store',typeof SO!=='undefined'?SO.site:'']:S.sel==='__ocert'?['oc',typeof OC!=='undefined'?OC.site:'']:S.sel==='__cost'?['cost',typeof CR!=='undefined'?CR.site:'']:null;
+  if(!cur||cur[1]!==fs)return '';
+  return `<div class="pane-h site-bar"><h2>${esc(site.name)}</h2><div class="actions">${siteShortcuts(site)}</div></div>${siteTabsHTML(site,cur[0])}`}
+document.addEventListener('click',ev=>{const t=ev.target.closest('[data-fs],[data-site]');if(!t)return;if(t.dataset.fs)S.fromSite=t.dataset.fs;else S.fromSite=''},true);
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-sitego]');if(!b)return;closePops();S.sel=b.dataset.sitego;S.siteTab=b.dataset.tab2||'mov';S.justSaved=true;render();window.scrollTo({top:0})});
 /* شرح ورا «؟» */
 function hq(t){return `<button type="button" class="hq" data-hq aria-label="شرح" aria-expanded="false">؟</button><span class="hq-t" hidden>${esc(t)}</span>`}
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-hq]');if(!b)return;ev.preventDefault();const t=b.nextElementSibling;if(!t)return;t.hidden=!t.hidden;b.setAttribute('aria-expanded',String(!t.hidden))});
@@ -6886,27 +6902,26 @@ function renderSite(){
   $('#pane').innerHTML=`
   <div class="pane-h"><h2>${esc(site.name)}</h2><div class="actions">
     ${canEditRec(site)&&S.confirmSite?`<span class="confirm"><span class="msg err">${hasAny?'يجب حذف إيداعات ومصروفات وجرد الموقع أولًا.':'نقل الموقع إلى سلة المهملات؟'}</span>${hasAny?'':'<button class="danger" id="delSiteYes">حذف</button>'}<button id="delSiteNo">إلغاء</button></span>`:''}
-    ${APP&&typeof SO!=='undefined'&&SO.d&&(SO.d.sites||[]).some(x=>x.site_id===site.id)?`<button type="button" class="more-btn store-btn" data-sogo="${esc(site.id)}">📦 المخزن</button>`:''}${APP&&typeof spRenderPage==='function'?`<button type="button" class="more-btn store-btn" data-stmtsite="${esc(site.id)}">🧾 التقارير</button>`:''}<button type="button" class="more-btn store-btn" data-jsite="${esc(site.id)}">📒 اليومية</button>${APP&&typeof ocCan==='function'&&ocCan()&&revCan(site.id)?`<button type="button" class="more-btn store-btn" data-ocgo="${esc(site.id)}">📑 مستخلص المالك</button>`:''}
+    ${siteShortcuts(site)}
     <div class="pop-wrap"><button type="button" class="more-btn" data-pop="siteMenu" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">⋯</span> خيارات الموقع</button>
     <div class="pop pop-end" id="siteMenu" role="menu" hidden>
     ${S.canWrite&&canEntry(site)?'<button role="menuitem" id="impOpen">استيراد من Excel</button>':''}
     ${APP&&typeof entCan==='function'&&entCan(site.id)&&!ENT.missing?`<button role="menuitem" data-entsite="${esc(site.id)}" data-on="${entOn(site.id)?'':'1'}">${entOn(site.id)?'إنهاء وضع تسجيل البيانات القديمة':'وضع تسجيل البيانات القديمة…'}</button>`:''}
-    ${APP?`<button role="menuitem" data-stmtsite="${esc(site.id)}" data-full="1">كشف الحساب (التقارير)</button>`:'<button role="menuitem" data-print="site">طباعة كشف الحساب / PDF</button>'}
-    ${APP?`<button role="menuitem" data-sogo="${esc(site.id)}">مخزن الموقع</button>`:''}
-    ${APP&&typeof siteBoss==='function'&&siteBoss(site)?`<button role="menuitem" data-crgo="${esc(site.id)}">مراجعة التكاليف</button><button role="menuitem" data-stabgo="sum" data-igopen="1">البنود العامة لهذا الموقع</button>`:''}
+    ${APP?'':'<button role="menuitem" data-print="site">طباعة كشف الحساب / PDF</button>'}
+    ${APP&&typeof siteBoss==='function'&&siteBoss(site)?`<button role="menuitem" data-stabgo="sum" data-igopen="1">البنود العامة لهذا الموقع</button>`:''}
     ${S.downloads&&hasAny?'<button role="menuitem" id="exportSite">Excel هذا الموقع</button>':''}
     ${canEditRec(site)&&!S.confirmSite?'<button role="menuitem" class="pop-danger" id="delSite">حذف الموقع</button>':''}
     </div></div>
   </div></div>
-  <div class="seg site-tabs" role="tablist">${[['mov','الحركات'],['sum','الملخص'],['cus','العهد والجرد']].map(([k,t])=>`<button role="tab" data-stabgo="${k}" aria-selected="${st===k}">${t}</button>`).join('')}</div>
+  ${siteTabsHTML(site,st)}
   <div data-stab="mov"${hid('mov')}>
   ${importCard(site)}
   ${S.canWrite&&!canEntry(site)?`<div class="card"><p class="note" style="margin:0"><b>اطلاع فقط:</b> هذا الموقع يخص صاحبه، ويمكنك عرض حساباته وطباعتها دون تعديل.</p></div>`:''}
   ${S.canWrite&&!canEditRec(site)&&canEntry(site)?`<div class="card"><p class="note" style="margin:0">هذا الموقع يخص صاحبه. يمكنك تسجيل مصروفات وإيداعات فيه، وتعديل ما سجّلته أنت فقط.</p></div>`:''}
-  ${S.canWrite&&canEntry(site)&&!ed&&S.entryOpen!==site.id&&uiMobile()?`<div class="card entry-mini"><button type="button" class="primary" data-entry="exp">+ تسجيل مصروف</button><button type="button" data-entry="dep">+ تسجيل إيداع</button></div>`:''}
-  ${S.canWrite&&canEntry(site)&&(ed||S.entryOpen===site.id||!uiMobile())?`<div class="card entry-card${ed?' editing':''}" id="entryCard">
+  ${S.canWrite&&canEntry(site)&&!ed&&S.entryOpen!==site.id?`<div class="card entry-mini"><button type="button" class="primary" data-entry="exp">+ تسجيل مصروف</button><button type="button" data-entry="dep">+ تسجيل إيداع</button></div>`:''}
+  ${S.canWrite&&canEntry(site)&&(ed||S.entryOpen===site.id)?`<div class="card entry-card${ed?' editing':''}" id="entryCard">
     ${ed?`<div class="edit-h"><b>تعديل ${ed.col==='expenses'?'مصروف':'إيداع'}</b><span class="note">سُجِّل ${esc(edRec?stamp(edRec.created):'')}${edRec&&edRec.by?' بواسطة '+esc(edRec.by):''}${edRec&&edRec.updated?' · آخر تعديل '+esc(stamp(edRec.updated)):''}. سيُسجَّل التعديل في سجل التعديلات بالقيمة القديمة والجديدة.</span></div>`
-    :`<div class="seg" role="tablist" aria-label="نوع الحركة"><button role="tab" data-kind="exp" aria-selected="${kind==='exp'}">تسجيل مصروف</button><button role="tab" data-kind="dep" aria-selected="${kind==='dep'}">تسجيل إيداع من المالك</button></div>${uiMobile()?'<button type="button" class="ghost entry-x" data-entry="close" aria-label="إغلاق">إغلاق ✕</button>':''}`}
+    :`<div class="seg" role="tablist" aria-label="نوع الحركة"><button role="tab" data-kind="exp" aria-selected="${kind==='exp'}">تسجيل مصروف</button><button role="tab" data-kind="dep" aria-selected="${kind==='dep'}">تسجيل إيداع من المالك</button></div>${'<button type="button" class="ghost entry-x" data-entry="close" aria-label="إغلاق">إغلاق ✕</button>'}`}
     <form class="entry" id="entryForm" autocomplete="off" novalidate>${form}</form></div>`:''}
   ${balTiles(b)}${custLinesCard(site.id)}
   </div>
@@ -9081,10 +9096,10 @@ function listsBar(){
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-listgo]');if(!b)return;const [sel,tab]=b.dataset.listgo.split('|');if(tab){CDP.tab=tab;CDP.msg=null}S.sel=sel;S.stmt=null;S.regEdit=null;S.justSaved=true;render();window.scrollTo({top:0})});
 /* ===== القائمة الرئيسية مجموعات ===== */
 function uiGroupMenu(tm){
-  const get=id=>tm.querySelector(`.site-btn[data-site="${id}"]`);
+  const get=id=>tm.querySelector(`.site-btn[data-site="${id}"]`);for(const id of ['__ocert','__cost']){const x=get(id);if(x)x.remove()}
   for(const id of ['__contractors','__codes','__all']){const b=get(id);if(b)b.remove()}
   const it=get('__items');if(it){const n=it.querySelector('.n');if(n)n.textContent='البنود والموردين';const t=it.querySelector('.cnt,.t');if(t)t.remove();it.setAttribute('aria-current',String(LISTS_SEL.includes(S.sel)))}
-  const G=[['',['__wait']],['الشغل اليومي',['__store','__custody','__certs','__ocert']],['التقارير',['__stmts','__cost','__journal']],['البنود والموردين',['__items','__banks']],['أدوات',['__search','__review','__imports','__trash']]];
+  const G=[['',['__wait']],['الشغل اليومي',['__store','__custody','__certs']],['التقارير',['__stmts','__journal']],['البنود والموردين',['__items','__banks']],['أدوات',['__search','__review','__imports','__trash']]];
   const used=new Set(),out=[];for(const [h,ids] of G){const bs=ids.map(get).filter(Boolean);if(!bs.length)continue;if(h)out.push(h);for(const b of bs){out.push(b);used.add(b)}}
   const rest=[...tm.querySelectorAll('.site-btn')].filter(b=>!used.has(b));
   tm.innerHTML='';for(const x of out){if(typeof x==='string')tm.insertAdjacentHTML('beforeend',`<div class="mh" role="presentation">${x}</div>`);else tm.appendChild(x)}for(const b of rest)tm.appendChild(b);
@@ -10047,6 +10062,7 @@ function render(){
   {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal'||(S.sel==='__ocert'&&!!OC&&!!OC.cur))}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
   S.sel==='__cost'&&APP?crRender():S.sel==='__ocert'&&APP?ocRender():S.sel==='__wait'&&APP?renderWaiting():S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?(typeof cdCan==='function'&&cdCan()?(CDP.tab='pend',S.sel='__codes',renderCodes()):prRenderPage()):S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__ignored'&&APP?niRender():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
+  if(APP&&['__store','__ocert','__cost'].includes(S.sel)&&S.fromSite){const h=siteBarFor(),pn=$('#pane');if(h&&pn&&!pn.querySelector('.site-bar'))pn.insertAdjacentHTML('afterbegin',h)}
   if(APP&&!appIsEngineer()&&(S.conflicts||[]).length)$('#pane').insertAdjacentHTML('afterbegin',cfCard());
   if(APP&&typeof itsLoad==='function'){itsLoad().then(()=>itsSync()).catch(()=>{})}
   if(APP&&typeof ocLocksLoad==='function')ocLocksLoad();
