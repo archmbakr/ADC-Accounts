@@ -447,6 +447,60 @@ def b12_seed():
     seed['members'].append({'id': 'u-acct', 'email': 'acct@test.local', 'name': 'Taha elsayed', 'role': 'acct', 'approved': True, 'created_at': '2026-10-01T00:00:00Z'})
     return seed
 
+def qty_seed():
+    seed = b12_seed()
+    for x in seed['owner_docs']:
+        if x['kind'] == 'proj':
+            x['data']['boq'] = [{'id': 'b1', 's': 'sc1', 'code': '10', 'desc': 'خرسانة مسلحة للأسقف', 'unit': 'م3', 'cq': 100, 'rate': 5000},
+                                {'id': 'b2', 's': 'sc1', 'code': '5', 'desc': 'دكة خرسانة عادية', 'unit': 'م2', 'cq': 1000, 'rate': 300}]
+            x['data']['shared'] = [{'id': 'conc', 'n': 'خرسانة', 'm': 'qty', 'kw': 'خرسان', 'price': '2000', 'sc': '', 'ws': '', 'th': '', 'left': 'pend'}]
+            x['data']['sharedV'] = 2
+        if x['kind'] == 'cert' and x['data']['no'] == 2:
+            x['data']['lines'] = [{'id': 'l1', 's': 'sc1', 'boq': 'b1', 'desc': 'خرسانة مسلحة للأسقف', 'unit': 'م3', 'cq': 100, 'rate': 5000, 'totQ': 40, 'pct': 100},
+                                  {'id': 'l2', 's': 'sc1', 'boq': 'b2', 'desc': 'دكة خرسانة عادية', 'unit': 'م2', 'cq': 1000, 'rate': 300, 'totQ': 200, 'pct': 100}]
+    seed['docs'] = [x for x in seed['docs'] if x['path'] not in ('expenses/t1', 'expenses/t2', 'expenses/t4')]
+    seed['docs'] += [doc('expenses/q1', {'siteId': 's1', 'amount': 50000, 'date': d(20), 'item': 'خرسانة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'صبة سقف', 'boq': 'b1', 'created': 6000}),
+                     doc('expenses/q2', {'siteId': 's1', 'amount': 99999, 'date': d(20), 'item': 'توريدات حديد', 'contractor': 'مورد الحديد', 'method': 'cash', 'notes': 'حديد سقف', 'boq': 'b1', 'created': 6001}),
+                     doc('expenses/q3', {'siteId': 's1', 'amount': 100000, 'date': d(1), 'item': 'خرسانة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'صبة مشتركة', 'boq': 'sh:conc', 'created': 6002})]
+    seed['cost_items'] = [{'id': 'ci1', 'site_id': 's1', 'data': {'boq': 'b1', 'name': 'أسقف', 'deds': [], 'links': [], 'parts': []}},
+                          {'id': 'ci2', 'site_id': 's1', 'data': {'boq': 'b2', 'name': 'دكة', 'deds': [], 'links': [], 'parts': []}}]
+    return seed
+
+def t_qtyconc(b, port):
+    """التوزيع «بكميات المستخلص»: م3 من المستخلص × السعر، المتعلّم مباشرة الأول، الفائض معلّق أو هالك."""
+    a = App(b, port, qty_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(700)
+        if a.ev("CR.site") != 's1':
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(400)
+        a.check('مراجعة التكاليف بكميات المستخلص')
+        q = "(()=>{const K=crK('s1',crCert('s1'));const b=K.SH.B.find(x=>x.x.id==='conc');return {paid:b.paid,left:b.left,waste:b.waste,after:b.after,needT:b.theoT,rows:Object.fromEntries(b.rows.map(r=>[r.id,{m3:r.m3,need:r.need,dir:r.dir,alloc:r.alloc,waste:r.waste,tot:r.tot}])),sha1:K.K.find(x=>x.r.id==='ci1').k.sha,act1:K.K.find(x=>x.r.id==='ci1').k.act,actTo1:K.K.find(x=>x.r.id==='ci1').k.actTo}})()"
+        r = a.ev(q); R = r['rows']
+        expect(abs(R['ci1']['m3'] - 40) < 0.01 and abs(R['ci2']['m3'] - 20) < 0.01, f'م3 غلط (م2 × 0.10): {R}')
+        expect(abs(R['ci1']['need'] - 80000) < 0.01 and abs(R['ci1']['dir'] - 50000) < 0.01, f'المفروض/المتعلّم مباشرة غلط (الحديد اتحسب؟): {R}')
+        expect(abs(R['ci1']['alloc'] - 30000) < 0.01 and abs(R['ci2']['alloc'] - 40000) < 0.01, f'التسكين غلط: {R}')
+        expect(abs(r['paid'] - 100000) < 0.01 and abs(r['left'] - 30000) < 0.01 and abs(r['after'] - 100000) < 0.01, f'الفائض/بعد تاريخ المستخلص غلط: {r}')
+        expect(abs(r['sha1'] - 30000) < 0.01 and abs(r['act1'] - (50000 + 99999 + 30000)) < 0.01, f'نصيب البند ما اتضافش للمصروف: {r}')
+        a.p.click('[data-cr="shtog"][data-id="conc"]'); a.p.wait_for_timeout(300)
+        t = a.text()
+        expect('متعلّم مباشرة' in t and 'لسه منزلتش في مستخلص' in t and 'بكميات المستخلص' in t, 'جدول التسكين ما ظهرش')
+        a.p.click('[data-cr="shleft"][data-v="waste"]'); a.p.wait_for_timeout(600)
+        r = a.ev(q); R = r['rows']
+        expect(abs(r['waste'] - 30000) < 0.05 and abs(r['left']) < 0.05 and abs(R['ci1']['waste'] - 20000) < 0.05 and abs(R['ci2']['waste'] - 10000) < 0.05, f'الهالك ما اتحمّلش بنسبة المفروض: {r}')
+        expect(a.ev("ocProj('s1').data.shared.find(x=>x.id==='conc').left") == 'waste', 'اختيار الفائض ما اتحفظش في ملف المشروع')
+        a.ev("ocProj('s1').data.shared[0].th='1.1=0.3 ; 1.2=0.15'")
+        dbg = a.ev("(()=>{const x=bqShared('s1')[0];return {th:x.th,code:crInfo('s1',CR.rows.find(r=>r.id==='ci2').data),t:bqThick(x,crInfo('s1',CR.rows.find(r=>r.id==='ci2').data))}})()")
+        expect(abs(a.ev(q)['rows']['ci2']['m3'] - 30) < 0.01, f'التخانة المكتوبة ما اتطبقتش {dbg}')
+        a.ev("ocProj('s1').data.shared[0].price=''")
+        r = a.ev(q)
+        expect(abs(r['left'] - 100000) < 0.05 or r['waste'] > 0, f'من غير سعر المفروض ميتوزعش: {r}')
+        a.ev("ocProj('s1').data.shared[0].price='2000';ocProj('s1').data.shared[0].th='';ocProj('s1').data.shared[0].left='pend'")
+        v = a.ev("crVarRows('s1').rows.map(x=>x.ovs.map(o=>o.t||'').join('|')).join('#')")
+        expect(isinstance(v, str), 'تقرير الفروق اتكسر')
+        a.check('بعد التسكين والهالك')
+    finally:
+        a.close()
+
 def t_batch12(b, port):
     """الدفعة 1+2: بند المقايسة على المصروف، مصروفات على الشركة، الخامات المشتركة بتتوزع، الأرباح من حد الصرف، تقرير الفروق، نسبة الإشراف، عهدة المحاسب."""
     a = App(b, port, b12_seed(), OWNER)
@@ -836,7 +890,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc)]
 
 def main():
     from playwright.sync_api import sync_playwright
