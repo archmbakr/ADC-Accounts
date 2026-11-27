@@ -456,11 +456,11 @@ def t_overhead(b, port):
         sp = k['split']
         expect(sp['has'] and sp['dir'] > 0, f'التقسيم ما اتحسبش: {sp}')
         expect(abs(sp['oh'] - 0.1 * sp['dir']) < 0.01 and abs(sp['tax'] - 0.14 * sp['dir']) < 0.01, f'أوفر هيد/ضريبة غلط: {sp}')
-        expect(abs(k['lim'] - 1.24 * sp['dir']) < 0.01, f'حد الصرف غلط: {k["lim"]}')
+        expect(abs(k['lim'] - sp['dir']) < 0.01 and abs(sp['tot'] - 1.24 * sp['dir']) < 0.01, f'حد الصرف المفروض = المباشر بس: {k["lim"]} / {sp}')
         expect('حد الصرف' in a.text(), 'عمود حد الصرف ما ظهرش في المراجعة')
         a.p.click('[data-cr="edit"] >> nth=0'); a.p.wait_for_timeout(300)
         txt = a.text()
-        expect('أوفر هيد للوحدة' in txt and 'ضريبة للوحدة' in txt and 'حد الصرف المفروض للوحدة' in txt, 'كروت التحليل ما ظهروش')
+        expect('أوفر هيد للوحدة' in txt and 'ضريبة للوحدة' in txt and 'حد الصرف للوحدة (المباشر)' in txt, 'كروت التحليل ما ظهروش')
         expect(a.p.locator('table.cr-an').count() == 1, 'جدول التحليل مش متعلم بـ cr-an')
         a.p.click('[data-cr="cancel"]'); a.p.wait_for_timeout(200)
         a.p.click('[data-cr="tog"] >> nth=0'); a.p.wait_for_timeout(200)
