@@ -516,6 +516,38 @@ def t_batch12(b, port):
     finally:
         a.close()
 
+def t_bq_visibility(b, port):
+    """بند المقايسة ظاهر: فلتر «من غير بند مقايسة» + تنبيه + تسجيل جماعي + تفاصيل البند + كشف بند مقايسة + البند في اليومية."""
+    a = App(b, port, b12_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(600)
+        a.ev("S.filt={c:'',i:'',b:'',from:'',to:'',q:''};S.kind='exp';S.tab='exp';S.siteTab='mov'"); a.go('s1'); a.p.wait_for_timeout(400)
+        a.check('صفحة الموقع')
+        t = a.text()
+        expect('من غير بند مقايسة' in t and a.p.locator('#bqShow').count() == 1, 'تنبيه «من غير بند مقايسة» مش ظاهر')
+        expect(a.p.locator('.bq-tag').count() >= 1, 'علامة بند المقايسة مش ظاهرة في الجدول')
+        a.p.click('#bqShow'); a.p.wait_for_timeout(400)
+        n0 = a.ev("S.exp.filter(e=>e.siteId==='s1'&&!e.deleted&&!e.boq).length")
+        expect(a.ev("S.filt.b") == '__none' and a.p.locator('[data-bqpick]').count() >= 2, 'الفلتر / الاختيار ما اشتغلش')
+        a.p.locator('[data-bqpick]').nth(0).check(); a.p.wait_for_timeout(150); a.p.locator('[data-bqpick]').nth(1).check(); a.p.wait_for_timeout(150)
+        a.p.select_option('#bqTo', 'b1'); a.p.click('#bqApply'); a.p.wait_for_timeout(500)
+        n1 = a.ev("S.exp.filter(e=>e.siteId==='s1'&&!e.deleted&&!e.boq).length")
+        expect(n1 == n0 - 2, f'التسجيل الجماعي ما اشتغلش ({n0} → {n1})')
+        # اليومية
+        a.go('__journal'); a.p.wait_for_timeout(400); a.check('اليومية')
+        expect(a.p.locator('.j-grp').count() >= 1, 'بند المقايسة / البند العام مش ظاهر في اليومية')
+        # تفاصيل البند + كشف
+        a.ev("CR.open=new Set(['ci1'])"); a.go('__cost'); a.p.wait_for_timeout(500)
+        expect('مسجّل على البند' in a.text() and a.p.locator('[data-cr="bqdoc"]').count() >= 1, 'قائمة مصروفات البند مش في التفاصيل')
+        d = a.ev("bqStmt('s1',['b1'])")
+        expect('كشف بند مقايسة' in d['title'] and len(d['xl']) >= 3, f'كشف البند غلط: {d["title"]}')
+        s = a.ev("bqStmt('s1',[])")
+        expect('من غير بند مقايسة' in s['body'], 'الملخص ما فيهوش «من غير بند مقايسة»')
+        a.ev("SP.type='bq';SP.site='s1'"); a.go('__stmts'); a.p.wait_for_timeout(500); a.check('التقارير ← بند مقايسة')
+        expect('كشف بنود المقايسة' in a.text(), 'موضوع «بند مقايسة» في التقارير ما ظهرش')
+    finally:
+        a.close()
+
 def t_overhead(b, port):
     """أوفر هيد وضريبة جوه تحليل السعر: مباشر + أوفر هيد + ضريبة = حد الصرف (إجمالي البند + للوحدة) وعمود حد الصرف في المراجعة."""
     a = App(b, port, cost_seed(), OWNER)
@@ -791,7 +823,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility)]
 
 def main():
     from playwright.sync_api import sync_playwright
