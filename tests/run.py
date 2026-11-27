@@ -494,6 +494,23 @@ def t_qtyconc(b, port):
         a.ev("ocProj('s1').data.shared[0].price=''")
         r = a.ev(q)
         expect(abs(r['left'] - 100000) < 0.05 or r['waste'] > 0, f'من غير سعر المفروض ميتوزعش: {r}')
+        # السعر من التحليل لما الخانة فاضية — وعنصر المصنعيات «…الخرسانة» يروح للمصنعيات مش للخرسانة
+        an = a.ev("""(()=>{const P=ocProj('s1');P.data.shared=[{id:'conc',n:'خرسانة',m:'qty',kw:'خرسان',price:'',sc:'',left:'pend'},{id:'lab',n:'مصنعيات أعمال الخرسانة',m:'qty',kw:'مصن',price:'',sc:'',left:'pend'}];
+          const r=CR.rows.find(x=>x.id==='ci1');r.data.parts=[{id:'a1',name:'سعر الخرسانة محتوي 400',type:'mat',per:1,price:2500},{id:'a2',name:'هالك الخرسانة 3%',type:'mat',per:0.03,price:2500},{id:'a3',name:'مصناعيات أعمال الخرسانة',type:'lab',per:1,price:1500}];
+          const K=crK('s1',crCert('s1'));const c=K.SH.B.find(b=>b.x.id==='conc'),l=K.SH.B.find(b=>b.x.id==='lab');
+          return {cu:c.rows.find(y=>y.id==='ci1').uP,cs:c.rows.find(y=>y.id==='ci1').src,lu:l.rows.find(y=>y.id==='ci1').uP,c2:c.rows.find(y=>y.id==='ci2').uP,lsh:bqPartSh('s1',r.data.parts[2])}})()""")
+        expect(abs(an['cu'] - 2575) < 0.01 and an['cs'] == 'an' and abs(an['lu'] - 1500) < 0.01 and an['c2'] == 0 and an['lsh'] == 'lab', f'السعر من التحليل غلط: {an}')
+        a.ev("CR.rows.find(x=>x.id==='ci1').data.parts=[];ocProj('s1').data.shared=[{id:'conc',n:'خرسانة',m:'qty',kw:'خرسان',price:'2000',sc:'',ws:'',th:'',left:'pend'}]")
+        # ثبات الشاشة: الرسم بيستنى والقايمة مفتوحة، وبيتجمّع
+        a.go('s1'); a.p.wait_for_timeout(300)
+        hold = a.ev("""(async()=>{const sel=document.querySelector('#pane select');if(!sel)return {skip:1};
+          const mk=()=>{const d=document.createElement('i');d.id='__mk';document.getElementById('pane').appendChild(d)};mk();
+          sel.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));for(let i=0;i<10;i++)renderSoon();await new Promise(r=>setTimeout(r,400));const held=!!document.getElementById('__mk');
+          sel.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,400));const after=!document.getElementById('__mk');return {held,after}})()""")
+        expect(hold.get('skip') or (hold['held'] and hold['after']), f'الرسم ما استناش القايمة المفتوحة: {hold}')
+        cnt = a.ev("(async()=>{let n=0;const o=render;window.render=function(){n++;return o.apply(this,arguments)};for(let i=0;i<30;i++)renderSoon();await new Promise(r=>setTimeout(r,500));window.render=o;return n})()")
+        expect(cnt == 1, f'الرسمات ما اتجمّعتش: {cnt}')
+        a.go('__cost'); a.p.wait_for_timeout(300)
         a.ev("ocProj('s1').data.shared[0].price='2000';ocProj('s1').data.shared[0].th='';ocProj('s1').data.shared[0].left='pend'")
         v = a.ev("crVarRows('s1').rows.map(x=>x.ovs.map(o=>o.t||'').join('|')).join('#')")
         expect(isinstance(v, str), 'تقرير الفروق اتكسر')
