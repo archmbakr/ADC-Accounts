@@ -436,7 +436,7 @@ def b12_seed():
         if x['kind'] == 'proj':
             x['data']['tpl'] = 'tb'
     seed['owner_docs'].append({'id': 'tb', 'kind': 'tpl', 'data': {'name': 'نموذج بالمقايسة', 'type': 'boq'}})
-    seed['docs'] += [doc('expenses/t1', {'siteId': 's1', 'amount': 30000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'على البند', 'boq': 'b1', 'created': 5000}),
+    seed['docs'] += [doc('expenses/t1', {'siteId': 's1', 'amount': 30000, 'date': d(10), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'على البند', 'boq': 'b1', 'created': 5000}),
                      doc('expenses/t2', {'siteId': 's1', 'amount': 50000, 'date': d(3), 'item': 'توريدات حديد', 'contractor': 'مورد الحديد', 'method': 'cash', 'notes': 'حديد مشترك', 'boq': 'sh:steel', 'created': 5001}),
                      doc('expenses/t3', {'siteId': 's1', 'amount': 2000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'مكتب', 'boq': 'co', 'created': 5002}),
                      doc('expenses/t4', {'siteId': 's1', 'amount': 1000, 'date': d(3), 'item': 'أعمال السباكة', 'contractor': 'مقاول أحمد', 'method': 'cash', 'notes': 'يوميات صب', 'boq': 'sh:misc', 'created': 5003})]
@@ -470,6 +470,12 @@ def t_batch12(b, port):
         expect(abs(st['alloc'] - 50000) < 0.05 and abs(st['left']) < 0.05, f'التوزيع غلط (المدفوع أقل من النظري): {st}')
         expect(abs(SH['b1'] - 3200 * 50000 / 153200) < 0.05, f'نصيب البند من الحديد غلط: {SH["b1"]}')
         expect(SH['hasOh'], 'الأوفر هيد مش متعرف')
+        tk = a.ev("(()=>{const k=crK('s1',crCert('s1')).K.find(x=>x.r.id==='ci1').k;return {act:k.act,actTo:k.actTo,after:k.after,save:k.save,earned:k.earned}})()")
+        expect(tk['actTo'] is not None and tk['after'] > 0.01 and tk['actTo'] >= 30000 - 0.01 and abs(tk['act'] - tk['actTo'] - tk['after']) < 0.01, f'المصروف بعد تاريخ المستخلص ما اتفصلش: {tk}')
+        expect(abs(tk['save'] - (tk['earned'] - tk['actTo'])) < 0.01 or tk['actTo'] < 0.005, f'الوفر المفروض حتى تاريخ المستخلص: {tk}')
+        expect('بعد تاريخ المستخلص' in a.text(), 'سطر «بعد تاريخ المستخلص» مش ظاهر')
+        a.p.click('[data-cr="shtog"][data-id="steel"]'); a.p.wait_for_timeout(300)
+        expect('للوحدة (المستخدم)' in a.text() and 'المستهلك نظريًا = ' in a.text(), 'تفاصيل توزيع الحديد على البنود ما ظهرتش')
         expect(a.ev("bqResolve('s1','نثريات خرسانة — مشترك')") == 'sh:misc', 'قراءة «نثريات خرسانة — مشترك» غلط')
         expect(a.ev("bqInSc('4-13','7')") and not a.ev("bqInSc('4-13','2')") and a.ev("bqInSc('','2')") and a.ev("bqInSc('4,7','7')"), 'نطاق البنود غلط')
         ms = a.ev("(()=>{ocProj('s1').data.shared=[...BQ_SH_DEF.slice(0,4),{...BQ_MISC,sc:'1.2'}];const K=crK('s1',crCert('s1'));const b=K.SH.B.find(x=>x.x.id==='misc');return {paid:b.paid,rows:b.rows.map(r=>r.id),alloc:b.alloc}})()")
