@@ -1,11 +1,21 @@
-/* ADC accounts — offline shell cache. version 20261127203000 */
-const CACHE = 'adc-app-20261127203000';
+/* ADC accounts — offline shell cache. version 20261127213000 */
+const CACHE = 'adc-app-20261127213000';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { mode: u.startsWith('http') ? 'cors' : 'same-origin' })).catch(() => {})))).then(() => self.skipWaiting()));
+  // الصفحة الأساسية لازم تتخزن كاملة، وإلا التحديث يفشل ويفضل التخزين القديم شغال
+  const must = ['./index.html'];
+  e.waitUntil(caches.open(CACHE).then(c =>
+    Promise.all(SHELL.map(u => c.add(new Request(u, { mode: u.startsWith('http') ? 'cors' : 'same-origin', cache: 'reload' })).catch(err => { if (must.includes(u)) throw err; })))
+  ).then(() => caches.open(CACHE)).then(c => c.match('./index.html')).then(hit => {
+    if (!hit) throw new Error('index.html not cached');
+    return self.skipWaiting();
+  }).catch(err => caches.delete(CACHE).then(() => { throw err; })));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('adc-app-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  // امسح القديم بس لو الجديد فيه الصفحة الأساسية
+  e.waitUntil(caches.open(CACHE).then(c => c.match('./index.html')).then(ok => ok ?
+    caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('adc-app-') && k !== CACHE).map(k => caches.delete(k)))) : null
+  ).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   const r = e.request;
@@ -13,8 +23,8 @@ self.addEventListener('fetch', e => {
   const u = new URL(r.url);
   if (u.hostname.endsWith('supabase.co') || u.hostname.endsWith('supabase.in')) return; // data: always live
   if (r.mode === 'navigate') {
-    const net = fetch(r).then(res => { if (res && res.ok) { const cp = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); } return res; });
-    const fallback = () => caches.match('./index.html', { ignoreSearch: true, ignoreVary: true });
+    const net = fetch(r).then(res => { if (res && res.ok && res.type === 'basic' && !res.redirected) { const a = res.clone(), b = res.clone(); caches.open(CACHE).then(c => Promise.all([c.put('./index.html', a), c.put('./', b)])); } return res; });
+    const fallback = () => { const o = { ignoreSearch: true, ignoreVary: true }; return caches.match('./index.html', o).then(h => h || caches.match('./', o)).then(h => h || caches.match(r, o)); };
     e.respondWith(new Promise(resolve => {
       let done = false;
       const t = setTimeout(() => { fallback().then(c => { if (c && !done) { done = true; resolve(c); } }); }, 4000);
