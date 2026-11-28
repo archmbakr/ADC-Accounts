@@ -481,7 +481,7 @@ def t_qtyconc(b, port):
         expect(abs(R['ci1']['alloc'] - 30000) < 0.01 and abs(R['ci2']['alloc'] - 40000) < 0.01, f'التسكين غلط: {R}')
         expect(abs(r['paid'] - 100000) < 0.01 and abs(r['left'] - 30000) < 0.01 and abs(r['after'] - 100000) < 0.01, f'الفائض/بعد تاريخ المستخلص غلط: {r}')
         expect(abs(r['sha1'] - 30000) < 0.01 and abs(r['act1'] - (50000 + 99999 + 30000)) < 0.01, f'نصيب البند ما اتضافش للمصروف: {r}')
-        a.p.click('[data-cr="shtog"][data-id="conc"]'); a.p.wait_for_timeout(300)
+        a.p.click('tr[data-cr="shtog"][data-id="conc"]'); a.p.wait_for_timeout(300)
         t = a.text()
         expect('متعلّم مباشرة' in t and 'لسه منزلتش في مستخلص' in t and 'بكميات المستخلص' in t, 'جدول التسكين ما ظهرش')
         a.p.click('[data-cr="shleft"][data-v="waste"]'); a.p.wait_for_timeout(600)
@@ -508,8 +508,8 @@ def t_qtyconc(b, port):
           sel.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));for(let i=0;i<10;i++)renderSoon();await new Promise(r=>setTimeout(r,400));const held=!!document.getElementById('__mk');
           sel.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,400));const after=!document.getElementById('__mk');return {held,after}})()""")
         expect(hold.get('skip') or (hold['held'] and hold['after']), f'الرسم ما استناش القايمة المفتوحة: {hold}')
-        cnt = a.ev("(async()=>{let n=0;const o=render;window.render=function(){n++;return o.apply(this,arguments)};for(let i=0;i<30;i++)renderSoon();await new Promise(r=>setTimeout(r,500));window.render=o;return n})()")
-        expect(cnt == 1, f'الرسمات ما اتجمّعتش: {cnt}')
+        cnt = a.ev("(async()=>{await new Promise(r=>setTimeout(r,400));let n=0,st=[];const o=render;window.render=function(){n++;st.push((new Error().stack||'').split('\\n').slice(2,4).join('|'));return o.apply(this,arguments)};for(let i=0;i<30;i++)renderSoon();await new Promise(r=>setTimeout(r,500));window.render=o;return [n,st]})()")
+        expect(cnt[0] == 1, f'الرسمات ما اتجمّعتش: {cnt}')
         a.go('__cost'); a.p.wait_for_timeout(300)
         a.ev("ocProj('s1').data.shared[0].price='2000';ocProj('s1').data.shared[0].th='';ocProj('s1').data.shared[0].left='pend'")
         v = a.ev("crVarRows('s1').rows.map(x=>x.ovs.map(o=>o.t||'').join('|')).join('#')")
@@ -572,6 +572,42 @@ def t_simplify(b, port):
     finally:
         a.close()
 
+def t_cost_new(b, port):
+    """مراجعة التكاليف الجديدة: الجدول بالحالة، المسجّل/الموزّع، بطاقة البند، بعد تاريخ المستخلص «تبع المستخلص»، صحة البيانات، التقرير."""
+    a = App(b, port, b12_seed(), OWNER)
+    try:
+        a.go('__cost'); a.p.wait_for_timeout(700)
+        if a.ev("CR.site") != 's1':
+            a.p.select_option('#cr_site', 's1'); a.p.wait_for_timeout(400)
+        a.check('مراجعة التكاليف الجديدة')
+        t = a.text()
+        expect('المفروض يتصرف' in t and 'المسجّل' in t and 'الموزّع' in t and 'الضريبة المستحقة' in t, 'كروت/أعمدة الجدول الجديد ناقصة')
+        R = a.ev("(()=>{const c=crCert('s1'),CK=crK('s1',c);return crRowsNew('s1',CK,c).map(R=>({id:R.x.r.id,reg:R.reg,dist:R.dist,tot:R.tot,plan:R.plan,st:R.st.c,tax:R.tax,exeV:R.exeV}))})()")
+        r1 = [x for x in R if x['id'] == 'ci1'][0]
+        expect(abs(r1['reg'] + r1['dist'] - r1['tot']) < 0.01 and r1['st'] in ('g', 'y', 'r'), f'المسجّل + الموزّع ≠ الإجمالي: {r1}')
+        expect(abs(r1['tax'] - r1['exeV'] * 0.045) < 0.01, f'الضريبة المستحقة غلط: {r1}')
+        a.p.click('tr.crr[data-id="ci1"]'); a.p.wait_for_timeout(300)
+        t = a.text()
+        expect('الدراسة مقابل الفعلي' in t and 'الضريبة المستحقة على البند' in t and 'المتوقع عند نهاية البند' in t, 'بطاقة البند ما اتفتحتش')
+        # بعد تاريخ المستخلص
+        n = a.ev("crAfterList('s1',crCert('s1')).length")
+        expect(n >= 1, 'مفيش مصروفات بعد تاريخ المستخلص في التجربة')
+        tot0 = a.ev("(()=>{const c=crCert('s1');return crRowsNew('s1',crK('s1',c),c).reduce((s,R)=>s+R.tot,0)})()")
+        a.ev("CR.aftOpen=true;render()"); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="aftall"]'); a.p.wait_for_timeout(200)
+        a.p.click('[data-cr="aftin"]'); a.p.wait_for_timeout(500)
+        inc = a.ev("[...crIncOf('s1',crCert('s1'))].length")
+        expect(inc == n, f'التعليم «تبع المستخلص» ما اتحفظش ({inc}/{n})')
+        tot1 = a.ev("(()=>{const c=crCert('s1');return crRowsNew('s1',crK('s1',c),c).reduce((s,R)=>s+R.tot,0)})()")
+        expect(tot1 > tot0 + 0.01, f'المصروف المعلّم ما دخلش في المقارنة ({tot0} → {tot1})')
+        expect('تبع مستخلص' in a.text(), 'علامة «تبع المستخلص» مش ظاهرة')
+        # التقرير
+        d = a.ev("(()=>{const x=crRepDoc(S.sites.find(s=>s.id==='s1'),true);return {t:x.title,n:(x.body.match(/crp-pb/g)||[]).length}})()")
+        expect('تقرير التكاليف' in d['t'] and d['n'] >= 2, f'تقرير التكاليف ناقص: {d}')
+        a.check('بعد التعليم والتقرير')
+    finally:
+        a.close()
+
 def t_batch12(b, port):
     """الدفعة 1+2: بند المقايسة على المصروف، مصروفات على الشركة، الخامات المشتركة بتتوزع، الأرباح من حد الصرف، تقرير الفروق، نسبة الإشراف، عهدة المحاسب."""
     a = App(b, port, b12_seed(), OWNER)
@@ -599,7 +635,7 @@ def t_batch12(b, port):
         expect(tk['actTo'] is not None and tk['after'] > 0.01 and tk['actTo'] >= 30000 - 0.01 and abs(tk['act'] - tk['actTo'] - tk['after']) < 0.01, f'المصروف بعد تاريخ المستخلص ما اتفصلش: {tk}')
         expect(abs(tk['save'] - (tk['earned'] - tk['actTo'])) < 0.01 or tk['actTo'] < 0.005, f'الوفر المفروض حتى تاريخ المستخلص: {tk}')
         expect('بعد تاريخ المستخلص' in a.text(), 'سطر «بعد تاريخ المستخلص» مش ظاهر')
-        a.p.click('[data-cr="shtog"][data-id="steel"]'); a.p.wait_for_timeout(300)
+        a.p.click('tr[data-cr="shtog"][data-id="steel"]'); a.p.wait_for_timeout(300)
         expect('للوحدة (المستخدم)' in a.text() and 'المستهلك نظريًا = ' in a.text(), 'تفاصيل توزيع الحديد على البنود ما ظهرتش')
         expect(a.ev("bqResolve('s1','نثريات خرسانة — مشترك')") == 'sh:misc', 'قراءة «نثريات خرسانة — مشترك» غلط')
         expect(a.ev("bqInSc('4-13','7')") and not a.ev("bqInSc('4-13','2')") and a.ev("bqInSc('','2')") and a.ev("bqInSc('4,7','7')"), 'نطاق البنود غلط')
@@ -607,7 +643,7 @@ def t_batch12(b, port):
         expect(ms['paid'] == 1000 and ms['rows'] == ['ci2'] and abs(ms['alloc'] - 1000) < 0.01, f'نثريات الخرسانة اتوزعت برّه النطاق: {ms}')
         a.ev("delete ocProj('s1').data.shared")
         t = a.text()
-        expect('مقابل الأوفر هيد' in t and 'الخامات المشتركة' in t and 'المصروف حتى الآن' in t, 'كروت الأوفر هيد / الخامات المشتركة / المصروف حتى الآن ما ظهرتش')
+        expect('مقابل الأوفر هيد' in t and 'الخامات المشتركة' in t and 'اتصرف (مسجّل + موزّع)' in t, 'كروت الأوفر هيد / الخامات المشتركة / المصروف حتى الآن ما ظهرتش')
         expect(abs(a.ev("crCoSpent('s1')") - 2000) < 0.01, 'مصروفات على الشركة غلط')
         expect(len(a.ev("crVarRows('s1').rows")) >= 1, 'تقرير بنود فرقت عن الدراسة فاضي')
         a.ev("CR.printing=crVarDoc(S.sites.find(s=>s.id==='s1'))")
@@ -668,7 +704,7 @@ def t_bq_visibility(b, port):
         a.go('__journal'); a.p.wait_for_timeout(400); a.check('اليومية')
         expect(a.p.locator('.j-grp').count() >= 1, 'بند المقايسة / البند العام مش ظاهر في اليومية')
         # تفاصيل البند + كشف
-        a.ev("CR.open=new Set(['ci1'])"); a.go('__cost'); a.p.wait_for_timeout(500)
+        a.ev("CR.open=new Set(['ci1']);CR.oldOpen=true"); a.go('__cost'); a.p.wait_for_timeout(500)
         expect('مسجّل على البند' in a.text() and a.p.locator('[data-cr="bqdoc"]').count() >= 1, 'قائمة مصروفات البند مش في التفاصيل')
         d = a.ev("bqStmt('s1',['b1'])")
         expect('كشف بند مقايسة' in d['title'] and len(d['xl']) >= 3, f'كشف البند غلط: {d["title"]}')
@@ -713,14 +749,15 @@ def t_overhead(b, port):
         expect(sp['has'] and sp['dir'] > 0, f'التقسيم ما اتحسبش: {sp}')
         expect(abs(sp['oh'] - 0.1 * sp['dir']) < 0.01 and abs(sp['tax'] - 0.14 * sp['dir']) < 0.01, f'أوفر هيد/ضريبة غلط: {sp}')
         expect(abs(k['lim'] - sp['dir']) < 0.01 and abs(sp['tot'] - 1.24 * sp['dir']) < 0.01, f'حد الصرف المفروض = المباشر بس: {k["lim"]} / {sp}')
-        expect('حد الصرف' in a.text(), 'عمود حد الصرف ما ظهرش في المراجعة')
+        a.ev("CR.oldOpen=true;render()"); a.p.wait_for_timeout(200)
+        expect('حد الصرف' in a.text() and 'المفروض يتصرف' in a.text(), 'عمود حد الصرف ما ظهرش في المراجعة')
         expect(abs(k['limExe'] - k['lim'] / k['qty'] * k['exe']) < 0.01, f'حد الصرف للمنفذ غلط: {k["limExe"]}')
         t0 = a.text()
-        expect('حد الصرف للمنفذ' in t0 and 'إجمالي المشروع' in t0 and 'طبقًا لآخر مستخلص' in t0, 'سطرين الإجمالي/آخر مستخلص ما ظهروش')
+        expect('المفروض يتصرف' in t0 and 'الضريبة المستحقة' in t0 and 'اتصرف (مسجّل + موزّع)' in t0, 'كروت الإجمالي الجديدة ما ظهرتش')
         a.p.click('[data-cr="tog"] >> nth=0'); a.p.wait_for_timeout(200)
         expect('إجمالي البند' in a.text(), 'تفاصيل البند ما فيهاش السطرين')
         a.p.click('[data-cr="tog"] >> nth=0'); a.p.wait_for_timeout(200)
-        a.p.click('[data-cr="edit"] >> nth=0'); a.p.wait_for_timeout(300)
+        a.p.click('.cr-old [data-cr="edit"] >> nth=0'); a.p.wait_for_timeout(300)
         txt = a.text()
         expect('أوفر هيد للوحدة' in txt and 'ضريبة للوحدة' in txt and 'حد الصرف للوحدة (المباشر)' in txt, 'كروت التحليل ما ظهروش')
         expect(a.p.locator('table.cr-an').count() == 1, 'جدول التحليل مش متعلم بـ cr-an')
@@ -762,6 +799,7 @@ def t_cost_review(b, port):
         expect(abs(k['save'] - (90000 * 0.8 - act)) < 0.01, f'الوفر غلط {k["save"]}')
         a.p.select_option('#cr_oc', 'oc1'); a.p.wait_for_timeout(300)
         expect(abs(a.ev("crCalc('s1',window.__DB.cost_items[0].data).exe") - 0.5) < 1e-9, 'اختيار مستخلص رقم 1 ما غيّرش الكمية المنفذة')
+        a.ev("CR.oldOpen=true;render()"); a.p.wait_for_timeout(200)
         txt = a.text()
         expect('الإجمالي' in txt and 'بنود المراجعة (1)' in txt and 'للوحدة' not in txt, 'الجدول المختصر (4 أعمدة) مش ظاهر')
         a.p.click('[data-cr="tog"] >> nth=0'); a.p.wait_for_timeout(200)
@@ -847,6 +885,7 @@ def t_fixes27(b, port):
         expect(not over, 'اسم موقع طويل بيطلع برا عمود المواقع')
         a.go('__cost'); a.p.wait_for_timeout(1000)
         a.p.click('[data-cr="impoc"]'); a.p.wait_for_timeout(800)
+        a.ev("CR.oldOpen=true;render()"); a.p.wait_for_timeout(200)
         expect(a.ev("!!document.querySelector('.cr-t [data-cr=edit]')"), 'زرار «تعديل» مش ظاهر في جدول مراجعة التكاليف')
         a.go('__ocert'); a.p.wait_for_timeout(500)
         a.ev("OC.site='s1';OC.tab='proj';OC.pe=null;OC.fold={secs:true};render()"); a.p.wait_for_timeout(400)
@@ -961,7 +1000,7 @@ def t_batch_d(b, port):
 TESTS = [('owner', t_owner_pages), ('paging', t_load_paging), ('custody', t_custody_pager), ('certs', t_certs_pager),
          ('engineer', t_engineer), ('tech', t_tech), ('limits', t_limits), ('limits_quiet', t_limits_quiet),
          ('journal', t_journal), ('reports', t_reports), ('mobile_ui', t_mobile_ui), ('errors', t_errors), ('resync', t_resync), ('stuck', t_stuck_queue),
-         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc), ('batch14', t_batch14), ('simplify', t_simplify)]
+         ('retention', t_cert_retention), ('site_groups', t_site_groups), ('cost', t_cost_review), ('owner_boq', t_owner_boq), ('fixes27', t_fixes27), ('abc', t_batch_abc), ('batch_d', t_batch_d), ('overhead', t_overhead), ('batch12', t_batch12), ('bqvis', t_bq_visibility), ('qtyconc', t_qtyconc), ('batch14', t_batch14), ('simplify', t_simplify), ('cost_new', t_cost_new)]
 
 def main():
     from playwright.sync_api import sync_playwright
