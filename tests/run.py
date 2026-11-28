@@ -601,6 +601,15 @@ def t_cost_new(b, port):
         tot1 = a.ev("(()=>{const c=crCert('s1');return crRowsNew('s1',crK('s1',c),c).reduce((s,R)=>s+R.tot,0)})()")
         expect(tot1 > tot0 + 0.01, f'المصروف المعلّم ما دخلش في المقارنة ({tot0} → {tot1})')
         expect('تبع مستخلص' in a.text(), 'علامة «تبع المستخلص» مش ظاهرة')
+        # المرحلة 2: الصورة الثابتة + المقارنة + رصيد الموقع
+        a.p.wait_for_timeout(1200)
+        expect(a.ev("!!crSnapOf('s1',crCert('s1'))"), 'صورة الاعتماد ما اتحفظتش تلقائي')
+        expect(a.ev("!!crPrevMap('s1',crCert('s1'))") and 'كان ' in a.text(), 'المقارنة بالمستخلص اللي قبله مش ظاهرة')
+        a.ev("(()=>{const P=crProj('s1');P.data.crStock={on:true,v:{steel:10000}};render()})()"); a.p.wait_for_timeout(300)
+        st = a.ev("(()=>{const c=crCert('s1'),CK=crK('s1',c);const RR=crRowsNew('s1',CK,c);return {stk:RR.reduce((s,R)=>s+R.stk,0),ok:RR.every(R=>Math.abs(R.reg+R.dist-R.tot)<0.01)}})()")
+        expect(abs(st['stk'] - 10000) < 0.05 and st['ok'], f'خصم رصيد الموقع غلط: {st}')
+        expect('اتغير' in a.text(), 'مش ظاهر إن الأرقام اتغيرت عن وقت الاعتماد')
+        a.ev("crProj('s1').data.crStock={on:false,v:{}};render()")
         # التقرير
         d = a.ev("(()=>{const x=crRepDoc(S.sites.find(s=>s.id==='s1'),true);return {t:x.title,n:(x.body.match(/crp-pb/g)||[]).length}})()")
         expect('تقرير التكاليف' in d['t'] and d['n'] >= 2, f'تقرير التكاليف ناقص: {d}')
