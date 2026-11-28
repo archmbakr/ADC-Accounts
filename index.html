@@ -48,6 +48,26 @@ table.j-t td.date,table.j-t td.num{white-space:nowrap}table.j-t .j-notes{min-wid
 .set-grp>summary small{font-weight:400;color:var(--muted);font-size:12.5px;text-align:end;flex:1}
 .set-grp>.set-in{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 .set-grp>.set-in>details.fold{border-top:1px solid var(--line);padding-top:6px}
+
+/* مراجعة التكاليف 28 نوفمبر */
+.crn td,.crn th{vertical-align:top;font-size:13px;padding:7px 8px}.crn small,.crc small,.crk small{display:block;color:var(--muted);font-size:11.5px;font-weight:400}
+.crn tr.st-r>td{background:#fdecec}.crn tr.st-y>td{background:#fff8e1}.crn tr.st-g>td{background:#eaf6ee}
+[data-theme="dark"] .crn tr.st-r>td{background:#3a1f1f}[data-theme="dark"] .crn tr.st-y>td{background:#3a321a}[data-theme="dark"] .crn tr.st-g>td{background:#1c3324}
+.crn .stc{white-space:nowrap;font-weight:700}.crn .dif{font-weight:700}.crn tr.st-r .dif{color:#b3261e}.crn tr.st-g .dif{color:#1e7b45}.crn tr.st-y .dif{color:#8a6100}
+[data-theme="dark"] .crn tr.st-r .dif{color:#ff9a90}[data-theme="dark"] .crn tr.st-g .dif{color:#7fd8a0}[data-theme="dark"] .crn tr.st-y .dif{color:#f0cd6a}
+.crn tr.crr{cursor:pointer}.crn tr.crr:hover>td{filter:brightness(.97)}
+.crcr>td{background:var(--sunk)!important;padding:10px!important}
+.crk{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+.crk>div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;color:var(--muted)}.crk b{display:block;font-size:19px;color:var(--fg);margin-top:4px}
+.crk .st-r b{color:#b3261e}.crk .st-g b{color:#1e7b45}.crk .st-y b{color:#8a6100}
+.crl{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;margin:4px 0 8px;color:var(--muted)}.crl span[class]{padding:2px 9px;border-radius:12px;color:#222}
+.crl .st-g{background:#eaf6ee}.crl .st-y{background:#fff8e1}.crl .st-r{background:#fdecec}
+.crc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}.crc-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:16px}
+.crc h4{margin:14px 0 6px;font-size:14.5px}.crc-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.crc-g>div{border:1px solid var(--line);border-radius:10px;padding:9px;font-size:13px;color:var(--muted)}.crc-g b{display:block;font-size:16px;color:var(--fg);margin-top:3px}
+.crc-w{background:#fff3cd;border:1px solid #e0c060;color:#5a4300;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px}
+.crh summary{cursor:pointer;font-weight:700;color:#8a4b00}.crh summary small{font-weight:400;color:var(--muted);margin-inline-start:8px}.crh ul{margin:8px 0 0;padding-inline-start:20px;line-height:1.9}.crh.ok{color:#1e7b45;font-weight:600}
+.cra summary{cursor:pointer}.cr-sub2{margin:22px 0 8px;font-size:15px;color:var(--muted)}
 </style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script><script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"><\/script>')</script></head><body>
 <title>ADC حسابات المواقع</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1671,12 +1691,14 @@ const crN=v=>{const n=typeof v==='number'?v:parseAmount(v);return isFinite(n)?n:
 const crSiteRows=site=>{const L=crBoqList(site),pos=new Map(L.map((b,i)=>[b.id,i]));return (CR.rows||[]).filter(r=>r.site_id===site&&(r.data||{}).kind!=='adm').sort((a,b)=>((pos.get(a.data.boq)??1e6+crN(a.data.ord))-(pos.get(b.data.boq)??1e6+crN(b.data.ord)))||String(a.data.name||'').localeCompare(String(b.data.name||''),'ar'))};
 /* ---------- الأرقام الفعلية ---------- */
 const crTo=d=>!CR._to||!d||String(d)<=CR._to;
+const crToE=e=>crTo(e.date)||!!(CR._to&&CR._inc&&CR._inc.has(e.id));
+const crIncOf=(site,cert)=>{const P=crProj(site);return new Set(((P&&P.data&&P.data.crIn)||{})[cert&&cert.id]||[])};
 function crSoMoves(site){return ((typeof SO!=='undefined'&&SO.d&&SO.d.moves)||[]).filter(m=>!m.deleted&&m.site_id===site&&crTo(m.date))}
 function crInvDue(list,kind){return typeof soInvoices==='function'?soInvoices(list,kind).reduce((a,x)=>a+(+x.due||0),0):0}
 function crLinkVal(site,l){
   if(!l)return 0;const k=regNormK;
   if(l.t==='man')return crTo(l.d)?crN(l.a):0;
-  if(l.t==='exp')return r2((S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&!e.boq&&crTo(e.date)&&k(e.item||'')===k(l.n)).reduce((a,e)=>a+amt(e),0));
+  if(l.t==='exp')return r2((S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&!e.boq&&crToE(e)&&k(e.item||'')===k(l.n)).reduce((a,e)=>a+amt(e),0));
   if(l.t==='sup'){const L=crSoMoves(site).filter(m=>k((m.data||{}).sitem||'')===k(l.n));return r2(crInvDue(L,'in')-crInvDue(L,'ret')-crInvDue(L,'cn'))}
   if(l.t==='mat'){let v=0;for(const m of crSoMoves(site)){const d=m.data||{};if(d.item!==l.id)continue;const x=(+d.price||0)*(+d.qty||0);if(m.kind==='in')v+=x;else if(m.kind==='ret')v-=x}return r2(v)}
   if(l.t==='cert'){const L=(CT.rows||[]).filter(c=>c.site_id===site&&c.status==='approved'&&c.contractor===l.con&&k(ctItem(c))===k(l.item)&&crTo((c.data||{}).date)).sort((a,b)=>(b.no||0)-(a.no||0));if(!L.length)return 0;try{return r2(ctCalc(L[0]).works)}catch(e){return 0}}
@@ -1747,15 +1769,15 @@ function crAuto(site,d){const st=S.sites.find(x=>x.id===site);if(!st||st.igMode!
   const g=igGroups(igPfOfSite(site)).find(x=>x.boq===d.boq);return ((g&&g.items)||[]).map(n=>({t:typeof itNeedSup==='function'&&itNeedSup(n)?'sup':'exp',n,auto:1}))}
 /* المصاريف الإدارية: صف إعدادات لكل موقع في cost_items (id = adm_<site>) */
 const crAdm=site=>{const r=(CR.rows||[]).find(x=>x.id==='adm_'+site);return {on:false,items:[],...((r&&r.data)||{})}};
-function crAdmTotal(site){const A=crAdm(site),k=new Set((A.items||[]).map(regNormK));if(!k.size)return 0;return r2((S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&crTo(e.date)&&k.has(regNormK(e.item||''))).reduce((a,e)=>a+amt(e),0))}
+function crAdmTotal(site){const A=crAdm(site),k=new Set((A.items||[]).map(regNormK));if(!k.size)return 0;return r2((S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&crToE(e)&&k.has(regNormK(e.item||''))).reduce((a,e)=>a+amt(e),0))}
 /* حساب كل بنود الموقع + توزيع المصاريف الإدارية بنسبة المصروف الفعلي لكل بند */
 function crK(site,cert){const rows=crSiteRows(site),K=rows.map(r=>({r,d:r.data||{},k:crCalc(site,r.data||{},cert)})),A=crAdm(site);let admT=0;
   const SH=crShAlloc(site,K,cert),hasOh=K.some(x=>x.k.split&&x.k.split.has&&x.k.split.oh>0);
   for(const x of K){const k=x.k,m=SH.byRow.get(x.r.id);if(!m||!m.v)continue;k.sha=m.v;k.shd=m.d;k.act=r2(k.act+m.v);crRe(k)}
   if(A.on&&!hasOh){admT=crAdmTotal(site);const base=K.reduce((a,x)=>a+Math.max(0,x.k.act),0);
     for(const x of K){const k=x.k,sh=base>0?r2(admT*Math.max(0,k.act)/base):0;k.direct=k.act;k.adm=sh;k.act=r2(k.act+sh);k.actU=k.exe>0?k.act/k.exe:null;k.save=k.act>0.004?r2(k.earned-k.act):0;k.diff=r2(k.allowed-k.act);k.pct=k.allowed?Math.round((k.allowed-k.act)/k.allowed*100):0}}
-  if(cert&&!CR._to&&cert.data&&cert.data.date){CR._to=cert.data.date;let K2=null;try{K2=crK(site,cert).K}finally{CR._to=null}
-    const m=new Map(K2.map(x=>[x.r.id,x.k.act]));for(const x of K){const k=x.k,t=m.get(x.r.id)??k.act;k.actTo=t;k.after=r2(k.act-t);k.save=t>0.004?r2(k.earned-t):0;k.actU=k.exe>0?t/k.exe:null;k.toDate=cert.data.date}}
+  if(cert&&!CR._to&&cert.data&&cert.data.date){CR._to=cert.data.date;CR._inc=crIncOf(site,cert);let K2=null;try{K2=crK(site,cert).K}finally{CR._to=null;CR._inc=null}
+    const m=new Map(K2.map(x=>[x.r.id,x.k.act])),m2=new Map(K2.map(x=>[x.r.id,x.k]));for(const x of K){const k=x.k,t=m.get(x.r.id)??k.act,k2=m2.get(x.r.id);if(k2){k.shaTo=k2.sha||0;k.admTo=k2.adm||0;k.shdTo=k2.shd||[]}k.actTo=t;k.after=r2(k.act-t);k.save=t>0.004?r2(k.earned-t):0;k.actU=k.exe>0?t/k.exe:null;k.toDate=cert.data.date}}
   return {K,A,admT,SH,hasOh}}
 /* مصروفات وتوريدات الموقع اللي مش داخلة في أي بند */
 /* ---------- 27 نوفمبر (الدفعة 1+2): بند المقايسة على المصروف، «مصروفات على الشركة»، الخامات المشتركة اللي بتتوزع ---------- */
@@ -1785,7 +1807,7 @@ function bqResolve(site,raw){const v=String(raw??'').trim();if(!v)return '';cons
   const SL=bqShared(site).slice().sort((a,b)=>String(b.n||'').length-String(a.n||'').length);for(const x of SL)if(x.n&&n.includes(regNormK(x.n)))return 'sh:'+x.id;for(const x of SL){try{if(/مشترك/.test(n)&&x.kw&&new RegExp(x.kw).test(n))return 'sh:'+x.id}catch(e){}}
   const nm=L.find(b=>regNormK(b.name)===n)||L.find(b=>n.includes(regNormK(b.name).replace(/…$/,'')));return nm?nm.id:''}
 const bqExp=site=>(S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&e.boq);
-function bqSum(site,v){let t=0;for(const e of S.exp||[])if(e.siteId===site&&!e.deleted&&e.boq===v&&crTo(e.date))t+=amt(e);return r2(t)}
+function bqSum(site,v){let t=0;for(const e of S.exp||[])if(e.siteId===site&&!e.deleted&&e.boq===v&&crToE(e))t+=amt(e);return r2(t)}
 /* نسخة مختصرة من بنود المقايسة على سجل الموقع (علشان المحاسب والمهندس يشوفوها من غير ملف المشروع) */
 const BQ_SYNCED=new Set();
 function bqSync(site,force){if(!APP||!site||typeof siteBoss!=='function'||!siteBoss(site))return;if(!force&&BQ_SYNCED.has(site.id))return;BQ_SYNCED.add(site.id);const L=crBoqList(site.id);if(!L.length)return;
@@ -1803,7 +1825,7 @@ function bqThick(x,I){const s=toLatinDigits(String(x.th||''));const re=/(\d[\d.,
 function bqM3(x,I){const u=toLatinDigits(String(I.unit||'')).replace(/\s/g,'');if(/3|مكعب/.test(u))return 1;if(/2|مسطح/.test(u))return bqThick(x,I);return 0}
 /* المصروف المتعلّم على البند مباشرة اللي من نوع الخامة (بالبند في المصروف، ولو فاضي بالبيان) */
 function bqDirKw(site,boqId,kw){if(!boqId||!kw)return 0;let re;try{re=new RegExp(regNormK(kw))}catch(e){return 0}let t=0;
-  for(const e of S.exp||[])if(e.siteId===site&&!e.deleted&&e.boq===boqId&&crTo(e.date)&&re.test(regNormK(e.item||'')||regNormK(e.notes||'')))t+=amt(e);return r2(t)}
+  for(const e of S.exp||[])if(e.siteId===site&&!e.deleted&&e.boq===boqId&&crToE(e)&&re.test(regNormK(e.item||'')||regNormK(e.notes||'')))t+=amt(e);return r2(t)}
 const crAt=(to,f)=>{const t=CR._to;CR._to=to||null;try{return f()}finally{CR._to=t}};
 function crShAlloc(site,K,cert){const B=[],byRow=new Map(),add=(id,n,v)=>{if(!v)return;const m=byRow.get(id)||{v:0,d:[]};m.v=r2(m.v+v);m.d.push({n,v});byRow.set(id,m)};
   for(const x of bqShared(site)){const paid=bqSum(site,'sh:'+x.id),mode=x.m||'mat',rows=[];
@@ -1918,6 +1940,106 @@ function crAutoLink(site){if(CR.auto[site.id])return;const L=crBoqList(site.id);
   for(const r of crSiteRows(site.id)){const d=r.data||{};if(d.boq&&L.some(b=>b.id===d.boq))continue;const used=new Set(crSiteRows(site.id).map(x=>x.data.boq).filter(Boolean));
     const b=L.find(x=>!used.has(x.id)&&k(x.desc)===k(d.name)&&k(x.unit||'')===k(d.unit||''))||L.find(x=>!used.has(x.id)&&k(x.desc)===k(d.name));
     if(b)crSave(site,{id:r.id,data:{...d,boq:b.id}}).then(()=>{if(S.sel==='__cost')render()})}}
+
+/* ===================== 28 نوفمبر: مراجعة التكاليف — كل بند ماشي زي الدراسة ولا لأ ===================== */
+const CR_STOP=new Set(['سعر','اعمال','هالك','توريد','توريدات','مصروفات','متنوع','مصنعيات','مصناعيات','خامات','شامل','محتوي','نقل','عمال','اعمال']);
+const crTaxPct=site=>{const P=crProj(site);const v=P&&P.data&&P.data.taxPct;return v===''||v==null?4.5:crN(v)};
+function crSt(plan,tot){if(plan==null||!(plan>0))return {d:null,c:'n',t:'— مفيش تحليل'};const d=(plan-tot)/plan*100;return d>2?{d,c:'g',t:'🟢 وفر'}:d>=-2?{d,c:'y',t:'🟡 زي الدراسة'}:{d,c:'r',t:'🔴 زيادة'}}
+const crSg=v=>v>0.004?'+'+fmt(v):v<-0.004?'−'+fmt(-v):'0';
+const crPc=v=>v==null||!isFinite(v)?'—':(v>0.004?'+':v<-0.004?'−':'')+Math.abs(Math.round(v*10)/10)+'%';
+function crRowsNew(site,CK,cert){const tp=crTaxPct(site);
+  return CK.K.map(x=>{const k=x.k,qty=k.qty,exe=k.exe,rate=k.rate,exeV=r2(rate*exe),tot=r2(k.actTo??k.act),dist=r2((k.shaTo??k.sha??0)+(k.admTo??k.adm??0)),reg=r2(tot-dist),plan=k.limExe,planFull=k.lim,st=crSt(plan,tot);
+    const actU=exe>0?tot/exe:null,fc=actU!=null&&qty>0?r2(actU*qty):null,fcD=fc!=null&&planFull!=null?r2(planFull-fc):null;
+    return {x,k,code:k.I.code||'',name:k.I.name,unit:k.I.unit||'',qty,rate,contract:k.contract,exe,exeV,exePct:qty?exe/qty*100:0,plan,planFull,reg,dist,tot,diff:plan!=null?r2(plan-tot):null,st,fc,fcD,fcP:fcD!=null&&planFull?fcD/planFull*100:null,tax:r2(exeV*tp/100),oh:k.split&&k.split.has&&qty?r2(k.split.oh/qty*exe):0}})}
+/* عناصر البند: المفروض / المسجّل / الموزّع */
+function crElems(site,R,cert){const x=R.x,d=x.d,k=R.k,cd=cert&&cert.data&&cert.data.date,inc=cert?crIncOf(site,cert):new Set(),exe=R.exe,SHL=bqShared(site);
+  const at=f=>{const t=CR._to,i=CR._inc;CR._to=cd||null;CR._inc=inc;try{return f()}finally{CR._to=t;CR._inc=i}};
+  const G=new Map(),grp=(key,name)=>{let g=G.get(key);if(!g){g={key,name,uP:0,reg:0,dist:0,bucket:null,parts:[]};G.set(key,g)}return g};
+  for(const p of d.parts||[]){if(crPk(p)!=='dir')continue;const sh=bqPartSh(site,p),b=sh?SHL.find(z=>z.id===sh):null;const g=b?grp('b:'+b.id,b.n):grp('p:'+p.id,p.name||'عنصر');if(b)g.bucket=b;
+    g.uP+=p.lump?(k.qty?crN(p.amt)/k.qty:0):crN(p.per)*crN(p.price);g.parts.push(p)}
+  const used=new Set();
+  for(const g of G.values())if(g.bucket){const re=(()=>{try{return new RegExp(regNormK(g.bucket.kw||'^$'))}catch(e){return null}})();
+    if(re&&d.boq)for(const e of S.exp||[])if(e.siteId===site&&!e.deleted&&e.boq===d.boq&&at(()=>crToE(e))&&re.test(regNormK(e.item||'')||regNormK(e.notes||''))){g.reg+=amt(e);used.add(e.id)}}
+  const words=t=>regNormK(t).split(/[\s\-–—()\/.,،+]+/).map(w=>w.replace(/^(وال|بال|لل|ال)(?=..)/,'')).filter(w=>w.length>=3&&!CR_STOP.has(w)&&!/^\d/.test(w));
+  const wm=(a,b)=>a===b||(a.length>=4&&b.length>=4&&(a.startsWith(b)||b.startsWith(a)));
+  const pg=[...G.values()].filter(g=>!g.bucket).map(g=>({g,w:new Set(g.parts.flatMap(p=>words(p.name)))}));
+  let un=0;
+  if(d.boq)for(const e of S.exp||[]){if(e.siteId!==site||e.deleted||e.boq!==d.boq||used.has(e.id)||!at(()=>crToE(e)))continue;const ew=words(e.item||'');let hit=null;
+    for(const z of pg)if(ew.some(w=>[...z.w].some(v=>wm(w,v)))){hit=z.g;break}
+    if(hit)hit.reg+=amt(e);else un+=amt(e)}
+  for(const g of G.values())for(const p of g.parts)if(p.links&&p.links.length)g.reg+=at(()=>crLinksVal(site,p.links));
+  const shd=cert?(k.shdTo||k.shd||[]):(k.shd||[]);
+  for(const s0 of shd){const b=SHL.find(z=>z.n===s0.n);const g=b&&G.get('b:'+b.id);if(g)g.dist+=s0.v;else{const g2=grp('s:'+s0.n,s0.n);g2.dist+=s0.v;g2.onlyDist=true}}
+  const admV=r2(k.admTo??k.adm??0);if(admV>0.004){const g=grp('adm','مصاريف إدارية');g.dist+=admV;g.onlyDist=true}
+  const L=[...G.values()].map(g=>({...g,reg:r2(g.reg),dist:r2(g.dist),plan:g.uP>0?r2(g.uP*exe):null}));
+  const regSum=r2(L.reduce((a,g)=>a+g.reg,0)),rest=r2(R.reg-regSum);
+  return {L,un:r2(Math.max(0,rest)),gap:r2(rest)}}
+function crCardHTML(site,R,cert,CK){const E=crElems(site,R,cert),k=R.k,tp=crTaxPct(site),m=v=>fmt(v);
+  const rowE=g=>{const tot=r2(g.reg+g.dist),st=g.plan!=null?crSt(g.plan,tot):{c:'n',t:'—'},df=g.plan!=null?r2(g.plan-tot):null;
+    return `<tr class="st-${st.c}"><td>${esc(g.name)}${g.onlyDist?' <small>(موزّع)</small>':''}</td><td class="num">${g.uP?crU(g.uP):'—'}</td><td class="num">${g.plan!=null?m(g.plan):'—'}</td><td class="num">${m(g.reg)}</td><td class="num">${m(g.dist)}</td><td class="num"><b>${m(tot)}</b></td><td class="num dif">${df!=null?crSg(df)+'<small>'+crPc(st.d)+'</small>':'—'}</td><td class="stc">${st.t}</td></tr>`};
+  const dbl=E.L.filter(g=>g.bucket&&g.reg>0.004&&g.dist>0.004&&(g.bucket.m||'mat')!=='qty');
+  const shd=(k.shdTo||k.shd||[]).filter(z=>z.v>0.004),SH=CK.SH.B;
+  const shRow=z=>{const b=SH.find(y=>y.x.n===z.n),y=b&&b.rows.find(q=>q.id===R.x.r.id),how=!b?'':b.mode==='qty'?'بكميات المستخلص':b.mode==='exe'?'بنسبة المنفذ':'بالتحليل';
+    const basis=!y?'':b.mode==='qty'?fmt(y.exe)+' '+esc(R.unit)+' × '+(y.uP?crU(y.uP):'—')+(y.src==='an'?' (التحليل)':'')+(y.dir?' − مسجّل '+fmt(y.dir):''):b.mode==='exe'?'قيمة المنفذ '+fmt(y.theo):fmt(y.exe)+' × '+crU(y.uEff||0);
+    return `<tr><td>${esc(z.n)}</td><td>${how}</td><td>${basis}</td><td class="num">${m(z.v)}</td><td class="num">${b&&b.alloc?Math.round(z.v/b.alloc*1000)/10+'%':'—'}</td></tr>`};
+  const totE=r2(R.reg+R.dist),rem=R.planFull!=null?r2(R.planFull-totE):null;
+  return `<div class="crc"><div class="crc-h"><b>${esc((R.code?R.code+' ':'')+R.name)}</b><span class="row" style="gap:6px"><button type="button" class="ghost" data-cr="edit" data-id="${esc(R.x.r.id)}">✎ تحليل السعر والربط</button><button type="button" class="ghost" data-cr="card" data-id="${esc(R.x.r.id)}">إغلاق ✕</button></span></div>
+   <h4>أ) المقايسة والتنفيذ</h4><div class="crc-g"><div>المقايسة<b>${fmt(R.qty)} ${esc(R.unit)} × ${fmt(R.rate)}</b><small>= ${m(R.contract)}</small></div><div>المنفذ${cert?' (مستخلص '+esc(String(cert.data.no||''))+')':''}<b>${fmt(R.exe)} ${esc(R.unit)} · ${Math.round(R.exePct*10)/10}%</b><small>= ${m(R.exeV)}</small></div><div>المتبقي من المقايسة<b>${fmt(r2(R.qty-R.exe))} ${esc(R.unit)} · ${Math.round((100-R.exePct)*10)/10}%</b><small>= ${m(r2(R.contract-R.exeV))}</small></div><div>المفروض للمقايسة كلها<b>${R.planFull!=null?m(R.planFull):'—'}</b><small>${R.planFull!=null&&R.qty?'المباشر '+crU(R.planFull/R.qty)+' للوحدة':'مفيش تحليل سعر'}</small></div></div>
+   <h4>ب) الدراسة مقابل الفعلي — عنصر عنصر</h4>${E.L.length||E.un?`<div class="tbl-wrap"><table class="cr-t crn"><thead><tr><th>العنصر</th><th class="num">المفروض للوحدة</th><th class="num">المفروض للمنفذ</th><th class="num">المسجّل</th><th class="num">الموزّع</th><th class="num">الإجمالي</th><th class="num">الفرق</th><th>الحالة</th></tr></thead><tbody>
+   ${E.L.map(rowE).join('')}${E.un>0.004?`<tr><td>على البند من غير عنصر <small>(البند في المصروف مش شبه أي عنصر في التحليل)</small></td><td></td><td></td><td class="num">${m(E.un)}</td><td class="num">0</td><td class="num"><b>${m(E.un)}</b></td><td class="num dif">${crSg(-E.un)}</td><td class="stc">—</td></tr>`:''}</tbody>
+   <tfoot><tr class="st-${R.st.c}"><td>المباشر</td><td class="num">${R.planFull!=null&&R.qty?crU(R.planFull/R.qty):'—'}</td><td class="num">${R.plan!=null?m(R.plan):'—'}</td><td class="num">${m(R.reg)}</td><td class="num">${m(R.dist)}</td><td class="num">${m(totE)}</td><td class="num dif">${R.diff!=null?crSg(R.diff)+'<small>'+crPc(R.st.d)+'</small>':'—'}</td><td class="stc">${R.st.t}</td></tr>
+   ${R.oh?`<tr><td>أوفر هيد <small>(نصيب الشركة — مش مصروف على البند)</small></td><td class="num">${R.qty?crU(k.split.oh/R.qty):''}</td><td class="num">${m(R.oh)}</td><td colspan="5"></td></tr>`:''}
+   <tr><td>الضريبة المستحقة على البند <small>(${tp}% × المنفذ قبل الخصومات ${m(R.exeV)})</small></td><td></td><td class="num">${m(R.tax)}</td><td colspan="5"></td></tr></tfoot></table></div>`:'<p class="note">مفيش تحليل سعر للبند — افتح «تحليل السعر والربط» وضيف العناصر.</p>'}
+   ${dbl.map(g=>`<div class="crc-w">⚠ <b>${esc(g.name)}:</b> فيه مسجّل على البند (${m(g.reg)}) وموزّع من «${esc(g.bucket.n)} — مشترك» (${m(g.dist)}) في نفس الوقت — اتأكد إن الدفعة المسجّلة مش متحسوبة في المشترك كمان.</div>`).join('')}
+   ${shd.length?`<h4>ج) نصيبه من الخامات المشتركة</h4><div class="tbl-wrap"><table class="cr-t"><thead><tr><th>الخامة</th><th>التوزيع</th><th>الأساس</th><th class="num">نصيبه</th><th class="num">نسبته من الخامة</th></tr></thead><tbody>${shd.map(shRow).join('')}</tbody></table></div>`:''}
+   <h4>${shd.length?'د':'ج'}) الخلاصة</h4><div class="crc-g"><div>المفروض يتصرف (للمنفذ)<b>${R.plan!=null?m(R.plan):'—'}</b></div><div>اتصرف<b>${m(totE)}</b><small>${R.plan?Math.round(totE/R.plan*1000)/10+'% من المفروض · ':''}مسجّل ${m(R.reg)} + موزّع ${m(R.dist)}</small></div><div>الفرق<b class="${R.st.c==='r'?'neg':R.st.c==='g'?'in':''}">${R.diff!=null?crSg(R.diff):'—'}</b><small>${crPc(R.st.d)} · ${R.st.t}</small></div><div>المتبقي من المفروض للمقايسة كلها<b>${rem!=null?m(rem):'—'}</b><small>${rem!=null&&R.planFull?Math.round(rem/R.planFull*1000)/10+'% — للـ '+Math.round((100-R.exePct)*10)/10+'% الباقية من الكمية':''}</small></div>
+   <div>المتوقع عند نهاية البند<b>${R.fc!=null?m(R.fc):'—'}</b><small>${R.fc!=null?'بتكلفة '+crU(R.tot/R.exe)+' للوحدة × '+fmt(R.qty)+' '+esc(R.unit)+' · '+(R.fcD>=0?'هيخلص بوفر ':'هيخلص بزيادة ')+fmt(Math.abs(R.fcD))+' ('+crPc(R.fcP)+')':'لسه ما اتنفذش'}</small></div></div></div>`}
+/* صحة البيانات */
+function crHealth(site,RR,CK){const H=[],m=v=>fmt(v);
+  if(typeof bqOn==='function'&&bqOn(site.id)){const L=(S.exp||[]).filter(e=>e.siteId===site.id&&!e.deleted&&!e.boq);if(L.length)H.push(`<b>${L.length}</b> مصروف من غير بند مقايسة (${m(r2(L.reduce((a,e)=>a+amt(e),0)))}) <button type="button" class="linkish" data-cdtnone="${esc(site.id)}">عرضها ↗</button>`)}
+  const low=RR.filter(R=>R.plan>0&&R.exe>0&&R.tot<R.plan*0.1);if(low.length)H.push(`بنود اتنفذ منها شغل ومصروفها قليل جدًا (أقل من 10% من المفروض) — غالبًا مصروفاتها متسجلة على بند تاني: ${low.map(R=>`<button type="button" class="linkish" data-cr="card" data-id="${esc(R.x.r.id)}">${esc((R.code?R.code+' ':'')+R.name)}</button> (${m(R.tot)} من ${m(R.plan)})`).join('، ')}`);
+  const pre=RR.filter(R=>!(R.exe>0)&&R.tot>0.004);if(pre.length)H.push(`بنود عليها مصروف ولسه ما اتنفذش منها حاجة في المستخلص: ${pre.map(R=>esc((R.code?R.code+' ':'')+R.name)+' ('+m(R.tot)+')').join('، ')}`);
+  const noA=RR.filter(R=>R.plan==null);if(noA.length)H.push(`بنود من غير تحليل سعر (مفيش «مفروض» تتقارن بيه): ${noA.map(R=>`<button type="button" class="linkish" data-cr="edit" data-id="${esc(R.x.r.id)}">${esc((R.code?R.code+' ':'')+R.name)}</button>`).join('، ')}`);
+  for(const b of CK.SH.B)if(b.left>0.004&&b.paid)H.push(`«${esc(b.x.n)}»: ${m(b.left)} مدفوعة ما اتوزعتش على البنود${b.mode==='qty'?' (لسه منزلتش في مستخلص)':''} <button type="button" class="linkish" data-cr="shtog" data-id="${esc(b.x.id)}">التفاصيل</button>`);
+  const un=crUnlinked(site.id);if(un.total>0.004)H.push(`مصروفات وتوريدات مش داخلة في أي بند: ${m(un.total)} — ${un.list.slice(0,5).map(([n,v])=>esc(n)+' ('+m(v)+')').join('، ')}${un.list.length>5?' …':''}`);
+  return H.length?`<details class="card crh" ${CR.hOpen?'open':''}><summary>⚠ صحة البيانات — ${H.length} ملاحظة <small>راجعها قبل ما تعتمد على الأرقام</small></summary><ul>${H.map(h=>`<li>${h}</li>`).join('')}</ul></details>`:'<div class="card crh ok">✓ صحة البيانات: مفيش ملاحظات.</div>'}
+/* مصروفات بعد تاريخ المستخلص */
+function crAfterList(site,cert){const cd=cert&&cert.data&&cert.data.date;if(!cd)return [];return (S.exp||[]).filter(e=>e.siteId===site&&!e.deleted&&e.boq&&e.boq!==BQ_CO&&(e.date||'')>cd).sort((a,b)=>(a.date||'').localeCompare(b.date||''))}
+function crAfterHTML(site,cert){const L=crAfterList(site.id,cert);if(!L.length)return '';const inc=crIncOf(site.id,cert),sum=v=>r2(v.reduce((a,e)=>a+amt(e),0)),I=L.filter(e=>inc.has(e.id)),N=L.filter(e=>!inc.has(e.id)),no=esc(String(cert.data.no||''));
+  const cons=[...new Set(L.map(e=>e.contractor||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar')),fc=CR.aftC||'',V=fc?L.filter(e=>(e.contractor||'')===fc):L,sel=CR.aftSel||(CR.aftSel=new Set());
+  return `<details class="card cra" ${CR.aftOpen?'open':''}><summary>📋 مصروفات بعد تاريخ المستخلص (${L.length}) · <b>${fmt(sum(L))}</b> · منها <b>${fmt(sum(I))}</b> تبع مستخلص ${no} · <b>${fmt(sum(N))}</b> للمستخلص الجاي</summary>
+   <p class="note">علّم على المصروفات اللي اتدفعت بعد ${esc(ocDmy(cert.data.date))} عن شغل قبل المستخلص، فتدخل في المقارنة. العلامة دي في مراجعة التكاليف بس — الحسابات والكشوف زي ما هي.</p>
+   <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><select id="cr_aftc" aria-label="المقاول / المورد" style="width:auto"><option value="">كل المقاولين والموردين</option>${cons.map(c=>`<option ${c===fc?'selected':''}>${esc(c)}</option>`).join('')}</select><button type="button" class="ghost" data-cr="aftall">تحديد الكل (${V.length})</button><button type="button" class="ghost" data-cr="aftnone">إلغاء التحديد</button><span class="note">المحدد: ${sel.size}</span><button type="button" class="primary" data-cr="aftin" ${sel.size?'':'disabled'}>تبع مستخلص ${no}</button><button type="button" data-cr="aftout" ${sel.size?'':'disabled'}>للمستخلص الجاي</button></div>
+   <div class="tbl-wrap"><table class="cr-t"><thead><tr><th></th><th>التاريخ</th><th>البيان</th><th>البند</th><th>المقاول / المورد</th><th class="num">المبلغ</th><th></th></tr></thead><tbody>${V.map(e=>`<tr><td><input type="checkbox" data-craft="${esc(e.id)}" ${sel.has(e.id)?'checked':''} aria-label="تحديد"></td><td class="date">${esc(e.date||'')}</td><td>${esc(e.notes||'')}</td><td>${esc(typeof bqShort==='function'?bqShort(site.id,e.boq):e.boq)}</td><td>${esc(e.contractor||'')}</td><td class="num">${fmt(amt(e))}</td><td>${inc.has(e.id)?'<span class="kind-tag">تبع '+no+'</span>':''}</td></tr>`).join('')}</tbody></table></div></details>`}
+function crMainHTML(site,CK,cert){const RR=crRowsNew(site.id,CK,cert),T=k=>r2(RR.reduce((a,R)=>a+(R[k]||0),0)),tp=crTaxPct(site.id);
+  const planT=r2(RR.reduce((a,R)=>a+(R.plan||0),0)),totT=T('tot'),regT=T('reg'),distT=T('dist'),st=crSt(planT,totT),con=T('contract'),exeV=T('exeV');
+  const ord=RR.slice().sort((a,b)=>(a.st.d==null?1e9:a.st.d)-(b.st.d==null?1e9:b.st.d));
+  const after=cert?crAfterList(site.id,cert):[],inc=cert?crIncOf(site.id,cert):new Set(),aftN=r2(after.filter(e=>!inc.has(e.id)).reduce((a,e)=>a+amt(e),0));
+  const row=R=>`<tr class="st-${R.st.c} crr" data-cr="card" data-id="${esc(R.x.r.id)}"><td><b>${esc((R.code?R.code+' ':'')+R.name)}</b></td><td class="num">${fmt(R.qty)} ${esc(R.unit)}<small>${fmt(R.contract)}</small></td><td class="num">${fmt(R.exe)} ${esc(R.unit)} · <b>${Math.round(R.exePct)}%</b><small>${fmt(R.exeV)}</small></td><td class="num">${R.plan!=null?fmt(R.plan):'—'}</td><td class="num">${fmt(R.reg)}</td><td class="num">${fmt(R.dist)}</td><td class="num"><b>${fmt(R.tot)}</b><small>${R.plan?Math.round(R.tot/R.plan*100)+'% من المفروض':''}</small></td><td class="num dif">${R.diff!=null?crSg(R.diff)+'<small>'+crPc(R.st.d)+'</small>':'—'}</td><td class="stc">${R.st.t}</td><td class="num">${R.fc!=null&&R.fcD!=null?fmt(R.fc)+'<small class="'+(R.fcD<-0.004?'neg':'')+'">'+(R.fcD>=0?'وفر ':'زيادة ')+crPc(R.fcP).replace(/^[+−]/,'')+'</small>':'—'}</td></tr>${CR.card===R.x.r.id?`<tr class="crcr"><td colspan="10">${crCardHTML(site.id,R,cert,CK)}</td></tr>`:''}`;
+  return `${crHealth(site,RR,CK)}
+   <div class="crk"><div>قيمة المقايسة<b>${fmt(con)}</b></div><div>المنفذ<b>${fmt(exeV)}</b><small>${con?Math.round(exeV/con*1000)/10:0}% من المقايسة</small></div><div>المفروض يتصرف<b>${fmt(planT)}</b><small>المباشر من تحليل السعر × المنفذ</small></div><div>اتصرف (مسجّل + موزّع)<b>${fmt(totT)}</b><small>مسجّل ${fmt(regT)} · موزّع ${fmt(distT)}${cert?' · لحد '+esc(ocDmy(cert.data.date)):''}</small></div><div class="st-${st.c}">الفرق<b>${crSg(r2(planT-totT))}</b><small>${crPc(st.d)} · ${st.t}</small></div><div>الضريبة المستحقة<b>${fmt(T('tax'))}</b><small>${tp}% من المنفذ قبل الخصومات</small></div></div>
+   <div class="crl"><span class="st-g">🟢 وفر أكتر من 2%</span><span class="st-y">🟡 زي الدراسة (±2%)</span><span class="st-r">🔴 زيادة أكتر من 2%</span><span>المفروض = المباشر من تحليل السعر × المنفذ (من غير الأوفر هيد والضريبة) · اضغط على البند تفتح بطاقته</span></div>
+   <div class="tbl-wrap"><table class="cr-t crn"><thead><tr><th>البند</th><th class="num">المقايسة</th><th class="num">المنفذ</th><th class="num">المفروض يتصرف</th><th class="num">المسجّل</th><th class="num">الموزّع</th><th class="num">الإجمالي</th><th class="num">الفرق</th><th>الحالة</th><th class="num">المتوقع عند النهاية</th></tr></thead><tbody>${ord.map(row).join('')}</tbody>
+   <tfoot><tr class="st-${st.c}"><td>الإجمالي</td><td class="num">${fmt(con)}</td><td class="num">${fmt(exeV)}</td><td class="num">${fmt(planT)}</td><td class="num">${fmt(regT)}</td><td class="num">${fmt(distT)}</td><td class="num">${fmt(totT)}</td><td class="num dif">${crSg(r2(planT-totT))}<small>${crPc(st.d)}</small></td><td class="stc">${st.t}</td><td class="num">${fmt(r2(RR.reduce((a,R)=>a+(R.fc!=null?R.fc:0),0)))}</td></tr></tfoot></table></div>
+   ${cert?`<p class="note">${aftN>0.004?'+ مصروف بعد تاريخ المستخلص للمستخلص الجاي: <b>'+fmt(aftN)+'</b> (مش داخل في المقارنة)':''}</p>${crAfterHTML(site,cert)}`:''}
+   <div class="row cr-acts"><button type="button" data-cr="rep1">تقرير التكاليف — الملخص</button><button type="button" data-cr="rep2">الملخص + بطاقات البنود</button><button type="button" data-cr="repxl">Excel</button></div>`}
+/* التقرير: طباعة / Excel */
+function crRepDoc(site,withCards){const cert=crCert(site.id),CK=crK(site.id,cert),RR=crRowsNew(site.id,CK,cert),T=k=>r2(RR.reduce((a,R)=>a+(R[k]||0),0)),planT=r2(RR.reduce((a,R)=>a+(R.plan||0),0)),st=crSt(planT,T('tot')),m=v=>fmt(v).replace(/[⁦⁩]/g,'');
+  const bg={g:'#eaf6ee',y:'#fff8e1',r:'#fdecec',n:'#fff'},ord=RR.slice().sort((a,b)=>(a.st.d==null?1e9:a.st.d)-(b.st.d==null?1e9:b.st.d));
+  let body=`<style>.crp td,.crp th{font-size:11px}.crp small{display:block;color:#555}.crp-k{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.crp-k div{border:1px solid #bbb;border-radius:6px;padding:5px 8px;font-size:11px}.crp-k b{display:block;font-size:14px}.crp-pb{page-break-before:always}</style>
+   <div class="crp-k"><div>قيمة المقايسة<b>${m(T('contract'))}</b></div><div>المنفذ<b>${m(T('exeV'))}</b></div><div>المفروض يتصرف<b>${m(planT)}</b></div><div>اتصرف<b>${m(T('tot'))}</b>مسجّل ${m(T('reg'))} · موزّع ${m(T('dist'))}</div><div>الفرق<b>${crSg(r2(planT-T('tot'))).replace(/[⁦⁩]/g,'')}</b>${crPc(st.d)} · ${st.t}</div><div>الضريبة المستحقة<b>${m(T('tax'))}</b></div></div>
+   <table class="crp"><thead><tr><th>البند</th><th>المقايسة</th><th>المنفذ</th><th>المفروض</th><th>المسجّل</th><th>الموزّع</th><th>الإجمالي</th><th>الفرق</th><th>الحالة</th><th>المتوقع عند النهاية</th></tr></thead><tbody>
+   ${ord.map(R=>`<tr style="background:${bg[R.st.c]}"><td class="tl"><b>${esc((R.code?R.code+' ':'')+R.name)}</b></td><td class="n">${m(R.qty)} ${esc(R.unit)}<small>${m(R.contract)}</small></td><td class="n">${m(R.exe)} · ${Math.round(R.exePct)}%<small>${m(R.exeV)}</small></td><td class="n">${R.plan!=null?m(R.plan):'—'}</td><td class="n">${m(R.reg)}</td><td class="n">${m(R.dist)}</td><td class="n b">${m(R.tot)}</td><td class="n">${R.diff!=null?crSg(R.diff).replace(/[⁦⁩]/g,'')+'<small>'+crPc(R.st.d)+'</small>':'—'}</td><td>${R.st.t}</td><td class="n">${R.fc!=null?m(R.fc)+'<small>'+(R.fcD>=0?'وفر ':'زيادة ')+crPc(R.fcP).replace(/^[+−]/,'')+'</small>':'—'}</td></tr>`).join('')}</tbody></table>
+   <div style="margin-top:8px;font-size:11px">${crHealth(site,RR,CK).replace(/<button[^>]*>.*?<\/button>/g,'').replace(/<\/?details[^>]*>|<\/?summary>/g,'')}</div>`;
+  if(withCards)for(const R of ord)body+=`<div class="crp-pb">${crCardHTML(site.id,R,cert,CK).replace(/<button[^>]*>.*?<\/button>/g,'')}</div>`;
+  return {title:'تقرير التكاليف — '+site.name,sub:(cert?'طبقًا لمستخلص المالك رقم '+(cert.data.no||'')+' — '+(cert.data.date||'')+' · المصروف لحد تاريخ المستخلص · ':'')+'حتى '+today(),body}}
+async function crRepXl(site){const cert=crCert(site.id),CK=crK(site.id,cert),RR=crRowsNew(site.id,CK,cert),R2=v=>v==null||!isFinite(v)?'':Math.round(v*100)/100;
+  const A=[['البند','الوحدة','كمية المقايسة','سعر الوحدة','قيمة المقايسة','المنفذ','نسبة التنفيذ %','قيمة المنفذ','المفروض يتصرف','المسجّل','الموزّع','الإجمالي','الفرق','الفرق %','الحالة','المتوقع عند النهاية','الضريبة المستحقة']];
+  for(const R of RR)A.push([(R.code?R.code+' ':'')+R.name,R.unit,R.qty,R.rate,R.contract,R.exe,R2(R.exePct),R.exeV,R2(R.plan),R.reg,R.dist,R.tot,R2(R.diff),R2(R.st.d),R.st.t.replace(/^\S+\s/,''),R2(R.fc),R.tax]);
+  const B=[['البند','العنصر','المفروض للوحدة','المفروض للمنفذ','المسجّل','الموزّع','الإجمالي','الفرق']];
+  for(const R of RR){const E=crElems(site.id,R,cert);for(const g of E.L){const t=r2(g.reg+g.dist);B.push([(R.code?R.code+' ':'')+R.name,g.name,R2(g.uP||null),R2(g.plan),g.reg,g.dist,t,g.plan!=null?r2(g.plan-t):''])}if(E.un>0.004)B.push([(R.code?R.code+' ':'')+R.name,'على البند من غير عنصر','','',E.un,0,E.un,-E.un])}
+  try{await saveFile('تقرير التكاليف - '+site.name+' - '+today()+'.xlsx',XLSX_W.build([{name:'الملخص',rows:A,styles:{0:1},widths:[34,8,12,12,16,12,10,16,16,16,16,16,14,9,14,16,14],freeze:1},{name:'العناصر',rows:B,styles:{0:1},widths:[34,30,14,16,16,16,16,14],freeze:1}]))}catch(e){}}
+
 function crRender(){
   if(!CR.loaded){crLoad().then(()=>{if(S.sel==='__cost')render()});$('#pane').innerHTML='<div class="blank"><h3>جاري التحميل…</h3></div>';return}
   if(!CR.edit&&Date.now()-(CR.at||0)>60000){CR.at=Date.now();crLoad().then(()=>{if(S.sel==='__cost'&&!CR.edit)render()})}
@@ -1938,17 +2060,16 @@ function crRender(){
   $('#pane').innerHTML=`<div class="pane-h"><h2>مراجعة التكاليف ${hq('للمدير وصاحب الموقع فقط. البنود والكميات والأسعار من ملف مستخلص المشروع، والمنفذ = الكمية في المستخلص × نسبة التنفيذ. الفعلي للوحدة = المصروف فعلًا ÷ المنفذ. المسموح للوحدة = سعر التعاقد − الخصومات للوحدة. الوفر حتى الآن = (المسموح للوحدة × المنفذ) − المصروف فعلًا.')}</h2><div class="actions">${sites.length>1?`<select id="cr_site" aria-label="الموقع" style="width:auto">${sites.map(s=>`<option value="${esc(s.id)}" ${s.id===site.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>`:`<b>${esc(site.name)}</b>`}</div></div>
   ${CR.missing?'<div class="card"><p class="msg err">شغّل ملف «ADC-مراجعة-التكاليف.sql» في Supabase لتعمل هذه الصفحة.</p></div>':''}
   ${!P||!BQ.length?`<div class="card blank"><h3>لا يوجد ملف مستخلص المشروع لهذا الموقع</h3><p>بنود مراجعة التكاليف هي نفس بنود «ملف مستخلص المشروع». أنشئه أولًا من «مستخلص المالك» ← ملف المشروع، وأضف بنود التعاقد.</p><button type="button" class="primary" data-site="__ocert">فتح مستخلص المالك</button></div>`:''}
-  ${P&&BQ.length?`<div class="row cr-acts"><button type="button" class="primary" data-cr="new" ${free.length?'':'disabled'}>+ بند من ملف المشروع</button>${free.length?`<button type="button" data-cr="impoc">إضافة كل بنود ملف المشروع (${free.length})</button>`:''}${rows.length?'<button type="button" data-cr="print">طباعة / PDF</button><button type="button" data-cr="xl">Excel</button>':''}</div>
+  ${P&&BQ.length?`<div class="row cr-acts"><button type="button" class="primary" data-cr="new" ${free.length?'':'disabled'}>+ بند من ملف المشروع</button>${free.length?`<button type="button" data-cr="impoc">إضافة كل بنود ملف المشروع (${free.length})</button>`:''}${rows.length?'<button type="button" data-cr="rep1">تقرير التكاليف</button><button type="button" data-cr="repxl">Excel</button>':''}</div>
   <div class="row cr-acts" style="align-items:center"><label for="cr_oc">الكمية المنفذة من مستخلص المالك:</label>${certs.length?`<select id="cr_oc" style="width:auto">${certs.slice().reverse().map(c=>`<option value="${esc(c.id)}" ${cert&&c.id===cert.id?'selected':''}>رقم ${esc(String(c.data.no||''))} — ${esc(c.data.date||'')}${c.data.status==='approved'?'':' (غير معتمد)'}</option>`).join('')}</select>`:'<b class="neg">لا توجد مستخلصات مالك بعد — الكمية المنفذة = 0</b>'}</div>`:''}
   ${m?`<p class="msg ${m.ok?'ok':'err'}">${esc(m.t)}</p>`:''}
   ${bad.length?`<div class="card due-card"><b>⚠ ${bad.length} بند غير مربوط ببند في ملف المشروع:</b> ${bad.map(x=>esc(x.r.data.name||'')).join('، ')}. افتح البند واختر بنده من ملف المشروع.</div>`:''}
   ${CR.edit?crFormHTML(site):''}
-  ${rows.length?crTwo(tot,{cert,ohtax:r2(K.reduce((a,x)=>a+crOhTax(x.k),0)),deds:[...dedBy].map(([n,v])=>`<span>${esc(n)} <b>${fmt(v)}</b></span>`).join('')}):''}
-  ${un.total>0.004&&rows.length?`<div class="card due-card"><b>⚠ مصروفات وتوريدات في الموقع غير داخلة في أي بند: ${fmt(un.total)} ${CUR}</b><div class="note" style="margin-top:4px">${un.list.slice(0,8).map(([n,v])=>esc(n)+' ('+fmt(v)+')').join('، ')}${un.list.length>8?' …':''}</div></div>`:''}
-  ${rows.length?(CK.hasOh?crOhCard(site,CK):crAdmCard(site,CK))+crShCard(site,CK)+crTableHTML(site,K,tot,CK)
+  ${rows.length?crMainHTML(site,CK,cert)+'<h3 class="cr-sub2">تفاصيل التوزيع والأوفر هيد</h3>'+(CK.hasOh?crOhCard(site,CK):crAdmCard(site,CK))+crShCard(site,CK)+`<details class="card cr-old" ${CR.oldOpen?'open':''}><summary><b>الجدول التفصيلي</b> <span class="note">حد الصرف والفعلي لكل وحدة · المصروفات المسجّلة على كل بند · تعديل وحذف البنود</span></summary>${crTableHTML(site,K,tot,CK)}</details>`
   :P&&BQ.length?'<div class="card"><p class="note">لا توجد بنود في المراجعة بعد. أضف بندًا من ملف المشروع، أو أضف كل البنود مرة واحدة.</p></div>':''}`;
   const ss=$('#cr_site');if(ss)ss.onchange=()=>{CR.site=ss.value;CR.edit=null;CR.pick=null;render()};
   const so=$('#cr_oc');if(so)so.onchange=()=>{CR.oc[site.id]=so.value;render()};
+  const ac=$('#cr_aftc');if(ac)ac.onchange=()=>{CR.aftC=ac.value;S.justSaved=true;render()};
   crBindForm();
 }
 document.addEventListener('click',ev=>{if(!ev.target.closest('[data-octpl]'))return;OC.tab='tpl';OC.te=null;S.sel='__ocert';S.justSaved=true;render();window.scrollTo({top:0})});
@@ -2078,6 +2199,13 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-cr
   if(a==='cancel'){CR.edit=null;CR.pick=null;render();return}
   if(a==='impoc'){await crImportOc(site);return}
   if(a==='print'){CR.printing=crDoc(site);printReport('cost');return}
+  if(a==='rep1'||a==='rep2'){CR.printing=crRepDoc(site,a==='rep2');printReport('cost');return}
+  if(a==='repxl'){await crRepXl(site);return}
+  if(a==='card'){if(ev.target.closest('a,input,select,.crcr button:not([data-cr="card"])'))return;CR.card=CR.card===b.dataset.id?'':b.dataset.id;S.justSaved=true;render();if(CR.card)setTimeout(()=>{const x=document.querySelector('.crcr');if(x)x.scrollIntoView({block:'nearest'})},40);return}
+  if(a==='aftall'){const cert=crCert(site.id),fc=CR.aftC||'';CR.aftSel=new Set(crAfterList(site.id,cert).filter(e=>!fc||(e.contractor||'')===fc).map(e=>e.id));CR.aftOpen=true;S.justSaved=true;render();return}
+  if(a==='aftnone'){CR.aftSel=new Set();CR.aftOpen=true;S.justSaved=true;render();return}
+  if(a==='aftin'||a==='aftout'){const cert=crCert(site.id),P=crProj(site.id);if(!cert||!P){flash('مفيش ملف مشروع أو مستخلص.');return}const cur=new Set(((P.data.crIn||{})[cert.id])||[]);for(const id of CR.aftSel||[])a==='aftin'?cur.add(id):cur.delete(id);
+    const crIn={...(P.data.crIn||{}),[cert.id]:[...cur]};if(await ocPut({...P,data:{...P.data,crIn}})){const n=(CR.aftSel||new Set()).size;CR.aftSel=new Set();CR.aftOpen=true;flash(a==='aftin'?n+' مصروف دخلوا في مقارنة مستخلص '+(cert.data.no||''):n+' مصروف اتنقلوا للمستخلص الجاي');render()}return}
   if(a==='shleft'){const P=crProj(site.id);if(!P){flash('مفيش ملف مشروع.');return}const L=ocClone(bqShared(site.id)).map(x=>x.id===b.dataset.id?{...x,left:b.dataset.v}:x);if(await ocPut({...P,data:{...P.data,shared:L,sharedV:2}})){bqSync(site,true);flash(b.dataset.v==='waste'?'الفائض اتحمّل كهالك.':'الفائض رصيد لسه منزلتش في مستخلص.');render()}return}
   if(a==='shtog'){const S2=CR.shOpen||(CR.shOpen=new Set()),id=b.dataset.id;if(S2.has(id))S2.delete(id);else S2.add(id);render();return}
   if(a==='var'){CR.printing=crVarDoc(site);printReport('cost');return}
@@ -9416,6 +9544,8 @@ document.addEventListener('click',ev=>{if(ev.target.closest('[data-fopen]')){S.f
 document.addEventListener('click',ev=>{const d=ev.target.closest('[data-rmenu]');const all=document.querySelectorAll('.rm-pop:not([hidden])');
   if(d){const p=d.nextElementSibling,open=p&&p.hidden;all.forEach(x=>{x.hidden=true;const t=x.previousElementSibling;if(t)t.setAttribute('aria-expanded','false')});if(p&&open){p.hidden=false;d.setAttribute('aria-expanded','true')}return}
   if(!ev.target.closest('.rm-pop'))all.forEach(x=>{x.hidden=true});else setTimeout(()=>document.querySelectorAll('.rm-pop:not([hidden])').forEach(x=>{x.hidden=true}),0)},true);
+document.addEventListener('change',ev=>{const c=ev.target.closest&&ev.target.closest('[data-craft]');if(!c)return;const S2=CR.aftSel||(CR.aftSel=new Set());if(c.checked)S2.add(c.dataset.craft);else S2.delete(c.dataset.craft);CR.aftOpen=true;S.justSaved=true;render()});
+document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList){if(d.classList.contains('cr-old'))CR.oldOpen=d.open;if(d.classList.contains('cra'))CR.aftOpen=d.open;if(d.classList.contains('crh'))CR.hOpen=d.open}},true);
 function uiGroupMenu(tm){
   const get=id=>tm.querySelector(`.site-btn[data-site="${id}"]`);for(const id of ['__ocert','__cost']){const x=get(id);if(x)x.remove()}
   for(const id of ['__contractors','__codes','__all']){const b=get(id);if(b)b.remove()}
@@ -9710,6 +9840,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-crboq]')
 function ocSharedHTML(d){if(!Array.isArray(d.shared))d.shared=ocClone(BQ_SH_DEF);if(!d.sharedV&&!d.shared.some(x=>x.id==='misc'))d.shared.push(ocClone(BQ_MISC));const F=OC.fold||(OC.fold={});
   return `<details class="card oc-fold" data-fold="shared" ${F.shared?'open':''}><summary><b>الخامات المشتركة اللي بتتوزع على البنود</b><span class="note">${d.shared.map(x=>esc(x.n||'—')).join(' · ')}</span></summary>
    <p class="note" style="margin:6px 0">المصروف المسجّل على «… — مشترك» بيتوزع في مراجعة التكاليف ${hq('بالتحليل: بنسبة العنصر في تحليل سعر كل بند × الكمية المنفذة (وعنصر التحليل بيتعرف بالكلمات أو باختيار «خامة مشتركة» جنبه). بنسبة المنفذ: بنسبة قيمة الأعمال المنفذة لكل بند (زي المساحة). بكميات المستخلص: م3 المنفذة من آخر مستخلص مالك × متوسط السعر (للمتر المكعب) — المتعلّم على البند مباشرة بيتحسب الأول والناقص من المشترك، والفائض «لسه منزلتش في مستخلص» أو «هالك»؛ بنود م2 بتتحول بالتخانة. «البنود»: فاضي = كل البنود، أو أرقام بنود المقايسة زي 4-13 أو 4,7,8 والتوزيع بيبقى عليها بس. متوسط سعر التوريد اختياري — لو فاضي بيتاخد سعر الوحدة من التحليل.')}</p>
+   <div class="row" style="gap:8px;align-items:center;margin:4px 0 8px"><label for="pe_tax">نسبة الضريبة المستحقة على البنود %</label><input id="pe_tax" data-pe="taxPct" value="${esc(d.taxPct??'')}" inputmode="decimal" class="w-n" placeholder="4.5" style="width:80px"><span class="note">بتتحسب من قيمة المنفذ في المستخلص قبل أي خصم — للمعلومة في مراجعة التكاليف بس.</span></div>
    <div class="tbl-wrap"><table class="oc-t"><thead><tr><th>الخامة</th><th>التوزيع</th><th>البنود</th><th>متوسط سعر التوريد</th><th>كلمات التعرف في التحليل</th><th>بكميات المستخلص: هالك مسموح ٪ · تخانة م2 · الفائض</th><th></th></tr></thead><tbody>
    ${d.shared.map((x,i)=>`<tr><td><input data-pe="shared.${i}.n" value="${esc(x.n||'')}" aria-label="اسم الخامة"></td><td><select data-pe="shared.${i}.m" aria-label="طريقة التوزيع"><option value="mat" ${(x.m||'mat')==='mat'?'selected':''}>بالتحليل</option><option value="exe" ${x.m==='exe'?'selected':''}>بنسبة المنفذ</option><option value="qty" ${x.m==='qty'?'selected':''}>بكميات المستخلص</option></select></td><td><input data-pe="shared.${i}.sc" value="${esc(x.sc||'')}" class="w-s" placeholder="كل البنود" title="فاضي = كل البنود، أو أرقام زي 4-13 أو 4,7,8" aria-label="نطاق البنود">${x.m==='exe'&&!String(x.sc||'').trim()?'<small class="neg" style="display:block">⚠ فاضي = كل البنود</small>':''}</td><td><input data-pe="shared.${i}.price" value="${esc(x.price??'')}" inputmode="decimal" class="w-n" placeholder="من التحليل" title="فاضي = سعر العنصر من تحليل كل بند"></td><td><input data-pe="shared.${i}.kw" value="${esc(x.kw||'')}" class="w-s" placeholder="مثال: حديد" aria-label="كلمات التعرف"></td><td><input data-pe="shared.${i}.ws" value="${esc(x.ws??'')}" inputmode="decimal" class="w-n" placeholder="0" title="هالك مسموح ٪ (بكميات المستخلص)" aria-label="هالك مسموح ٪"> <input data-pe="shared.${i}.th" value="${esc(x.th||'')}" class="w-s" placeholder="عادية 0.10 · مسلحة 0.20" title="تخانة بنود المتر المسطح (م3 لكل م2) — مثال: 5,6=0.10 ; 12,13=0.20. فاضي: العادية 0.10 والمسلحة 0.20" aria-label="تخانة بنود م2"> <select data-pe="shared.${i}.left" aria-label="الفائض"><option value="pend" ${x.left!=='waste'?'selected':''}>الفائض: لسه منزلتش</option><option value="waste" ${x.left==='waste'?'selected':''}>الفائض: هالك</option></select></td><td><button type="button" class="linkish" data-oc="shdel" data-i="${i}" aria-label="حذف">✕</button></td></tr>`).join('')}
    </tbody></table></div><button type="button" class="ghost" data-oc="shadd">+ خامة مشتركة</button></details>`}
@@ -10414,7 +10545,7 @@ function render(){
   const FT=document.activeElement;const ftKeep=FT&&FT.id&&((FT.tagName==='INPUT'&&/^(text|search|tel|email|url|number)?$/.test(FT.type||''))||FT.tagName==='TEXTAREA')?{id:FT.id,v:FT.value,s:FT.selectionStart,e:FT.selectionEnd}:null;
   if(!S.justSaved)for(const id of KEEP){const el=document.getElementById(id);if(el)keep[id]=el.value}
   S.justSaved=false;
-  {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal'||(S.sel==='__ocert'&&!!OC&&!!OC.cur))}
+  {const L=document.querySelector('.layout');if(L)L.classList.toggle('wide',S.sel==='__journal'||S.sel==='__cost'||(S.sel==='__ocert'&&!!OC&&!!OC.cur))}
   if(APP&&appIsEngineer()){appRenderEngineer()}else
   S.sel==='__cost'&&APP?crRender():S.sel==='__ocert'&&APP?ocRender():S.sel==='__wait'&&APP?renderWaiting():S.sel==='__codes'&&APP?renderCodes():S.sel==='__imports'&&APP?renderImports():S.sel==='__pendregs'&&APP?(typeof cdCan==='function'&&cdCan()?(CDP.tab='pend',S.sel='__codes',renderCodes()):prRenderPage()):S.sel==='__custody'&&APP?appRenderCustody():S.sel==='__all'?renderOverview():S.sel==='__journal'?renderJournal():S.sel==='__contractors'?renderRegister('contractors'):S.sel==='__items'?renderRegister('items'):S.sel==='__banks'?renderBanks():S.sel==='__certs'&&APP?ctRenderPage():S.sel==='__stmts'&&APP?spRenderPage():S.sel==='__store'&&APP?soRenderPage():S.sel==='__ignored'&&APP?niRender():S.sel==='__trash'?renderTrash():S.sel==='__review'?renderReview():S.sel==='__search'?renderSearch():S.sel==='__settings'?renderSettings():renderSite();
   if(APP&&['__store','__ocert','__cost'].includes(S.sel)&&S.fromSite){const h=siteBarFor(),pn=$('#pane');if(h&&pn&&!pn.querySelector('.site-bar'))pn.insertAdjacentHTML('afterbegin',h)}

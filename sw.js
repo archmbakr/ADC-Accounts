@@ -1,5 +1,5 @@
-/* ADC accounts — offline shell cache. version 20261128001500 */
-const CACHE = 'adc-app-20261128001500';
+/* ADC accounts — offline shell cache. version 20261128103000 */
+const CACHE = 'adc-app-20261128103000';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'];
 self.addEventListener('install', e => {
   // الصفحة الأساسية لازم تتخزن كاملة، وإلا التحديث يفشل ويفضل التخزين القديم شغال
