@@ -51,22 +51,22 @@ table.j-t td.date,table.j-t td.num{white-space:nowrap}table.j-t .j-notes{min-wid
 
 /* مراجعة التكاليف 28 نوفمبر */
 .crn td,.crn th{vertical-align:top;font-size:13px;padding:7px 8px}.crn small,.crc small,.crk small{display:block;color:var(--muted);font-size:11.5px;font-weight:400}
-.crn tr.st-r>td{background:#fdecec}.crn tr.st-y>td{background:#fff8e1}.crn tr.st-g>td{background:#eaf6ee}
-[data-theme="dark"] .crn tr.st-r>td{background:#3a1f1f}[data-theme="dark"] .crn tr.st-y>td{background:#3a321a}[data-theme="dark"] .crn tr.st-g>td{background:#1c3324}
-.crn .stc{white-space:nowrap;font-weight:700}.crn .dif{font-weight:700}.crn tr.st-r .dif{color:#b3261e}.crn tr.st-g .dif{color:#1e7b45}.crn tr.st-y .dif{color:#8a6100}
-[data-theme="dark"] .crn tr.st-r .dif{color:#ff9a90}[data-theme="dark"] .crn tr.st-g .dif{color:#7fd8a0}[data-theme="dark"] .crn tr.st-y .dif{color:#f0cd6a}
+.crn tr.st-r>td{background:rgba(214,69,53,.14)}.crn tr.st-y>td{background:rgba(230,175,20,.16)}.crn tr.st-g>td{background:rgba(46,158,91,.14)}
+.crn .stc{white-space:nowrap;font-weight:700}.crn .dif{font-weight:700}.crn tr.st-r .dif{color:#d64535}.crn tr.st-g .dif{color:#2e9e5b}.crn tr.st-y .dif{color:#c08a00}
 .crn tr.crr{cursor:pointer}.crn tr.crr:hover>td{filter:brightness(.97)}
 .crcr>td{background:var(--sunk)!important;padding:10px!important}
 .crk{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
 .crk>div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;color:var(--muted)}.crk b{display:block;font-size:19px;color:var(--fg);margin-top:4px}
-.crk .st-r b{color:#b3261e}.crk .st-g b{color:#1e7b45}.crk .st-y b{color:#8a6100}
-.crl{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;margin:4px 0 8px;color:var(--muted)}.crl span[class]{padding:2px 9px;border-radius:12px;color:#222}
-.crl .st-g{background:#eaf6ee}.crl .st-y{background:#fff8e1}.crl .st-r{background:#fdecec}
+.crk .st-r b{color:#d64535}.crk .st-g b{color:#2e9e5b}.crk .st-y b{color:#c08a00}
+.crl{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;margin:4px 0 8px;color:var(--muted)}.crl span[class]{padding:2px 9px;border-radius:12px;color:var(--fg)}
+.crl .st-g{background:rgba(46,158,91,.16)}.crl .st-y{background:rgba(230,175,20,.18)}.crl .st-r{background:rgba(214,69,53,.16)}
 .crc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}.crc-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:16px}
 .crc h4{margin:14px 0 6px;font-size:14.5px}.crc-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
 .crc-g>div{border:1px solid var(--line);border-radius:10px;padding:9px;font-size:13px;color:var(--muted)}.crc-g b{display:block;font-size:16px;color:var(--fg);margin-top:3px}
-.crc-w{background:#fff3cd;border:1px solid #e0c060;color:#5a4300;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px}
-.crh summary{cursor:pointer;font-weight:700;color:#8a4b00}.crh summary small{font-weight:400;color:var(--muted);margin-inline-start:8px}.crh ul{margin:8px 0 0;padding-inline-start:20px;line-height:1.9}.crh.ok{color:#1e7b45;font-weight:600}
+.crc-w{background:rgba(230,175,20,.16);border:1px solid rgba(200,150,20,.6);color:var(--fg);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px}
+.crh summary{cursor:pointer;font-weight:700;color:#c07000}.crh summary small{font-weight:400;color:var(--muted);margin-inline-start:8px}.crh ul{margin:8px 0 0;padding-inline-start:20px;line-height:1.9}.crh.ok{color:#2e9e5b;font-weight:600}
+.crn small.up{color:#2e9e5b}.crn small.dn{color:#d64535}.crn small.chg{color:#c07000}
+.cr-stk{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.cr-stk input.w-n{width:130px}
 .cra summary{cursor:pointer}.cr-sub2{margin:22px 0 8px;font-size:15px;color:var(--muted)}
 </style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script><script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"><\/script>')</script></head><body>
 <title>ADC حسابات المواقع</title>
@@ -1947,10 +1947,14 @@ const crTaxPct=site=>{const P=crProj(site);const v=P&&P.data&&P.data.taxPct;retu
 function crSt(plan,tot){if(plan==null||!(plan>0))return {d:null,c:'n',t:'— مفيش تحليل'};const d=(plan-tot)/plan*100;return d>2?{d,c:'g',t:'🟢 وفر'}:d>=-2?{d,c:'y',t:'🟡 زي الدراسة'}:{d,c:'r',t:'🔴 زيادة'}}
 const crSg=v=>v>0.004?'+'+fmt(v):v<-0.004?'−'+fmt(-v):'0';
 const crPc=v=>v==null||!isFinite(v)?'—':(v>0.004?'+':v<-0.004?'−':'')+Math.abs(Math.round(v*10)/10)+'%';
-function crRowsNew(site,CK,cert){const tp=crTaxPct(site);
-  return CK.K.map(x=>{const k=x.k,qty=k.qty,exe=k.exe,rate=k.rate,exeV=r2(rate*exe),tot=r2(k.actTo??k.act),dist=r2((k.shaTo??k.sha??0)+(k.admTo??k.adm??0)),reg=r2(tot-dist),plan=k.limExe,planFull=k.lim,st=crSt(plan,tot);
+const crStk=site=>{const P=crProj(site),v=P&&P.data&&P.data.crStock;return v&&v.on?v:null};
+function crRowsNew(site,CK,cert){const tp=crTaxPct(site),SK=crStk(site);
+  return CK.K.map(x=>{const k=x.k,qty=k.qty,exe=k.exe,rate=k.rate,exeV=r2(rate*exe);let tot=r2(k.actTo??k.act),dist=r2((k.shaTo??k.sha??0)+(k.admTo??k.adm??0)),stk=0;const stkBy={};
+    if(SK)for(const z of (k.shdTo||k.shd||[])){const b=CK.SH.B.find(y=>y.x.n===z.n),sv=b?Math.min(crN((SK.v||{})[b.x.id]),b.alloc):0;if(sv>0&&b.alloc>0){const dd=r2(sv*z.v/b.alloc);stkBy[z.n]=dd;stk+=dd}}
+    stk=r2(stk);if(stk){dist=r2(dist-stk);tot=r2(tot-stk)}
+    const reg=r2(tot-dist),plan=k.limExe,planFull=k.lim,st=crSt(plan,tot);
     const actU=exe>0?tot/exe:null,fc=actU!=null&&qty>0?r2(actU*qty):null,fcD=fc!=null&&planFull!=null?r2(planFull-fc):null;
-    return {x,k,code:k.I.code||'',name:k.I.name,unit:k.I.unit||'',qty,rate,contract:k.contract,exe,exeV,exePct:qty?exe/qty*100:0,plan,planFull,reg,dist,tot,diff:plan!=null?r2(plan-tot):null,st,fc,fcD,fcP:fcD!=null&&planFull?fcD/planFull*100:null,tax:r2(exeV*tp/100),oh:k.split&&k.split.has&&qty?r2(k.split.oh/qty*exe):0}})}
+    return {x,k,stk,stkBy,code:k.I.code||'',name:k.I.name,unit:k.I.unit||'',qty,rate,contract:k.contract,exe,exeV,exePct:qty?exe/qty*100:0,plan,planFull,reg,dist,tot,diff:plan!=null?r2(plan-tot):null,st,fc,fcD,fcP:fcD!=null&&planFull?fcD/planFull*100:null,tax:r2(exeV*tp/100),oh:k.split&&k.split.has&&qty?r2(k.split.oh/qty*exe):0}})}
 /* عناصر البند: المفروض / المسجّل / الموزّع */
 function crElems(site,R,cert){const x=R.x,d=x.d,k=R.k,cd=cert&&cert.data&&cert.data.date,inc=cert?crIncOf(site,cert):new Set(),exe=R.exe,SHL=bqShared(site);
   const at=f=>{const t=CR._to,i=CR._inc;CR._to=cd||null;CR._inc=inc;try{return f()}finally{CR._to=t;CR._inc=i}};
@@ -1969,7 +1973,7 @@ function crElems(site,R,cert){const x=R.x,d=x.d,k=R.k,cd=cert&&cert.data&&cert.d
     if(hit)hit.reg+=amt(e);else un+=amt(e)}
   for(const g of G.values())for(const p of g.parts)if(p.links&&p.links.length)g.reg+=at(()=>crLinksVal(site,p.links));
   const shd=cert?(k.shdTo||k.shd||[]):(k.shd||[]);
-  for(const s0 of shd){const b=SHL.find(z=>z.n===s0.n);const g=b&&G.get('b:'+b.id);if(g)g.dist+=s0.v;else{const g2=grp('s:'+s0.n,s0.n);g2.dist+=s0.v;g2.onlyDist=true}}
+  for(const s0 of shd){const b=SHL.find(z=>z.n===s0.n);const g=b&&G.get('b:'+b.id);const sv=r2(s0.v-((R.stkBy||{})[s0.n]||0));if(g)g.dist+=sv;else{const g2=grp('s:'+s0.n,s0.n);g2.dist+=sv;g2.onlyDist=true}}
   const admV=r2(k.admTo??k.adm??0);if(admV>0.004){const g=grp('adm','مصاريف إدارية');g.dist+=admV;g.onlyDist=true}
   const L=[...G.values()].map(g=>({...g,reg:r2(g.reg),dist:r2(g.dist),plan:g.uP>0?r2(g.uP*exe):null}));
   const regSum=r2(L.reduce((a,g)=>a+g.reg,0)),rest=r2(R.reg-regSum);
@@ -2011,21 +2015,40 @@ function crAfterHTML(site,cert){const L=crAfterList(site.id,cert);if(!L.length)r
    <p class="note">علّم على المصروفات اللي اتدفعت بعد ${esc(ocDmy(cert.data.date))} عن شغل قبل المستخلص، فتدخل في المقارنة. العلامة دي في مراجعة التكاليف بس — الحسابات والكشوف زي ما هي.</p>
    <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><select id="cr_aftc" aria-label="المقاول / المورد" style="width:auto"><option value="">كل المقاولين والموردين</option>${cons.map(c=>`<option ${c===fc?'selected':''}>${esc(c)}</option>`).join('')}</select><button type="button" class="ghost" data-cr="aftall">تحديد الكل (${V.length})</button><button type="button" class="ghost" data-cr="aftnone">إلغاء التحديد</button><span class="note">المحدد: ${sel.size}</span><button type="button" class="primary" data-cr="aftin" ${sel.size?'':'disabled'}>تبع مستخلص ${no}</button><button type="button" data-cr="aftout" ${sel.size?'':'disabled'}>للمستخلص الجاي</button></div>
    <div class="tbl-wrap"><table class="cr-t"><thead><tr><th></th><th>التاريخ</th><th>البيان</th><th>البند</th><th>المقاول / المورد</th><th class="num">المبلغ</th><th></th></tr></thead><tbody>${V.map(e=>`<tr><td><input type="checkbox" data-craft="${esc(e.id)}" ${sel.has(e.id)?'checked':''} aria-label="تحديد"></td><td class="date">${esc(e.date||'')}</td><td>${esc(e.notes||'')}</td><td>${esc(typeof bqShort==='function'?bqShort(site.id,e.boq):e.boq)}</td><td>${esc(e.contractor||'')}</td><td class="num">${fmt(amt(e))}</td><td>${inc.has(e.id)?'<span class="kind-tag">تبع '+no+'</span>':''}</td></tr>`).join('')}</tbody></table></div></details>`}
+/* الصورة الثابتة لكل مستخلص + المستخلص اللي قبله */
+function crSnapOf(site,cert){const P=crProj(site);return cert&&P&&P.data&&P.data.crSnap?P.data.crSnap[cert.id]||null:null}
+function crSnapMake(RR,planT,totT){const it={};for(const R of RR)it[R.x.r.id]={plan:R.plan,tot:R.tot,reg:R.reg,dist:R.dist,d:R.st.d};return {at:Date.now(),by:(APPU.me||{}).name||'',items:it,plan:planT,tot:totT}}
+async function crSnapSave(site,cert,snap){const P=crProj(site);if(!P||!cert)return false;const crSnap={...(P.data.crSnap||{}),[cert.id]:snap};return await ocPut({...P,data:{...P.data,crSnap}})}
+function crPrevMap(site,cert){const L=crCerts(site);const i=L.findIndex(c=>c.id===(cert&&cert.id));if(i<1)return null;const pc=L[i-1],sn=crSnapOf(site,pc);
+  if(sn)return {no:pc.data.no,snap:true,m:new Map(Object.entries(sn.items).map(([id,v])=>[id,v.d]))};
+  try{const RR=crRowsNew(site,crK(site,pc),pc);return {no:pc.data.no,snap:false,m:new Map(RR.map(R=>[R.x.r.id,R.st.d]))}}catch(e){return null}}
 function crMainHTML(site,CK,cert){const RR=crRowsNew(site.id,CK,cert),T=k=>r2(RR.reduce((a,R)=>a+(R[k]||0),0)),tp=crTaxPct(site.id);
   const planT=r2(RR.reduce((a,R)=>a+(R.plan||0),0)),totT=T('tot'),regT=T('reg'),distT=T('dist'),st=crSt(planT,totT),con=T('contract'),exeV=T('exeV');
   const ord=RR.slice().sort((a,b)=>(a.st.d==null?1e9:a.st.d)-(b.st.d==null?1e9:b.st.d));
+  const PV=cert?crPrevMap(site.id,cert):null,SN=cert?crSnapOf(site.id,cert):null,stkT=T('stk'),SK=crStk(site.id);
+  const pvTxt=R=>{if(!PV||R.st.d==null)return '';const v=PV.m.get(R.x.r.id);if(v==null)return '';const up=R.st.d>v+0.05,dn=R.st.d<v-0.05;return `<small class="${up?'up':dn?'dn':''}">كان ${crPc(v)} في ${PV.no}${up?' ↑':dn?' ↓':''}</small>`};
+  const snTxt=R=>{const v=SN&&SN.items[R.x.r.id];if(!v)return '';const dd=r2(R.tot-v.tot);return Math.abs(dd)>1?`<small class="chg">اتغير ${crSg(dd)} عن وقت الاعتماد</small>`:''};
   const after=cert?crAfterList(site.id,cert):[],inc=cert?crIncOf(site.id,cert):new Set(),aftN=r2(after.filter(e=>!inc.has(e.id)).reduce((a,e)=>a+amt(e),0));
-  const row=R=>`<tr class="st-${R.st.c} crr" data-cr="card" data-id="${esc(R.x.r.id)}"><td><b>${esc((R.code?R.code+' ':'')+R.name)}</b></td><td class="num">${fmt(R.qty)} ${esc(R.unit)}<small>${fmt(R.contract)}</small></td><td class="num">${fmt(R.exe)} ${esc(R.unit)} · <b>${Math.round(R.exePct)}%</b><small>${fmt(R.exeV)}</small></td><td class="num">${R.plan!=null?fmt(R.plan):'—'}</td><td class="num">${fmt(R.reg)}</td><td class="num">${fmt(R.dist)}</td><td class="num"><b>${fmt(R.tot)}</b><small>${R.plan?Math.round(R.tot/R.plan*100)+'% من المفروض':''}</small></td><td class="num dif">${R.diff!=null?crSg(R.diff)+'<small>'+crPc(R.st.d)+'</small>':'—'}</td><td class="stc">${R.st.t}</td><td class="num">${R.fc!=null&&R.fcD!=null?fmt(R.fc)+'<small class="'+(R.fcD<-0.004?'neg':'')+'">'+(R.fcD>=0?'وفر ':'زيادة ')+crPc(R.fcP).replace(/^[+−]/,'')+'</small>':'—'}</td></tr>${CR.card===R.x.r.id?`<tr class="crcr"><td colspan="10">${crCardHTML(site.id,R,cert,CK)}</td></tr>`:''}`;
+  const row=R=>`<tr class="st-${R.st.c} crr" data-cr="card" data-id="${esc(R.x.r.id)}"><td><b>${esc((R.code?R.code+' ':'')+R.name)}</b></td><td class="num">${fmt(R.qty)} ${esc(R.unit)}<small>${fmt(R.contract)}</small></td><td class="num">${fmt(R.exe)} ${esc(R.unit)} · <b>${Math.round(R.exePct)}%</b><small>${fmt(R.exeV)}</small></td><td class="num">${R.plan!=null?fmt(R.plan):'—'}</td><td class="num">${fmt(R.reg)}</td><td class="num">${fmt(R.dist)}</td><td class="num"><b>${fmt(R.tot)}</b><small>${R.plan?Math.round(R.tot/R.plan*100)+'% من المفروض':''}</small>${R.stk?'<small>بعد خصم رصيد بالموقع '+fmt(R.stk)+'</small>':''}${snTxt(R)}</td><td class="num dif">${R.diff!=null?crSg(R.diff)+'<small>'+crPc(R.st.d)+'</small>':'—'}</td><td class="stc">${R.st.t}${pvTxt(R)}</td><td class="num">${R.fc!=null&&R.fcD!=null?fmt(R.fc)+'<small class="'+(R.fcD<-0.004?'neg':'')+'">'+(R.fcD>=0?'وفر ':'زيادة ')+crPc(R.fcP).replace(/^[+−]/,'')+'</small>':'—'}</td></tr>${CR.card===R.x.r.id?`<tr class="crcr"><td colspan="10">${crCardHTML(site.id,R,cert,CK)}</td></tr>`:''}`;
   return `${crHealth(site,RR,CK)}
-   <div class="crk"><div>قيمة المقايسة<b>${fmt(con)}</b></div><div>المنفذ<b>${fmt(exeV)}</b><small>${con?Math.round(exeV/con*1000)/10:0}% من المقايسة</small></div><div>المفروض يتصرف<b>${fmt(planT)}</b><small>المباشر من تحليل السعر × المنفذ</small></div><div>اتصرف (مسجّل + موزّع)<b>${fmt(totT)}</b><small>مسجّل ${fmt(regT)} · موزّع ${fmt(distT)}${cert?' · لحد '+esc(ocDmy(cert.data.date)):''}</small></div><div class="st-${st.c}">الفرق<b>${crSg(r2(planT-totT))}</b><small>${crPc(st.d)} · ${st.t}</small></div><div>الضريبة المستحقة<b>${fmt(T('tax'))}</b><small>${tp}% من المنفذ قبل الخصومات</small></div></div>
+   <div class="crk"><div>قيمة المقايسة<b>${fmt(con)}</b></div><div>المنفذ<b>${fmt(exeV)}</b><small>${con?Math.round(exeV/con*1000)/10:0}% من المقايسة</small></div><div>المفروض يتصرف<b>${fmt(planT)}</b><small>المباشر من تحليل السعر × المنفذ</small></div><div>اتصرف (مسجّل + موزّع)<b>${fmt(totT)}</b><small>مسجّل ${fmt(regT)} · موزّع ${fmt(distT)}${cert?' · لحد '+esc(ocDmy(cert.data.date)):''}</small></div><div class="st-${st.c}">الفرق<b>${crSg(r2(planT-totT))}</b><small>${crPc(st.d)} · ${st.t}${SN&&Math.abs(r2(totT-SN.tot))>1?' · اتغير '+crSg(r2(totT-SN.tot))+' عن وقت الاعتماد':''}</small></div><div>الضريبة المستحقة<b>${fmt(T('tax'))}</b><small>${tp}% من المنفذ قبل الخصومات</small></div></div>
    <div class="crl"><span class="st-g">🟢 وفر أكتر من 2%</span><span class="st-y">🟡 زي الدراسة (±2%)</span><span class="st-r">🔴 زيادة أكتر من 2%</span><span>المفروض = المباشر من تحليل السعر × المنفذ (من غير الأوفر هيد والضريبة) · اضغط على البند تفتح بطاقته</span></div>
    <div class="tbl-wrap"><table class="cr-t crn"><thead><tr><th>البند</th><th class="num">المقايسة</th><th class="num">المنفذ</th><th class="num">المفروض يتصرف</th><th class="num">المسجّل</th><th class="num">الموزّع</th><th class="num">الإجمالي</th><th class="num">الفرق</th><th>الحالة</th><th class="num">المتوقع عند النهاية</th></tr></thead><tbody>${ord.map(row).join('')}</tbody>
    <tfoot><tr class="st-${st.c}"><td>الإجمالي</td><td class="num">${fmt(con)}</td><td class="num">${fmt(exeV)}</td><td class="num">${fmt(planT)}</td><td class="num">${fmt(regT)}</td><td class="num">${fmt(distT)}</td><td class="num">${fmt(totT)}</td><td class="num dif">${crSg(r2(planT-totT))}<small>${crPc(st.d)}</small></td><td class="stc">${st.t}</td><td class="num">${fmt(r2(RR.reduce((a,R)=>a+(R.fc!=null?R.fc:0),0)))}</td></tr></tfoot></table></div>
+   <p class="note">${PV?'↑↓ مقارنة بمستخلص '+esc(String(PV.no))+(PV.snap?' (من صورة الاعتماد)':' (بأرقام النهارده)')+' · ':''}${SN?'صورة الاعتماد لمستخلص '+esc(String(cert.data.no||''))+': '+esc(stamp(SN.at))+(SN.by?' — '+esc(SN.by):'')+' <button type="button" class="linkish" data-cr="snapnow">تحديث الصورة</button>':cert&&cert.data.status==='approved'?'<button type="button" class="linkish" data-cr="snapnow">حفظ صورة الاعتماد</button>':''}</p>
+   ${crStockHTML(site,CK,SK,stkT)}
    ${cert?`<p class="note">${aftN>0.004?'+ مصروف بعد تاريخ المستخلص للمستخلص الجاي: <b>'+fmt(aftN)+'</b> (مش داخل في المقارنة)':''}</p>${crAfterHTML(site,cert)}`:''}
    <div class="row cr-acts"><button type="button" data-cr="rep1">تقرير التكاليف — الملخص</button><button type="button" data-cr="rep2">الملخص + بطاقات البنود</button><button type="button" data-cr="repxl">Excel</button></div>`}
+/* رصيد الخامات بالموقع (اختياري) */
+function crStockHTML(site,CK,SK,stkT){const P=crProj(site.id),v=(P&&P.data&&P.data.crStock)||{},B=CK.SH.B.filter(b=>b.alloc>0.004);if(!B.length)return '';
+  return `<details class="card" ${CR.stkOpen||v.on?'open':''} data-crstk><summary><b>رصيد الخامات بالموقع</b> <span class="note">${v.on?'مفعّل — اتخصم '+fmt(stkT)+' من الموزّع':'اختياري — مقفول'}</span></summary>
+   <p class="note">خامات اتوردت ولسه ما اتركبتش: قيمتها بتتخصم من «الموزّع» على البنود بنسبة نصيب كل بند، لحد ما تتركب. اكتب القيمة الموجودة في الموقع لكل خامة (من آخر جرد).</p>
+   <div class="cr-stk"><label class="chk"><input type="checkbox" id="cr_stkon" ${v.on?'checked':''}> خصم رصيد الخامات بالموقع</label>
+   ${B.map(b=>`<label>${esc(b.x.n)} <input class="w-n" inputmode="decimal" data-crstkv="${esc(b.x.id)}" value="${esc(String((v.v||{})[b.x.id]??''))}" placeholder="0"> <span class="note">من ${fmt(b.alloc)}</span></label>`).join('')}
+   <button type="button" class="primary" data-cr="stksave">حفظ</button></div></details>`}
 /* التقرير: طباعة / Excel */
 function crRepDoc(site,withCards){const cert=crCert(site.id),CK=crK(site.id,cert),RR=crRowsNew(site.id,CK,cert),T=k=>r2(RR.reduce((a,R)=>a+(R[k]||0),0)),planT=r2(RR.reduce((a,R)=>a+(R.plan||0),0)),st=crSt(planT,T('tot')),m=v=>fmt(v).replace(/[⁦⁩]/g,'');
-  const bg={g:'#eaf6ee',y:'#fff8e1',r:'#fdecec',n:'#fff'},ord=RR.slice().sort((a,b)=>(a.st.d==null?1e9:a.st.d)-(b.st.d==null?1e9:b.st.d));
+  const bg={g:'#e3f3e9',y:'#fdf3d4',r:'#fbe3e0',n:'#fff'},ord=RR.slice().sort((a,b)=>(a.st.d==null?1e9:a.st.d)-(b.st.d==null?1e9:b.st.d));
   let body=`<style>.crp td,.crp th{font-size:11px}.crp small{display:block;color:#555}.crp-k{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.crp-k div{border:1px solid #bbb;border-radius:6px;padding:5px 8px;font-size:11px}.crp-k b{display:block;font-size:14px}.crp-pb{page-break-before:always}</style>
    <div class="crp-k"><div>قيمة المقايسة<b>${m(T('contract'))}</b></div><div>المنفذ<b>${m(T('exeV'))}</b></div><div>المفروض يتصرف<b>${m(planT)}</b></div><div>اتصرف<b>${m(T('tot'))}</b>مسجّل ${m(T('reg'))} · موزّع ${m(T('dist'))}</div><div>الفرق<b>${crSg(r2(planT-T('tot'))).replace(/[⁦⁩]/g,'')}</b>${crPc(st.d)} · ${st.t}</div><div>الضريبة المستحقة<b>${m(T('tax'))}</b></div></div>
    <table class="crp"><thead><tr><th>البند</th><th>المقايسة</th><th>المنفذ</th><th>المفروض</th><th>المسجّل</th><th>الموزّع</th><th>الإجمالي</th><th>الفرق</th><th>الحالة</th><th>المتوقع عند النهاية</th></tr></thead><tbody>
@@ -2070,6 +2093,7 @@ function crRender(){
   const ss=$('#cr_site');if(ss)ss.onchange=()=>{CR.site=ss.value;CR.edit=null;CR.pick=null;render()};
   const so=$('#cr_oc');if(so)so.onchange=()=>{CR.oc[site.id]=so.value;render()};
   const ac=$('#cr_aftc');if(ac)ac.onchange=()=>{CR.aftC=ac.value;S.justSaved=true;render()};
+  if(cert&&cert.data&&cert.data.status==='approved'&&rows.length&&!crSnapOf(site.id,cert)&&navigator.onLine){CR._snapTry=CR._snapTry||{};if(!CR._snapTry[cert.id]){CR._snapTry[cert.id]=1;setTimeout(async()=>{try{if(crSnapOf(site.id,cert))return;const CK2=crK(site.id,cert),RR=crRowsNew(site.id,CK2,cert);if(await crSnapSave(site.id,cert,crSnapMake(RR,r2(RR.reduce((q,R)=>q+(R.plan||0),0)),r2(RR.reduce((q,R)=>q+R.tot,0)))))renderSoon()}catch(e){}},800)}}
   crBindForm();
 }
 document.addEventListener('click',ev=>{if(!ev.target.closest('[data-octpl]'))return;OC.tab='tpl';OC.te=null;S.sel='__ocert';S.justSaved=true;render();window.scrollTo({top:0})});
@@ -2201,6 +2225,9 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-cr
   if(a==='print'){CR.printing=crDoc(site);printReport('cost');return}
   if(a==='rep1'||a==='rep2'){CR.printing=crRepDoc(site,a==='rep2');printReport('cost');return}
   if(a==='repxl'){await crRepXl(site);return}
+  if(a==='snapnow'){const cert=crCert(site.id),CK=crK(site.id,cert),RR=crRowsNew(site.id,CK,cert);if(await crSnapSave(site.id,cert,crSnapMake(RR,r2(RR.reduce((q,R)=>q+(R.plan||0),0)),r2(RR.reduce((q,R)=>q+R.tot,0))))){flash('اتحفظت صورة مستخلص '+(cert.data.no||''));render()}return}
+  if(a==='stksave'){const P=crProj(site.id);if(!P)return;const v={};document.querySelectorAll('[data-crstkv]').forEach(i=>{const n=crN(i.value);if(n>0)v[i.dataset.crstkv]=n});const on=!!($('#cr_stkon')||{}).checked;CR.stkOpen=true;
+    if(await ocPut({...P,data:{...P.data,crStock:{on,v}}})){flash(on?'اتحفظ رصيد الخامات بالموقع واتخصم من الموزّع.':'اتحفظ — الخصم مقفول.');render()}return}
   if(a==='card'){if(ev.target.closest('a,input,select,.crcr button:not([data-cr="card"])'))return;CR.card=CR.card===b.dataset.id?'':b.dataset.id;S.justSaved=true;render();if(CR.card)setTimeout(()=>{const x=document.querySelector('.crcr');if(x)x.scrollIntoView({block:'nearest'})},40);return}
   if(a==='aftall'){const cert=crCert(site.id),fc=CR.aftC||'';CR.aftSel=new Set(crAfterList(site.id,cert).filter(e=>!fc||(e.contractor||'')===fc).map(e=>e.id));CR.aftOpen=true;S.justSaved=true;render();return}
   if(a==='aftnone'){CR.aftSel=new Set();CR.aftOpen=true;S.justSaved=true;render();return}
@@ -9545,7 +9572,7 @@ document.addEventListener('click',ev=>{const d=ev.target.closest('[data-rmenu]')
   if(d){const p=d.nextElementSibling,open=p&&p.hidden;all.forEach(x=>{x.hidden=true;const t=x.previousElementSibling;if(t)t.setAttribute('aria-expanded','false')});if(p&&open){p.hidden=false;d.setAttribute('aria-expanded','true')}return}
   if(!ev.target.closest('.rm-pop'))all.forEach(x=>{x.hidden=true});else setTimeout(()=>document.querySelectorAll('.rm-pop:not([hidden])').forEach(x=>{x.hidden=true}),0)},true);
 document.addEventListener('change',ev=>{const c=ev.target.closest&&ev.target.closest('[data-craft]');if(!c)return;const S2=CR.aftSel||(CR.aftSel=new Set());if(c.checked)S2.add(c.dataset.craft);else S2.delete(c.dataset.craft);CR.aftOpen=true;S.justSaved=true;render()});
-document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList){if(d.classList.contains('cr-old'))CR.oldOpen=d.open;if(d.classList.contains('cra'))CR.aftOpen=d.open;if(d.classList.contains('crh'))CR.hOpen=d.open}},true);
+document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.dataset&&d.dataset.crstk!==undefined)CR.stkOpen=d.open;if(d&&d.classList){if(d.classList.contains('cr-old'))CR.oldOpen=d.open;if(d.classList.contains('cra'))CR.aftOpen=d.open;if(d.classList.contains('crh'))CR.hOpen=d.open}},true);
 function uiGroupMenu(tm){
   const get=id=>tm.querySelector(`.site-btn[data-site="${id}"]`);for(const id of ['__ocert','__cost']){const x=get(id);if(x)x.remove()}
   for(const id of ['__contractors','__codes','__all']){const b=get(id);if(b)b.remove()}
